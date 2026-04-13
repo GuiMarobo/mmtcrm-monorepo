@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat    = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN        // Administrador - privilégios máximos
+  VENDEDOR     // Vendedor - negociações, orçamentos, clientes
+  ATENDENTE    // Atendente - atendimento e qualificação de leads
+  TECNICO      // Técnico - avaliação de dispositivos usados
+}
+
+enum UserStatus {
+  ATIVO
+  INATIVO
+}
+
+enum ClientStatus {
+  LEAD         // Lead - ainda não qualificado
+  ATIVO        // Cliente ativo com negociações
+  INATIVO      // Cliente sem atividade recente
+}
+
+model User {
+  id          Int     @id @default(autoincrement())
+  name        String
+  email       String     @unique
+  password    String     // Hash bcrypt
+  role        Role       @default(VENDEDOR)
+  status      UserStatus @default(ATIVO)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("users")
+}
