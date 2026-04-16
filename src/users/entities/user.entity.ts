@@ -1,6 +1,10 @@
 export class User {
-    id: number;
-    name: string;
-    email: string;
-    password: string;
+    id!: number;
+    name!: string;
+    email!: string;
+    password!: string;
+    role!: string;
+    status!: string;
+    createdAt!: Date;
+    updatedAt!: Date;
 }

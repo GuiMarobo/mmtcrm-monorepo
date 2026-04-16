@@ -1,77 +1,92 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ReplaceUserDto } from './dto/replace-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
-
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
+  private readonly userSelect = {
+    id: true,
+    name: true,
+    email: true,
+    role: true,
+    status: true,
+    createdAt: true,
+    updatedAt: true,
+  } as const;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
-    if (!createUserDto || !createUserDto.email) {
-      throw new BadRequestException('Request body must include a valid email');
+    const user = await this.prisma.user.findUnique({
+      where: { email: createUserDto.email },
+    });
+    if (user) {
+      throw new ConflictException('E-mail already exists');
     }
 
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: createUserDto.email
-      }
-    });
-    if (user){
-      throw new HttpException('E-mail already exists', HttpStatus.BAD_REQUEST);
-    }
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+
     return this.prisma.user.create({
-      data: createUserDto
+      data: {
+        name: createUserDto.name,
+        email: createUserDto.email,
+        password: hashedPassword,
+        role: createUserDto.role ?? 'VENDEDOR',
+        status: createUserDto.status ?? 'ATIVO',
+      },
+      select: this.userSelect,
     });
   }
 
+  async findByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+    });
+  }
 
   async findAll() {
-    return await this.prisma.user.findMany();
+    return this.prisma.user.findMany({
+      select: this.userSelect,
+    });
   }
 
   async findOne(id: number) {
     const user = await this.prisma.user.findUnique({
-      where: {
-        id
-      }
+      where: { id },
+      select: this.userSelect,
     });
     if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      throw new NotFoundException('User not found');
     }
     return user;
   }
 
   async replace(id: number, replaceUserDto: ReplaceUserDto) {
-    if (!replaceUserDto || !replaceUserDto.email || !replaceUserDto.name || !replaceUserDto.password) {
-      throw new BadRequestException('PUT requires all user fields: name, email, password');
-    }
-
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.user.findUnique({
       where: { id },
     });
     if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      throw new NotFoundException('User not found');
     }
 
     if (replaceUserDto.email !== user.email) {
-      const existingUser = await this.prisma.user.findFirst({
-        where: {
-          email: replaceUserDto.email,
-          NOT: { id }
-        }
-      });
-      if (existingUser) {
-        throw new HttpException('E-mail already exists', HttpStatus.BAD_REQUEST);
-      }
+      await this.checkEmail(replaceUserDto.email, id);
     }
 
-    return await this.prisma.user.update({
+    const hashedPassword = await bcrypt.hash(replaceUserDto.password, 10);
+
+    return this.prisma.user.update({
       where: { id },
-      data: replaceUserDto
+      data: {
+        name: replaceUserDto.name,
+        email: replaceUserDto.email,
+        password: hashedPassword,
+      },
+      select: this.userSelect,
     });
   }
 
@@ -80,43 +95,52 @@ export class UsersService {
       throw new BadRequestException('PATCH requires at least one field to update');
     }
 
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.user.findUnique({
       where: { id },
     });
     if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      throw new NotFoundException('User not found');
     }
 
     if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.prisma.user.findFirst({
-        where: {
-          email: updateUserDto.email,
-          NOT: { id }
-        }
-      });
-      if (existingUser) {
-        throw new HttpException('E-mail already exists', HttpStatus.BAD_REQUEST);
-      }
+      await this.checkEmail(updateUserDto.email, id);
     }
 
-    return await this.prisma.user.update({
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+    }
+
+    return this.prisma.user.update({
       where: { id },
-      data: updateUserDto
+      data: updateUserDto,
+      select: this.userSelect,
     });
   }
 
-
   async remove(id: number) {
-    try{
+    try {
       return await this.prisma.user.delete({
-        where: {
-          id
-        }
+        where: { id },
+        select: this.userSelect,
       });
     } catch (error) {
       if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
         throw new NotFoundException(`User with id ${id} not found`);
       }
+      throw error;
+    }
+  }
+
+  private async checkEmail(email: string, userId?: number) {
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        email,
+        NOT: userId ? { id: userId } : undefined,
+      },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('E-mail already exists');
     }
   }
 }
