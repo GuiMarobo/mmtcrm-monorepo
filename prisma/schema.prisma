@@ -26,6 +26,20 @@ enum ClientStatus {
   INATIVO      // Cliente sem atividade recente
 }
 
+enum LeadQualification {
+  NAO_QUALIFICADO
+  QUALIFICADO
+  ALTA_INTENCAO  // Alta intenção de compra
+}
+
+enum LeadOrigin {
+  WHATSAPP
+  INSTAGRAM
+  SITE
+  INDICACAO
+  OUTRO
+}
+
 model User {
   id          Int     @id @default(autoincrement())
   name        String
@@ -37,4 +51,27 @@ model User {
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model Client {
+  id              String             @id @default(uuid())
+  name            String
+  email           String?
+  phone           String?
+  cpf             String?            @unique
+  address         String?
+  status          ClientStatus       @default(LEAD)
+  qualification   LeadQualification  @default(NAO_QUALIFICADO)
+  origin          LeadOrigin?
+  notes           String?
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  lastContactAt   DateTime?          @map("last_contact_at")
+
+  // Relacionamentos
+  negotiations    Negotiation[]
+  quotations      Quotation[]
+  orders          Order[]
+
+    @@map("clients")
 }
