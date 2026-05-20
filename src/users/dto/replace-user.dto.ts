@@ -1,3 +1,21 @@
-import { CreateUserDto } from './create-user.dto';
+import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum } from 'class-validator';
+import { RoleEnum, UserStatusEnum } from './create-user.dto';
 
-export class ReplaceUserDto extends CreateUserDto {}
+export class ReplaceUserDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(8)
+  password!: string;
+
+  @IsEnum(RoleEnum)
+  role!: RoleEnum;
+
+  @IsEnum(UserStatusEnum)
+  status!: UserStatusEnum;
+}

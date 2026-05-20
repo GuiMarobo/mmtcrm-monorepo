@@ -6,6 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL)
 }
 
 enum Role {
@@ -67,11 +68,6 @@ model Client {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   lastContactAt   DateTime?          @map("last_contact_at")
-
-  // Relacionamentos
-  negotiations    Negotiation[]
-  quotations      Quotation[]
-  orders          Order[]
-
-    @@map("clients")
+  
+  @@map("clients")
 }

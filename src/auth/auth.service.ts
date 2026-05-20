@@ -1,33 +1,43 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
-import { UsersService } from '../users/users.service'
-import { LoginUserDto } from './dto/login-user.dto'
-import * as bcrypt from 'bcrypt'
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { UsersService } from '../users/users.service';
+import { LoginUserDto } from './dto/login-user.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async validateUser(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email)
+    const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('E-mail ou senha inválidos')
+      throw new UnauthorizedException('E-mail ou senha inválidos');
     }
 
-    const passwordMatches = await bcrypt.compare(password, user.password)
+    const passwordMatches = await bcrypt.compare(password, user.password);
     if (!passwordMatches) {
-      throw new UnauthorizedException('E-mail ou senha inválidos')
+      throw new UnauthorizedException('E-mail ou senha inválidos');
     }
 
     if (user.status !== 'ATIVO') {
-      throw new UnauthorizedException('Usuário inativo')
+      throw new UnauthorizedException('Usuário inativo');
     }
 
-    return user
+    return user;
   }
 
   async login(loginDto: LoginUserDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password)
-    const { password, ...publicUser } = user
-    return publicUser
+    const user = await this.validateUser(loginDto.email, loginDto.password);
+
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const { password, ...publicUser } = user;
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: publicUser,
+    };
   }
 }

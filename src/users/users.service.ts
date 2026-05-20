@@ -2,8 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { CreateUserDto } from './dto/create-user.dto';
 import { ReplaceUserDto } from './dto/replace-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from '../../src/prisma/prisma.service';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '../../generated/prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -85,6 +85,8 @@ export class UsersService {
         name: replaceUserDto.name,
         email: replaceUserDto.email,
         password: hashedPassword,
+        role: replaceUserDto.role,
+        status: replaceUserDto.status,
       },
       select: this.userSelect,
     });
@@ -124,7 +126,7 @@ export class UsersService {
         select: this.userSelect,
       });
     } catch (error) {
-      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         throw new NotFoundException(`User with id ${id} not found`);
       }
       throw error;
