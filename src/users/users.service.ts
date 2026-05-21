@@ -145,4 +145,33 @@ export class UsersService {
       throw new ConflictException('E-mail already exists');
     }
   }
+
+  async activate(id: number) {
+    await this.findOne(id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { status: 'ATIVO' },
+      select: this.userSelect,
+    });
+  }
+
+  async deactivate(id: number) {
+    await this.findOne(id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { status: 'INATIVO' },
+      select: this.userSelect,
+    });
+  }
+
+  async changePassword(id: number, newPassword: string) {
+    await this.findOne(id);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    return this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+      select: this.userSelect,
+    });
+  }
+
 }
