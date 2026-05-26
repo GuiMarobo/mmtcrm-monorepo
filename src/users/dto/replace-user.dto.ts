@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum, IsOptional } from 'class-validator';
 import { RoleEnum, UserStatusEnum } from './create-user.dto';
 
 export class ReplaceUserDto {
@@ -12,6 +12,10 @@ export class ReplaceUserDto {
   @IsString()
   @MinLength(8)
   password!: string;
+
+  @IsString()
+  @IsOptional()
+  phone?: string;
 
   @IsEnum(RoleEnum)
   role!: RoleEnum;

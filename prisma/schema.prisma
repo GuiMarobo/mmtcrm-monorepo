@@ -45,6 +45,7 @@ model User {
   name        String
   email       String     @unique
   password    String     // bcrypt
+  phone       String?
   role        Role       @default(VENDEDOR)
   status      UserStatus @default(ATIVO)
   createdAt   DateTime   @default(now()) @map("created_at")
