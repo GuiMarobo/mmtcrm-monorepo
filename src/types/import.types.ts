@@ -1,0 +1,18 @@
+/** Tipos espelhados de `ImportRowErrorDto`/`ImportReportDto` do backend. */
+
+export interface ImportRowError {
+  rowNumber: number
+  field?: string
+  message: string
+  rawData?: Record<string, string>
+}
+
+export interface ImportReport {
+  dryRun: boolean
+  totalRows: number
+  toCreate: number
+  skipped: number
+  failed: number
+  errors: ImportRowError[]
+  ignoredColumns: string[]
+}
