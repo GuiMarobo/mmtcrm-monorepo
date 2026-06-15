@@ -51,6 +51,8 @@ model User {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
+  negotiations Negotiation[]
+
   @@map("users")
 }
 
@@ -68,6 +70,55 @@ model Client {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   lastContactAt   DateTime?          @map("last_contact_at")
-  
+
+  negotiations    Negotiation[]
+
   @@map("clients")
+}
+
+enum NegotiationStatus {
+  ABERTA
+  GANHA
+  PERDIDA
+}
+
+enum OrderStatus {
+  EM_NEGOCIACAO
+  COMPRA_APROVADA
+  DESISTENCIA
+}
+
+model Negotiation {
+  id          Int               @id @default(autoincrement())
+  clientId    String            @map("client_id")
+  vendedorId  Int?              @map("vendedor_id")
+  status      NegotiationStatus @default(ABERTA)
+  totalValue  Decimal           @default(0) @map("total_value") @db.Decimal(12, 2)
+  notes       String?
+  closedAt    DateTime?         @map("closed_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vendedor User?  @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
+  order    Order?
+
+  @@index([clientId])
+  @@map("negotiations")
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  negotiationId Int         @unique @map("negotiation_id")
+  code          String
+  status        OrderStatus @default(EM_NEGOCIACAO)
+  paymentMethod String?     @map("payment_method")
+  totalValue    Decimal     @default(0) @map("total_value") @db.Decimal(12, 2)
+  notes         String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  negotiation Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+
+  @@map("orders")
 }

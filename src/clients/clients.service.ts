@@ -55,9 +55,42 @@ export class ClientsService {
   }
 
   async findAll() {
-    return this.prisma.client.findMany({
+    const clients = await this.prisma.client.findMany({
       select: this.clientSelect,
       orderBy: { createdAt: 'desc' },
+    });
+
+    const negotiations = await this.prisma.$queryRaw<
+      { client_id: string; count: number }[]
+    >`
+      SELECT client_id, COUNT(id)::int AS count
+      FROM negotiations
+      GROUP BY client_id
+    `;
+
+    const orders = await this.prisma.$queryRaw<
+      { client_id: string; orders_count: number; revenue: number }[]
+    >`
+      SELECT n.client_id,
+             COUNT(o.id)::int AS orders_count,
+             COALESCE(SUM(o.total_value), 0)::float8 AS revenue
+      FROM orders o
+      JOIN negotiations n ON n.id = o.negotiation_id
+      WHERE o.status = 'COMPRA_APROVADA'
+      GROUP BY n.client_id
+    `;
+
+    const negByClient = new Map(negotiations.map((row) => [row.client_id, row.count]));
+    const ordByClient = new Map(orders.map((row) => [row.client_id, row]));
+
+    return clients.map((client) => {
+      const ord = ordByClient.get(client.id);
+      return {
+        ...client,
+        negotiationsCount: negByClient.get(client.id) ?? 0,
+        ordersCount: ord ? ord.orders_count : 0,
+        revenue: ord ? ord.revenue : 0,
+      };
     });
   }
 
