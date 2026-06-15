@@ -1,6 +1,3 @@
-/* MMT Urbana CRM — Top bar */
-
-import { displayProfile } from '../utils/avatar'
 import type { AuthUser } from '../types'
 
 interface TopbarProps {
@@ -8,17 +5,12 @@ interface TopbarProps {
 }
 
 export function Topbar({ user }: TopbarProps) {
-  const profile = displayProfile(user.name, user.id)
   return (
     <div className="topbar">
-      <div style={{ marginLeft: 'auto' }}>
-        <div
-          className="avatar"
-          title={`${user.name} · ${user.email}`}
-          style={{ background: profile.color, color: '#fff' }}
-        >
-          {profile.initials}
-        </div>
+      <div className="topbar-actions">
+        <span style={{ fontWeight: 600, fontSize: 14 }} title={user.email}>
+          {user.name}
+        </span>
       </div>
     </div>
   )

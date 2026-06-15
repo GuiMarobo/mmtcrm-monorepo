@@ -1,5 +1,3 @@
-/* MMT Urbana CRM — Placeholder for screens not yet designed */
-
 interface PlaceholderProps {
   title: string
   hint: string

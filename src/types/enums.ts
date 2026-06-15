@@ -1,13 +1,3 @@
-/**
- * Enumerações de domínio espelhadas do backend (Prisma).
- *
- * Os valores aqui são exatamente as strings que a API aceita/retorna.
- * A camada de apresentação (components, badges, selects) consome `*_LABELS`
- * e `*_OPTIONS` para exibir rótulos em português sem acoplar o domínio à UI.
- */
-
-// ─── User ───────────────────────────────────────────────────────────────────
-
 export const ROLES = ['ADMIN', 'VENDEDOR', 'ATENDENTE', 'TECNICO'] as const
 export type Role = (typeof ROLES)[number]
 
@@ -33,8 +23,6 @@ export const USER_STATUS_LABELS: Record<UserStatus, string> = {
 
 export const USER_STATUS_OPTIONS: { value: UserStatus; label: string }[] =
   USER_STATUSES.map((v) => ({ value: v, label: USER_STATUS_LABELS[v] }))
-
-// ─── Client ─────────────────────────────────────────────────────────────────
 
 export const CLIENT_STATUSES = ['LEAD', 'ATIVO', 'INATIVO'] as const
 export type ClientStatus = (typeof CLIENT_STATUSES)[number]

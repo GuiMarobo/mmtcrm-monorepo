@@ -1,5 +1,3 @@
-/* MMT Urbana CRM — Sidebar navigation */
-
 import type { ReactNode } from 'react'
 import { I } from '../icons'
 import type { Route } from '../types'
@@ -8,7 +6,6 @@ interface NavEntry {
   id: Route
   label: string
   icon: ReactNode
-  badge?: string
 }
 
 interface NavGroup {
@@ -16,8 +13,6 @@ interface NavGroup {
   items: NavEntry[]
 }
 
-/** Grupos da sidebar.
- *  Itens condicionais (ex: Usuários — só ADMIN) são filtrados em runtime. */
 function buildGroups(canManageUsers: boolean): NavGroup[] {
   const groups: NavGroup[] = [
     {
@@ -68,26 +63,17 @@ export function Sidebar({ route, setRoute, canManageUsers, onLogout }: SidebarPr
           <div className="brand-sub">CRM Comercial</div>
         </div>
       </div>
-      <div className="org-switch">
-        <div className="org-mark">PR</div>
-        <div style={{ minWidth: 0 }}>
-          <div className="org-name">Loja State-CoWork</div>
-          <div className="org-meta">Londrina · Matriz</div>
-        </div>
-        <span className="chev">{I.chev}</span>
-      </div>
-      {groups.map((g) => (
-        <div className="nav-group" key={g.label}>
-          <div className="nav-label">{g.label}</div>
-          {g.items.map((it) => (
+      {groups.map((group) => (
+        <div className="nav-group" key={group.label}>
+          <div className="nav-label">{group.label}</div>
+          {group.items.map((item) => (
             <div
-              key={it.id}
-              className={'nav-item ' + (route === it.id ? 'active' : '')}
-              onClick={() => setRoute(it.id)}
+              key={item.id}
+              className={'nav-item ' + (route === item.id ? 'active' : '')}
+              onClick={() => setRoute(item.id)}
             >
-              <span className="nav-ico">{it.icon}</span>
-              <span>{it.label}</span>
-              {it.badge && <span className="nav-badge">{it.badge}</span>}
+              <span className="nav-ico">{item.icon}</span>
+              <span>{item.label}</span>
             </div>
           ))}
         </div>

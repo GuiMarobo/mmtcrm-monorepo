@@ -14,11 +14,6 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Provedor de token — função injetada pelo AuthContext para que o cliente
- * permaneça desacoplado do mecanismo de persistência (localStorage,
- * sessionStorage, cookie etc.).
- */
 type TokenProvider = () => string | null
 let getToken: TokenProvider = () => null
 let onUnauthorized: (() => void) | null = null
@@ -32,9 +27,7 @@ export function configureHttp(opts: {
 }
 
 interface RequestOptions {
-  /** Body JSON-serializável. Quando ausente, nenhum body é enviado. */
   body?: unknown
-  /** Quando `true`, não anexa Authorization (rota pública). */
   skipAuth?: boolean
 }
 
@@ -47,8 +40,6 @@ async function request<T>(
     Accept: 'application/json',
   }
 
-  // FormData precisa que o browser defina o Content-Type (com boundary).
-  // Outros bodies vão como JSON.
   const isFormData =
     typeof FormData !== 'undefined' && opts.body instanceof FormData
 
@@ -81,7 +72,6 @@ async function request<T>(
     onUnauthorized?.()
   }
 
-  // Sem corpo (204) — retorna `undefined as T`
   if (response.status === 204) {
     return undefined as T
   }

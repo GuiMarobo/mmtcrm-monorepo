@@ -1,19 +1,17 @@
-/* MMT Urbana CRM — App shell + roteamento */
-
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { I } from './icons'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 import { Placeholder } from './components/Placeholder'
+import { Toast } from './components/ui'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Clientes } from './pages/Clientes'
 import { Usuarios } from './pages/Usuarios'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { useToast } from './hooks/useToast'
 import type { Route } from './types'
 
-/** Root: encapsula a árvore com o AuthProvider. */
 export default function App() {
   return (
     <AuthProvider>
@@ -25,44 +23,22 @@ export default function App() {
 function AppRoot() {
   const { user, loading, logout } = useAuth()
   const [route, setRoute] = useState<Route>('dashboard')
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
-  const toastTimer = useRef<number | undefined>(undefined)
+  const toast = useToast()
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg)
-    window.clearTimeout(toastTimer.current)
-    toastTimer.current = window.setTimeout(() => setToastMsg(null), 2400)
-  }
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          height: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--text-3)',
-          fontSize: 14,
-        }}
-      >
-        Carregando…
-      </div>
-    )
-  }
-
+  if (loading) return <div className="app-loading">Carregando…</div>
   if (!user) return <Login />
 
-  // O acesso à tela de Usuários é restrito a ADMIN tanto na sidebar (oculta)
-  // quanto aqui (fallback para Dashboard caso o role mude em runtime).
   const canManageUsers = user.role === 'ADMIN'
   const safeRoute: Route = route === 'usuarios' && !canManageUsers ? 'dashboard' : route
 
   const pages: Record<Route, ReactNode> = {
-    dashboard: <Dashboard user={user} />,
-    clientes: <Clientes toast={showToast} />,
-    usuarios: canManageUsers
-      ? <Usuarios toast={showToast} />
-      : <Placeholder title="Acesso negado" hint="Apenas administradores podem gerenciar usuários." />,
+    dashboard: <Dashboard />,
+    clientes: <Clientes toast={toast.show} />,
+    usuarios: canManageUsers ? (
+      <Usuarios toast={toast.show} />
+    ) : (
+      <Placeholder title="Acesso negado" hint="Apenas administradores podem gerenciar usuários." />
+    ),
     negociacoes: <Placeholder title="Negociações" hint="Pipeline de vendas com trade-in." />,
     orcamentos: <Placeholder title="Orçamentos" hint="Simulador de orçamento e propostas." />,
     pedidos: <Placeholder title="Pedidos" hint="Gerenciamento de pedidos e entregas." />,
@@ -85,12 +61,7 @@ function AppRoot() {
         <Topbar user={user} />
         <div className="content">{pages[safeRoute]}</div>
       </div>
-      {toastMsg && (
-        <div className="toast">
-          {I.check}
-          <span>{toastMsg}</span>
-        </div>
-      )}
+      {toast.message && <Toast message={toast.message} />}
     </div>
   )
 }

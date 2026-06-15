@@ -1,12 +1,3 @@
-/**
- * AuthContext — fonte única de verdade para autenticação no frontend.
- *
- * Persiste token + usuário em `localStorage` (sessão lembrada) ou
- * `sessionStorage` (apenas para a aba atual), conforme o flag `remember` da
- * tela de login. Configura o cliente HTTP global injetando o provedor de
- * token e o callback de 401 (logout automático).
- */
-
 import {
   createContext,
   useCallback,
@@ -34,13 +25,11 @@ interface AuthContextValue {
   loading: boolean
   login: (payload: LoginPayload, remember: boolean) => Promise<AuthUser>
   logout: () => void
-  /** Atualiza o usuário em memória + storage (ex: após editar o próprio perfil). */
   setUser: (user: AuthUser) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-/** Lê uma sessão persistida, tentando local e depois session storage. */
 function readPersistedSession(): PersistedSession | null {
   for (const storage of [window.localStorage, window.sessionStorage]) {
     const token = storage.getItem(TOKEN_KEY)
@@ -69,11 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<PersistedSession | null>(null)
   const [loading, setLoading] = useState(true)
 
-  /** Ref garante que o `configureHttp` use sempre o token vigente. */
   const tokenRef = useRef<string | null>(null)
   tokenRef.current = session?.token ?? null
 
-  // Bootstrap: lê o storage e configura o http client uma única vez.
   useEffect(() => {
     const persisted = readPersistedSession()
     if (persisted) setSession(persisted)
@@ -85,8 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
   }, [])
 
-  // O HTTP client é configurado uma vez: a função tokenProvider lê o ref,
-  // então sempre devolve o valor atual sem reconfigurar a cada render.
   useEffect(() => {
     configureHttp({
       tokenProvider: () => tokenRef.current,
@@ -101,7 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (payload: LoginPayload, remember: boolean): Promise<AuthUser> => {
       const { access_token, user } = await authApi.login(payload)
       const storage = remember ? window.localStorage : window.sessionStorage
-      // Limpa o storage oposto para evitar dois tokens persistidos ao alternar.
       const other = remember ? window.sessionStorage : window.localStorage
       other.removeItem(TOKEN_KEY)
       other.removeItem(USER_KEY)

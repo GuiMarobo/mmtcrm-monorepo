@@ -1,4 +1,3 @@
-/** Rotas internas endereçáveis pela Sidebar. */
 export type Route =
   | 'dashboard'
   | 'negociacoes'

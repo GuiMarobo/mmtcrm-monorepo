@@ -1,12 +1,5 @@
-/** Tipos do domínio de Cliente/Lead, espelhando o que a API expõe. */
+import type { ClientStatus, LeadOrigin, LeadQualification } from './enums'
 
-import type {
-  ClientStatus,
-  LeadOrigin,
-  LeadQualification,
-} from './enums'
-
-/** Cliente/Lead retornado pela API. */
 export interface Client {
   id: string
   name: string
@@ -21,9 +14,11 @@ export interface Client {
   lastContactAt: string | null
   createdAt: string
   updatedAt: string
+  negotiationsCount: number
+  ordersCount: number
+  revenue: number
 }
 
-/** Payload para `POST /clients`. */
 export interface CreateClientPayload {
   name: string
   email?: string | null
@@ -36,5 +31,4 @@ export interface CreateClientPayload {
   notes?: string | null
 }
 
-/** Payload para `PATCH /clients/:id`. */
 export type UpdateClientPayload = Partial<CreateClientPayload>

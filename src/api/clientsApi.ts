@@ -48,11 +48,6 @@ export const clientsApi = {
     return http.patch<Client>(`/clients/${id}/deactivate`)
   },
 
-  /**
-   * Importa um CSV de clientes.
-   * `dryRun = true` → valida sem persistir.
-   * `dryRun = false` → executa de fato.
-   */
   importCsv(file: File, dryRun: boolean): Promise<ImportReport> {
     const formData = new FormData()
     formData.append('file', file)

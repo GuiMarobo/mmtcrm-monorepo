@@ -1,9 +1,6 @@
-/* MMT Urbana CRM — Icons (inline SVG components) */
-
 import type { ReactNode } from 'react'
 
 interface IconProps {
-  /** Either an SVG path `d` string or one or more raw SVG child elements. */
   d: string | ReactNode
   size?: number
   stroke?: number
@@ -27,7 +24,6 @@ export function Icon({ d, size = 18, stroke = 1.7, fill = 'none' }: IconProps) {
   )
 }
 
-/** Pre-built icon elements, keyed by name. */
 export const I = {
   dashboard: <Icon d={<><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>} />,
   deal: <Icon d={<><path d="M3 7h18" /><path d="M5 7l1.5 11a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2L19 7" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></>} />,

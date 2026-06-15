@@ -1,5 +1,3 @@
-/** Tipos espelhados de `ImportRowErrorDto`/`ImportReportDto` do backend. */
-
 export interface ImportRowError {
   rowNumber: number
   field?: string
