@@ -1,10 +1,10 @@
 import { plainToInstance } from 'class-transformer'
 import { validateSync, ValidationError } from 'class-validator'
-import { CreateClientDto } from '../../dto/create-client.dto'
+import { ImportClientRowDto } from '../dto/import-client-row.dto'
 
 export interface ParseSuccess {
   ok: true
-  data: CreateClientDto
+  data: ImportClientRowDto
 }
 
 export interface ParseFailure {
@@ -44,7 +44,7 @@ function flattenErrors(
 
 export function parseClientRow(row: Record<string, string>): ParseResult {
   const normalized = normalizeRow(row)
-  const dto = plainToInstance(CreateClientDto, normalized)
+  const dto = plainToInstance(ImportClientRowDto, normalized)
   const errors = validateSync(dto, { whitelist: true })
   if (errors.length > 0) {
     return { ok: false, errors: flattenErrors(errors) }

@@ -4,12 +4,12 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { parseClientRow } from './parsers/client-row.parser'
 import { ImportReportDto } from './dto/import-report.dto'
 import { ImportRowErrorDto } from './dto/import-row-error.dto'
-import { CreateClientDto } from '../dto/create-client.dto'
+import { ImportClientRowDto } from './dto/import-client-row.dto'
 
 interface QueuedRow {
   rowNumber: number
   rawData: Record<string, string>
-  dto: CreateClientDto
+  dto: ImportClientRowDto
 }
 
 const KNOWN_COLUMNS = new Set<string>([

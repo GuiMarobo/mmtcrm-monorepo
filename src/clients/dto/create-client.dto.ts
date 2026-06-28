@@ -31,13 +31,25 @@ export class CreateClientDto {
     @IsNotEmpty()
     name!: string;
 
+    @IsString()
+    @IsNotEmpty()
+    phone!: string;
+
+    @IsNotEmpty()
+    @IsEnum(LeadOriginEnum)
+    origin!: LeadOriginEnum;
+
+    @IsNotEmpty()
+    @IsEnum(ClientStatusEnum)
+    status!: ClientStatusEnum;
+
+    @IsNotEmpty()
+    @IsEnum(LeadQualificationEnum)
+    qualification!: LeadQualificationEnum;
+
     @IsEmail()
     @IsOptional()
     email?: string;
-
-    @IsString()
-    @IsOptional()
-    phone?: string;
 
     @IsString()
     @IsOptional()
@@ -46,18 +58,6 @@ export class CreateClientDto {
     @IsString()
     @IsOptional()
     address?: string;
-
-    @IsEnum(ClientStatusEnum)
-    @IsOptional()
-    status?: ClientStatusEnum;
-
-    @IsEnum(LeadQualificationEnum)
-    @IsOptional()
-    qualification?: LeadQualificationEnum;
-
-    @IsEnum(LeadOriginEnum)
-    @IsOptional()
-    origin?: LeadOriginEnum;
 
     @IsString()
     @IsOptional()
