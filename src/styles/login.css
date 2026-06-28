@@ -9,7 +9,6 @@
   overflow: hidden;
 }
 .login-left .brand { color: #fff; }
-.login-left .brand-mark { background: #fff; color: #0e1116; }
 .login-left .brand-sub { color: rgba(255, 255, 255, 0.6); }
 .login-pitch { margin-top: auto; max-width: 460px; }
 .login-pitch h2 { font-size: 36px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; }

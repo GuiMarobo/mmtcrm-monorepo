@@ -3,6 +3,7 @@ import { I } from '../../icons'
 import { ApiError } from '../../api'
 import { Button, Field, FieldRow, Modal } from '../ui'
 import { maskCpf, maskPhone, onlyDigits } from '../../utils/format'
+import { isValidCpf, isValidEmail, isValidPhone } from '../../utils/validators'
 import type { Client, ClientStatus, CreateClientPayload, LeadOrigin, LeadQualification } from '../../types'
 import {
   CLIENT_STATUS_OPTIONS,
@@ -64,12 +65,22 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const validate = (): string | null => {
+    if (!form.name.trim()) return 'Informe o nome do cliente.'
+    if (!form.phone) return 'Informe o telefone.'
+    if (!isValidPhone(form.phone)) return 'Telefone inválido — informe DDD + número.'
+    if (form.email && !isValidEmail(form.email)) return 'E-mail inválido.'
+    if (form.cpf && !isValidCpf(form.cpf)) return 'CPF inválido.'
+    return null
+  }
+
   const submit = async () => {
-    setError(null)
-    if (!form.name.trim()) {
-      setError('Informe o nome do cliente.')
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
       return
     }
+    setError(null)
     setSaving(true)
     try {
       await onSave(normalize(form))
@@ -97,8 +108,8 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
         </>
       }
     >
-      <Field label="Nome Completo">
-        <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ex: Mariana Souza" />
+      <Field label="Nome Completo" required>
+        <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ex.: João da Silva" />
       </Field>
       <FieldRow>
         <Field label="E-mail">
@@ -106,14 +117,14 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             type="email"
             value={form.email ?? ''}
             onChange={(e) => set('email', e.target.value)}
-            placeholder="email@exemplo.com"
+            placeholder="cliente@email.com"
           />
         </Field>
-        <Field label="Telefone">
+        <Field label="Telefone" required>
           <input
             value={maskPhone(form.phone)}
             onChange={(e) => set('phone', onlyDigits(e.target.value).slice(0, 11))}
-            placeholder="(11) 90000-0000"
+            placeholder="(00) 00000-0000"
             inputMode="numeric"
           />
         </Field>
@@ -127,7 +138,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             inputMode="numeric"
           />
         </Field>
-        <Field label="Canal de Origem">
+        <Field label="Canal de Origem" required>
           <select value={form.origin ?? 'WHATSAPP'} onChange={(e) => set('origin', e.target.value as LeadOrigin)}>
             {LEAD_ORIGIN_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -141,11 +152,11 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
         <input
           value={form.address ?? ''}
           onChange={(e) => set('address', e.target.value)}
-          placeholder="Rua, número — Cidade/UF"
+          placeholder="Rua, nº — Bairro, Cidade/UF"
         />
       </Field>
       <FieldRow>
-        <Field label="Status">
+        <Field label="Status" required>
           <select value={form.status ?? 'LEAD'} onChange={(e) => set('status', e.target.value as ClientStatus)}>
             {CLIENT_STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -154,7 +165,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             ))}
           </select>
         </Field>
-        <Field label="Qualificação">
+        <Field label="Qualificação" required>
           <select
             value={form.qualification ?? 'NAO_QUALIFICADO'}
             onChange={(e) => set('qualification', e.target.value as LeadQualification)}
@@ -167,7 +178,11 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
           </select>
         </Field>
       </FieldRow>
-      {error && <div className="form-error">{error}</div>}
+      {error && (
+        <div className="form-alert" role="alert">
+          {error}
+        </div>
+      )}
     </Modal>
   )
 }

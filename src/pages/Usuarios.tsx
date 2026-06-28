@@ -5,17 +5,18 @@ import { UserFormModal } from '../components/users/UserFormModal'
 import { UserRoleBadge, UserStatusBadge } from '../components/users/UserBadges'
 import {
   Button,
+  ConfirmDialog,
   Field,
   FilterPopover,
   Menu,
   MenuItem,
+  Pagination,
   SearchInput,
   Stat,
   StatGrid,
   TableCard,
   TableEmpty,
   TableError,
-  TableResult,
   TableToolbar,
 } from '../components/ui'
 import { downloadCsv } from '../utils/csv'
@@ -26,7 +27,7 @@ import { ROLE_OPTIONS, USER_STATUS_OPTIONS } from '../types'
 const COLUMN_COUNT = 6
 
 interface UsuariosProps {
-  toast: (msg: string) => void
+  toast: (msg: string, type?: 'success' | 'error') => void
 }
 
 export function Usuarios({ toast }: UsuariosProps) {
@@ -36,16 +37,34 @@ export function Usuarios({ toast }: UsuariosProps) {
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<'ALL' | Role>('ALL')
   const [statusFilter, setStatusFilter] = useState<'ALL' | UserStatus>('ALL')
+  const [draftRole, setDraftRole] = useState<'ALL' | Role>('ALL')
+  const [draftStatus, setDraftStatus] = useState<'ALL' | UserStatus>('ALL')
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const activeFiltersCount = (roleFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0)
 
+  const openFilters = () => {
+    setDraftRole(roleFilter)
+    setDraftStatus(statusFilter)
+    setFiltersOpen(true)
+  }
+
+  const applyFilters = () => {
+    setRoleFilter(draftRole)
+    setStatusFilter(draftStatus)
+    setFiltersOpen(false)
+  }
+
   const clearFilters = () => {
-    setRoleFilter('ALL')
-    setStatusFilter('ALL')
+    setDraftRole('ALL')
+    setDraftStatus('ALL')
   }
 
   const reload = async () => {
@@ -74,6 +93,14 @@ export function Usuarios({ toast }: UsuariosProps) {
       return matchesTerm && matchesRole && matchesStatus
     })
   }, [list, query, roleFilter, statusFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, roleFilter, statusFilter, pageSize])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const stats = useMemo(() => {
     const total = list.length
@@ -106,19 +133,22 @@ export function Usuarios({ toast }: UsuariosProps) {
       setList((prev) => prev.map((u) => (u.id === user.id ? updated : u)))
       toast(`${updated.name} ${updated.status === 'ATIVO' ? 'ativado' : 'desativado'}`)
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : 'Erro ao alterar status')
+      toast(err instanceof ApiError ? err.message : 'Erro ao alterar status', 'error')
     }
   }
 
-  const remover = async (user: User) => {
-    setMenuFor(null)
-    if (!window.confirm(`Excluir "${user.name}"? Esta ação não pode ser desfeita.`)) return
+  const confirmRemove = async () => {
+    if (!confirmDelete) return
+    setDeleting(true)
     try {
-      await usersApi.remove(user.id)
-      setList((prev) => prev.filter((u) => u.id !== user.id))
-      toast(`"${user.name}" removido`)
+      await usersApi.remove(confirmDelete.id)
+      setList((prev) => prev.filter((u) => u.id !== confirmDelete.id))
+      toast(`"${confirmDelete.name}" removido`)
+      setConfirmDelete(null)
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : 'Erro ao excluir usuário')
+      toast(err instanceof ApiError ? err.message : 'Erro ao excluir usuário', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -168,12 +198,13 @@ export function Usuarios({ toast }: UsuariosProps) {
           <FilterPopover
             open={filtersOpen}
             activeCount={activeFiltersCount}
-            onToggle={() => setFiltersOpen((v) => !v)}
+            onToggle={() => (filtersOpen ? setFiltersOpen(false) : openFilters())}
             onClose={() => setFiltersOpen(false)}
             onClear={clearFilters}
+            onApply={applyFilters}
           >
             <Field label="Perfil" inline>
-              <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as 'ALL' | Role)}>
+              <select value={draftRole} onChange={(e) => setDraftRole(e.target.value as 'ALL' | Role)}>
                 <option value="ALL">Todos</option>
                 {ROLE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -184,8 +215,8 @@ export function Usuarios({ toast }: UsuariosProps) {
             </Field>
             <Field label="Status" inline>
               <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'ALL' | UserStatus)}
+                value={draftStatus}
+                onChange={(e) => setDraftStatus(e.target.value as 'ALL' | UserStatus)}
               >
                 <option value="ALL">Todos</option>
                 {USER_STATUS_OPTIONS.map((o) => (
@@ -266,7 +297,14 @@ export function Usuarios({ toast }: UsuariosProps) {
                         <MenuItem icon={I.power} onClick={() => toggleStatus(u)}>
                           {u.status === 'ATIVO' ? 'Desativar' : 'Ativar'} usuário
                         </MenuItem>
-                        <MenuItem icon={I.trash} danger onClick={() => remover(u)}>
+                        <MenuItem
+                          icon={I.trash}
+                          danger
+                          onClick={() => {
+                            setConfirmDelete(u)
+                            setMenuFor(null)
+                          }}
+                        >
                           Excluir
                         </MenuItem>
                       </Menu>
@@ -291,6 +329,23 @@ export function Usuarios({ toast }: UsuariosProps) {
             setEditing(null)
           }}
           onSubmit={upsert}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Excluir usuário?"
+          description={
+            <>
+              Esta ação não pode ser desfeita. O usuário <b>{confirmDelete.name}</b> perderá o acesso
+              e será removido permanentemente.
+            </>
+          }
+          confirmLabel="Excluir usuário"
+          danger
+          loading={deleting}
+          onConfirm={confirmRemove}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
     </div>

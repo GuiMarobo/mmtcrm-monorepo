@@ -4,12 +4,16 @@ interface FieldProps {
   label: ReactNode
   children: ReactNode
   inline?: boolean
+  required?: boolean
 }
 
-export function Field({ label, children, inline = false }: FieldProps) {
+export function Field({ label, children, inline = false, required = false }: FieldProps) {
   return (
     <div className={inline ? 'field inline' : 'field'}>
-      <label>{label}</label>
+      <label>
+        {label}
+        {required && <span className="req"> *</span>}
+      </label>
       {children}
     </div>
   )

@@ -9,6 +9,7 @@ interface FilterPopoverProps {
   onToggle: () => void
   onClose: () => void
   onClear: () => void
+  onApply: () => void
   children: ReactNode
 }
 
@@ -18,6 +19,7 @@ export function FilterPopover({
   onToggle,
   onClose,
   onClear,
+  onApply,
   children,
 }: FilterPopoverProps) {
   const ref = useClickOutside<HTMLDivElement>(open, onClose)
@@ -32,10 +34,8 @@ export function FilterPopover({
         <div className="popover">
           {children}
           <div className="popover-actions">
-            <Button onClick={onClear} disabled={activeCount === 0}>
-              Limpar
-            </Button>
-            <Button variant="primary" onClick={onClose}>
+            <Button onClick={onClear}>Limpar</Button>
+            <Button variant="primary" onClick={onApply}>
               Aplicar
             </Button>
           </div>

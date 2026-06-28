@@ -7,17 +7,18 @@ import { ClientStatusBadge, ClientQualificationBadge } from '../components/clien
 import {
   Button,
   Checkbox,
+  ConfirmDialog,
   Field,
   FilterPopover,
   Menu,
   MenuItem,
+  Pagination,
   SearchInput,
   Stat,
   StatGrid,
   TableCard,
   TableEmpty,
   TableError,
-  TableResult,
   TableToolbar,
 } from '../components/ui'
 import { downloadCsv } from '../utils/csv'
@@ -32,7 +33,7 @@ import {
 const COLUMN_COUNT = 8
 
 interface ClientesProps {
-  toast: (msg: string) => void
+  toast: (msg: string, type?: 'success' | 'error') => void
 }
 
 export function Clientes({ toast }: ClientesProps) {
@@ -42,19 +43,37 @@ export function Clientes({ toast }: ClientesProps) {
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | ClientStatus>('ALL')
   const [qualificationFilter, setQualificationFilter] = useState<'ALL' | LeadQualification>('ALL')
+  const [draftStatus, setDraftStatus] = useState<'ALL' | ClientStatus>('ALL')
+  const [draftQualification, setDraftQualification] = useState<'ALL' | LeadQualification>('ALL')
   const [editing, setEditing] = useState<Client | null>(null)
   const [creating, setCreating] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<Client | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const activeFiltersCount =
     (statusFilter !== 'ALL' ? 1 : 0) + (qualificationFilter !== 'ALL' ? 1 : 0)
 
+  const openFilters = () => {
+    setDraftStatus(statusFilter)
+    setDraftQualification(qualificationFilter)
+    setFiltersOpen(true)
+  }
+
+  const applyFilters = () => {
+    setStatusFilter(draftStatus)
+    setQualificationFilter(draftQualification)
+    setFiltersOpen(false)
+  }
+
   const clearFilters = () => {
-    setStatusFilter('ALL')
-    setQualificationFilter('ALL')
+    setDraftStatus('ALL')
+    setDraftQualification('ALL')
   }
 
   const reload = async () => {
@@ -87,6 +106,14 @@ export function Clientes({ toast }: ClientesProps) {
       return matchesTerm && matchesStatus && matchesQualification
     })
   }, [list, query, statusFilter, qualificationFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, statusFilter, qualificationFilter, pageSize])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const stats = useMemo(() => {
     const total = list.length
@@ -124,7 +151,7 @@ export function Clientes({ toast }: ClientesProps) {
       setList((prev) => prev.map((c) => (c.id === client.id ? { ...c, ...updated } : c)))
       toast(`Lead "${updated.name}" qualificado`)
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : 'Erro ao qualificar lead')
+      toast(err instanceof ApiError ? err.message : 'Erro ao qualificar lead', 'error')
     }
   }
 
@@ -135,29 +162,38 @@ export function Clientes({ toast }: ClientesProps) {
       setList((prev) => prev.map((c) => (c.id === client.id ? { ...c, ...updated } : c)))
       toast(`Contato registrado com ${updated.name}`)
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : 'Erro ao registrar contato')
+      toast(err instanceof ApiError ? err.message : 'Erro ao registrar contato', 'error')
     }
   }
 
-  const remover = async (client: Client) => {
-    setMenuFor(null)
-    if (!window.confirm(`Excluir "${client.name}"? Esta ação não pode ser desfeita.`)) return
+  const confirmRemove = async () => {
+    if (!confirmDelete) return
+    setDeleting(true)
     try {
-      await clientsApi.remove(client.id)
-      setList((prev) => prev.filter((c) => c.id !== client.id))
+      await clientsApi.remove(confirmDelete.id)
+      setList((prev) => prev.filter((c) => c.id !== confirmDelete.id))
       setSelected((prev) => {
         const next = new Set(prev)
-        next.delete(client.id)
+        next.delete(confirmDelete.id)
         return next
       })
-      toast(`"${client.name}" removido`)
+      toast(`"${confirmDelete.name}" removido`)
+      setConfirmDelete(null)
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : 'Erro ao excluir cliente')
+      toast(err instanceof ApiError ? err.message : 'Erro ao excluir cliente', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
-  const allSelected = filtered.length > 0 && selected.size === filtered.length
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(filtered.map((c) => c.id)))
+  const allSelected = paged.length > 0 && paged.every((c) => selected.has(c.id))
+  const toggleAll = () =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      const allOnPage = paged.every((c) => next.has(c.id))
+      paged.forEach((c) => (allOnPage ? next.delete(c.id) : next.add(c.id)))
+      return next
+    })
   const toggleOne = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev)
@@ -247,14 +283,15 @@ export function Clientes({ toast }: ClientesProps) {
           <FilterPopover
             open={filtersOpen}
             activeCount={activeFiltersCount}
-            onToggle={() => setFiltersOpen((v) => !v)}
+            onToggle={() => (filtersOpen ? setFiltersOpen(false) : openFilters())}
             onClose={() => setFiltersOpen(false)}
             onClear={clearFilters}
+            onApply={applyFilters}
           >
             <Field label="Status" inline>
               <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'ALL' | ClientStatus)}
+                value={draftStatus}
+                onChange={(e) => setDraftStatus(e.target.value as 'ALL' | ClientStatus)}
               >
                 <option value="ALL">Todos</option>
                 {CLIENT_STATUS_OPTIONS.map((o) => (
@@ -266,8 +303,8 @@ export function Clientes({ toast }: ClientesProps) {
             </Field>
             <Field label="Qualificação" inline>
               <select
-                value={qualificationFilter}
-                onChange={(e) => setQualificationFilter(e.target.value as 'ALL' | LeadQualification)}
+                value={draftQualification}
+                onChange={(e) => setDraftQualification(e.target.value as 'ALL' | LeadQualification)}
               >
                 <option value="ALL">Todas</option>
                 {LEAD_QUALIFICATION_OPTIONS.map((o) => (
@@ -316,7 +353,7 @@ export function Clientes({ toast }: ClientesProps) {
               <TableEmpty colSpan={COLUMN_COUNT}>Nenhum cliente encontrado.</TableEmpty>
             )}
             {!loading &&
-              filtered.map((c) => (
+              paged.map((c) => (
                 <tr key={c.id}>
                   <td className="checkbox-col">
                     <Checkbox
@@ -365,7 +402,14 @@ export function Clientes({ toast }: ClientesProps) {
                       <MenuItem icon={I.phone} onClick={() => registrarContato(c)}>
                         Registrar contato
                       </MenuItem>
-                      <MenuItem icon={I.trash} danger onClick={() => remover(c)}>
+                      <MenuItem
+                        icon={I.trash}
+                        danger
+                        onClick={() => {
+                          setConfirmDelete(c)
+                          setMenuFor(null)
+                        }}
+                      >
                         Excluir
                       </MenuItem>
                     </Menu>
@@ -375,11 +419,13 @@ export function Clientes({ toast }: ClientesProps) {
           </tbody>
         </table>
 
-        <TableResult>
-          {filtered.length === 0
-            ? '0 contatos'
-            : `Mostrando 1–${filtered.length} de ${list.length} contatos`}
-        </TableResult>
+        <Pagination
+          page={currentPage}
+          pageSize={pageSize}
+          total={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </TableCard>
 
       {(creating || editing) && (
@@ -399,6 +445,23 @@ export function Clientes({ toast }: ClientesProps) {
           onImported={() => {
             void reload()
           }}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Excluir cliente?"
+          description={
+            <>
+              Esta ação não pode ser desfeita. O cliente <b>{confirmDelete.name}</b> será removido
+              permanentemente da base.
+            </>
+          }
+          confirmLabel="Excluir cliente"
+          danger
+          loading={deleting}
+          onConfirm={confirmRemove}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
     </div>

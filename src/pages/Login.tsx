@@ -38,7 +38,6 @@ export function Login() {
         <div className="login-orb b" />
         <div className="login-layer">
           <div className="brand">
-            <div className="brand-mark">M</div>
             <div>
               <div className="brand-name">MMT Urbana</div>
               <div className="brand-sub">CRM Comercial</div>

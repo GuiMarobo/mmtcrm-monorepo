@@ -23,7 +23,7 @@ export default function App() {
 function AppRoot() {
   const { user, loading, logout } = useAuth()
   const [route, setRoute] = useState<Route>('dashboard')
-  const toast = useToast()
+  const { toast, show } = useToast()
 
   if (loading) return <div className="app-loading">Carregando…</div>
   if (!user) return <Login />
@@ -33,9 +33,9 @@ function AppRoot() {
 
   const pages: Record<Route, ReactNode> = {
     dashboard: <Dashboard />,
-    clientes: <Clientes toast={toast.show} />,
+    clientes: <Clientes toast={show} />,
     usuarios: canManageUsers ? (
-      <Usuarios toast={toast.show} />
+      <Usuarios toast={show} />
     ) : (
       <Placeholder title="Acesso negado" hint="Apenas administradores podem gerenciar usuários." />
     ),
@@ -61,7 +61,7 @@ function AppRoot() {
         <Topbar user={user} />
         <div className="content">{pages[safeRoute]}</div>
       </div>
-      {toast.message && <Toast message={toast.message} />}
+      {toast && <Toast text={toast.text} type={toast.type} />}
     </div>
   )
 }

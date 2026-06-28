@@ -3,6 +3,7 @@ import { I } from '../../icons'
 import { ApiError } from '../../api'
 import { Button, Field, FieldRow, Modal } from '../ui'
 import { maskPhone, onlyDigits } from '../../utils/format'
+import { isValidEmail, isValidPhone } from '../../utils/validators'
 import type { CreateUserPayload, Role, UpdateUserPayload, User, UserStatus } from '../../types'
 import { ROLE_OPTIONS, USER_STATUS_OPTIONS } from '../../types'
 
@@ -57,6 +58,8 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
   const validate = (): string | null => {
     if (!form.name.trim()) return 'Informe o nome.'
     if (!form.email.trim()) return 'Informe o e-mail.'
+    if (!isValidEmail(form.email)) return 'E-mail inválido.'
+    if (form.phone && !isValidPhone(form.phone)) return 'Telefone inválido — informe DDD + número.'
     if (!isEdit || form.password) {
       if (form.password.length < 8) {
         return isEdit
@@ -122,29 +125,29 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
         </>
       }
     >
-      <Field label="Nome Completo">
-        <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ex: Fernanda Costa" />
+      <Field label="Nome Completo" required>
+        <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ex.: João da Silva" />
       </Field>
       <FieldRow>
-        <Field label="E-mail corporativo">
+        <Field label="E-mail corporativo" required>
           <input
             type="email"
             value={form.email}
             onChange={(e) => set('email', e.target.value)}
-            placeholder="nome@mmturbana.com.br"
+            placeholder="nome@mmturbana.com"
           />
         </Field>
         <Field label="Telefone">
           <input
             value={maskPhone(form.phone)}
             onChange={(e) => set('phone', onlyDigits(e.target.value).slice(0, 11))}
-            placeholder="(11) 90000-0000"
+            placeholder="(00) 00000-0000"
             inputMode="numeric"
           />
         </Field>
       </FieldRow>
       <FieldRow>
-        <Field label={isEdit ? 'Nova senha (opcional)' : 'Senha'}>
+        <Field label={isEdit ? 'Nova senha (opcional)' : 'Senha'} required={!isEdit}>
           <input
             type="password"
             value={form.password}
@@ -183,7 +186,11 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
           </select>
         </Field>
       </FieldRow>
-      {error && <div className="form-error">{error}</div>}
+      {error && (
+        <div className="form-alert" role="alert">
+          {error}
+        </div>
+      )}
     </Modal>
   )
 }

@@ -57,7 +57,6 @@ export function Sidebar({ route, setRoute, canManageUsers, onLogout }: SidebarPr
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">M</div>
         <div>
           <div className="brand-name">MMT Urbana</div>
           <div className="brand-sub">CRM Comercial</div>

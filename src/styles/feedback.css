@@ -1,9 +1,16 @@
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--text); color: #fff; padding: 10px 16px; border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); z-index: 100; font-size: 13px;
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 500;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md); z-index: 100;
 }
+.toast svg { width: 18px; height: 18px; flex-shrink: 0; }
+.toast-success svg { color: var(--green); }
+.toast-error { border-color: rgba(220, 38, 38, 0.45); }
+.toast-error svg { color: var(--red); }
 
 .placeholder {
   margin-top: 18px; padding: 60px; background: #fff;
