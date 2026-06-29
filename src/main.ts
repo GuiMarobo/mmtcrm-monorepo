@@ -20,7 +20,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('MMT Urbana CRM API')
-    .setDescription('API do sistema CRM da MMT Urbana — Revenda Apple')
+    .setDescription('API do sistema CRM da MMT Urbana - Revenda Apple')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

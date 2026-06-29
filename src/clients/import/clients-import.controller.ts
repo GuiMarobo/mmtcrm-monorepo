@@ -13,7 +13,7 @@ import { ImportReportDto } from './dto/import-report.dto'
 import { Roles } from '../../auth/decorators/roles.decorator'
 import { RoleEnum } from '../../users/dto/create-user.dto'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB — cobre CSVs com milhares de linhas
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB - cobre CSVs com milhares de linhas
 
 @ApiBearerAuth()
 @Roles(RoleEnum.ADMIN, RoleEnum.VENDEDOR, RoleEnum.ATENDENTE)
