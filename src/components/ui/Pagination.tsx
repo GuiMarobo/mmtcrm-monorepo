@@ -39,7 +39,7 @@ export function Pagination({
   return (
     <div className="pagination">
       <div className="result">
-        {total === 0 ? 'Nenhum registro' : `Mostrando ${from}–${to} de ${total}`}
+        {total === 0 ? 'Nenhum registro' : `Mostrando ${from}-${to} de ${total}`}
       </div>
       <div className="page-controls">
         <select

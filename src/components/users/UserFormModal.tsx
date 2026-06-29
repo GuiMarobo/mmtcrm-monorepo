@@ -59,7 +59,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
     if (!form.name.trim()) return 'Informe o nome.'
     if (!form.email.trim()) return 'Informe o e-mail.'
     if (!isValidEmail(form.email)) return 'E-mail inválido.'
-    if (form.phone && !isValidPhone(form.phone)) return 'Telefone inválido — informe DDD + número.'
+    if (form.phone && !isValidPhone(form.phone)) return 'Telefone inválido - informe DDD + número.'
     if (!isEdit || form.password) {
       if (form.password.length < 8) {
         return isEdit

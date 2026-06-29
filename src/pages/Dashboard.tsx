@@ -103,7 +103,7 @@ export function Dashboard() {
                         <div className="name">{c.name}</div>
                       </div>
                     </td>
-                    <td>{c.email ?? '—'}</td>
+                    <td>{c.email ?? '-'}</td>
                     <td>
                       <ClientStatusBadge status={c.status} />
                     </td>

@@ -10,13 +10,13 @@ import {
   FilterPopover,
   Menu,
   MenuItem,
-  Pagination,
   SearchInput,
   Stat,
   StatGrid,
   TableCard,
   TableEmpty,
   TableError,
+  TableResult,
   TableToolbar,
 } from '../components/ui'
 import { downloadCsv } from '../utils/csv'
@@ -231,7 +231,7 @@ export function Usuarios({ toast }: UsuariosProps) {
 
         {loadError && (
           <TableError>
-            {loadError} —{' '}
+            {loadError} -{' '}
             <a
               href="#"
               onClick={(e) => {
@@ -267,7 +267,7 @@ export function Usuarios({ toast }: UsuariosProps) {
                       <div className="cell-user">
                         <div>
                           <div className="name">{u.name}</div>
-                          <div className="sub">{maskPhone(u.phone) || '—'}</div>
+                          <div className="sub">{maskPhone(u.phone) || '-'}</div>
                         </div>
                       </div>
                     </td>
@@ -317,7 +317,7 @@ export function Usuarios({ toast }: UsuariosProps) {
         <TableResult>
           {filtered.length === 0
             ? '0 usuários'
-            : `Mostrando 1–${filtered.length} de ${list.length} usuários`}
+            : `Mostrando 1-${filtered.length} de ${list.length} usuários`}
         </TableResult>
       </TableCard>
 

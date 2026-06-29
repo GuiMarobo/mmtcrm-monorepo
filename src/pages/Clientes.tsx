@@ -319,7 +319,7 @@ export function Clientes({ toast }: ClientesProps) {
 
         {loadError && (
           <TableError>
-            {loadError} —{' '}
+            {loadError} -{' '}
             <a
               href="#"
               onClick={(e) => {
@@ -370,8 +370,8 @@ export function Clientes({ toast }: ClientesProps) {
                       </div>
                     </div>
                   </td>
-                  <td>{maskPhone(c.phone) || '—'}</td>
-                  <td>{c.origin ? LEAD_ORIGIN_LABELS[c.origin] : '—'}</td>
+                  <td>{maskPhone(c.phone) || '-'}</td>
+                  <td>{c.origin ? LEAD_ORIGIN_LABELS[c.origin] : '-'}</td>
                   <td>
                     <ClientStatusBadge status={c.status} />
                   </td>

@@ -68,7 +68,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
   const validate = (): string | null => {
     if (!form.name.trim()) return 'Informe o nome do cliente.'
     if (!form.phone) return 'Informe o telefone.'
-    if (!isValidPhone(form.phone)) return 'Telefone inválido — informe DDD + número.'
+    if (!isValidPhone(form.phone)) return 'Telefone inválido - informe DDD + número.'
     if (form.email && !isValidEmail(form.email)) return 'E-mail inválido.'
     if (form.cpf && !isValidCpf(form.cpf)) return 'CPF inválido.'
     return null
@@ -152,7 +152,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
         <input
           value={form.address ?? ''}
           onChange={(e) => set('address', e.target.value)}
-          placeholder="Rua, nº — Bairro, Cidade/UF"
+          placeholder="Rua, nº - Bairro, Cidade/UF"
         />
       </Field>
       <FieldRow>

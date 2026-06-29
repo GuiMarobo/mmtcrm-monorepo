@@ -205,7 +205,7 @@ function ReportView({ report, importing }: { report: ImportReport; importing: bo
             fontSize: 12.5,
           }}
         >
-          <b>Colunas ignoradas:</b> {report.ignoredColumns.join(', ')} — não fazem parte do cadastro
+          <b>Colunas ignoradas:</b> {report.ignoredColumns.join(', ')} - não fazem parte do cadastro
           de clientes e foram descartadas.
         </div>
       )}
@@ -228,7 +228,7 @@ function ReportView({ report, importing }: { report: ImportReport; importing: bo
                 {report.errors.map((e, i) => (
                   <tr key={i}>
                     <td>{e.rowNumber}</td>
-                    <td>{e.field ?? '—'}</td>
+                    <td>{e.field ?? '-'}</td>
                     <td>{e.message}</td>
                   </tr>
                 ))}
