@@ -45,8 +45,6 @@ export function Usuarios({ toast }: UsuariosProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
 
   const activeFiltersCount = (roleFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0)
 
@@ -94,13 +92,6 @@ export function Usuarios({ toast }: UsuariosProps) {
     })
   }, [list, query, roleFilter, statusFilter])
 
-  useEffect(() => {
-    setPage(1)
-  }, [query, roleFilter, statusFilter, pageSize])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const stats = useMemo(() => {
     const total = list.length

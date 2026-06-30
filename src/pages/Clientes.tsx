@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { I } from '../icons'
 import { ApiError, clientsApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
 import { ImportClientesModal } from '../components/clients/ImportClientesModal'
 import { ClientFormModal } from '../components/clients/ClientFormModal'
 import { ClientStatusBadge, ClientQualificationBadge } from '../components/clients/ClientBadges'
@@ -21,12 +22,14 @@ import {
   TableError,
   TableToolbar,
 } from '../components/ui'
-import { downloadCsv } from '../utils/csv'
+import { downloadClientesXlsx } from '../utils/xlsx'
 import { formatCurrency, formatDate, maskCpf, maskPhone } from '../utils/format'
 import type { Client, ClientStatus, CreateClientPayload, LeadQualification } from '../types'
 import {
+  CLIENT_STATUS_LABELS,
   CLIENT_STATUS_OPTIONS,
   LEAD_ORIGIN_LABELS,
+  LEAD_QUALIFICATION_LABELS,
   LEAD_QUALIFICATION_OPTIONS,
 } from '../types'
 
@@ -37,6 +40,7 @@ interface ClientesProps {
 }
 
 export function Clientes({ toast }: ClientesProps) {
+  const { user } = useAuth()
   const [list, setList] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -51,6 +55,7 @@ export function Clientes({ toast }: ClientesProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [page, setPage] = useState(1)
@@ -202,30 +207,30 @@ export function Clientes({ toast }: ClientesProps) {
       return next
     })
 
-  const exportar = () => {
+  const exportar = async () => {
     if (filtered.length === 0) {
       toast('Nada para exportar com os filtros atuais.')
       return
     }
-    const today = new Date().toISOString().slice(0, 10)
-    downloadCsv<Client>({
-      rows: filtered,
-      filename: `clientes-${today}.csv`,
-      columns: [
-        'name',
-        'email',
-        'phone',
-        'cpf',
-        'address',
-        'status',
-        'qualification',
-        'origin',
-        'notes',
-        { key: 'lastContactAt', header: 'last_contact_at' },
-        { key: 'createdAt', header: 'created_at' },
-      ],
-    })
-    toast(`${filtered.length} contatos exportados`)
+    setExporting(true)
+    try {
+      const filtersApplied: string[] = []
+      if (query.trim()) filtersApplied.push(`Busca: "${query.trim()}"`)
+      if (statusFilter !== 'ALL') filtersApplied.push(`Status: ${CLIENT_STATUS_LABELS[statusFilter]}`)
+      if (qualificationFilter !== 'ALL') filtersApplied.push(`Qualificação: ${LEAD_QUALIFICATION_LABELS[qualificationFilter]}`)
+
+      await downloadClientesXlsx(filtered, {
+        exportedAt: new Date(),
+        exportedBy: user?.name ?? 'Desconhecido',
+        totalInSystem: list.length,
+        filtersApplied,
+      })
+      toast(`${filtered.length} clientes exportados em XLSX`)
+    } catch {
+      toast('Erro ao gerar o arquivo XLSX', 'error')
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -241,8 +246,8 @@ export function Clientes({ toast }: ClientesProps) {
           <Button icon={I.upload} onClick={() => setImporting(true)}>
             Importar
           </Button>
-          <Button icon={I.download} onClick={exportar}>
-            Exportar
+          <Button icon={I.download} onClick={() => void exportar()} disabled={exporting}>
+            {exporting ? 'Exportando…' : 'Exportar'}
           </Button>
           <Button variant="primary" icon={I.plus} onClick={() => setCreating(true)}>
             Novo cliente
