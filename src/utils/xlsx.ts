@@ -168,9 +168,11 @@ function buildResumoSheet(wb: ExcelJS.Workbook, rows: Client[], meta: ExportMeta
   const ticketMedio = ativos > 0
     ? rows.filter(c => c.status === 'ATIVO').reduce((s, c) => s + c.revenue, 0) / ativos
     : 0
-  const comEmail  = rows.filter(c => c.email).length
-  const semTel    = rows.filter(c => !c.phone).length
-  const indicados = rows.filter(c => c.origin === 'INDICACAO').length
+  const comEmail    = rows.filter(c => c.email).length
+  const comTelefone = rows.filter(c => c.phone).length
+  const comCpf      = rows.filter(c => c.cpf).length
+  const comEndereco = rows.filter(c => c.address).length
+  const indicados   = rows.filter(c => c.origin === 'INDICACAO').length
   const pct = (n: number) => total > 0 ? `${Math.round((n / total) * 100)}%` : '0%'
 
   section('Exportação')
@@ -186,6 +188,7 @@ function buildResumoSheet(wb: ExcelJS.Workbook, rows: Client[], meta: ExportMeta
   kv('Ativos', `${ativos} (${pct(ativos)})`)
   kv('Leads', `${leads} (${pct(leads)})`)
   kv('Inativos', `${inativos} (${pct(inativos)})`)
+  kv('Indicados', `${indicados} (${pct(indicados)})`)
 
   gap()
 
@@ -197,8 +200,9 @@ function buildResumoSheet(wb: ExcelJS.Workbook, rows: Client[], meta: ExportMeta
 
   section('Completude dos Dados')
   kv('Com e-mail', `${comEmail} (${pct(comEmail)})`)
-  kv('Sem telefone', `${semTel} (${pct(semTel)})`)
-  kv('Indicados', `${indicados} (${pct(indicados)})`)
+  kv('Com telefone', `${comTelefone} (${pct(comTelefone)})`)
+  kv('Com CPF', `${comCpf} (${pct(comCpf)})`)
+  kv('Com endereço', `${comEndereco} (${pct(comEndereco)})`)
 }
 
 export async function downloadClientesXlsx(rows: Client[], meta: ExportMeta): Promise<void> {
