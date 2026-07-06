@@ -46,9 +46,10 @@ model User {
   email       String     @unique
   password    String     // bcrypt
   phone       String?
-  role        Role       @default(VENDEDOR)
-  status      UserStatus @default(ATIVO)
-  createdAt   DateTime   @default(now()) @map("created_at")
+  role               Role       @default(VENDEDOR)
+  status             UserStatus @default(ATIVO)
+  mustChangePassword Boolean    @default(false) @map("must_change_password")
+  createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
   negotiations Negotiation[]

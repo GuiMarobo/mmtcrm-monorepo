@@ -15,6 +15,7 @@ export class UsersService {
     phone: true,
     role: true,
     status: true,
+    mustChangePassword: true,
     createdAt: true,
     updatedAt: true,
   } as const;
@@ -39,6 +40,7 @@ export class UsersService {
         phone: createUserDto.phone,
         role: createUserDto.role ?? 'VENDEDOR',
         status: createUserDto.status ?? 'ATIVO',
+        mustChangePassword: true,
       },
       select: this.userSelect,
     });
@@ -167,12 +169,18 @@ export class UsersService {
     });
   }
 
+  async verifyPassword(id: number, password: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) return false;
+    return bcrypt.compare(password, user.password);
+  }
+
   async changePassword(id: number, newPassword: string) {
     await this.findOne(id);
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     return this.prisma.user.update({
       where: { id },
-      data: { password: hashedPassword },
+      data: { password: hashedPassword, mustChangePassword: false },
       select: this.userSelect,
     });
   }

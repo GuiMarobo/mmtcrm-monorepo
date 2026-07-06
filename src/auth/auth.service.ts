@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { LoginUserDto } from './dto/login-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -32,12 +33,27 @@ export class AuthService {
   async login(loginDto: LoginUserDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { sub: user.id, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword };
     const { password, ...publicUser } = user;
 
     return {
       access_token: this.jwtService.sign(payload),
       user: publicUser,
+    };
+  }
+
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    const valid = await this.usersService.verifyPassword(userId, dto.currentPassword);
+    if (!valid) {
+      throw new UnauthorizedException('Senha atual incorreta');
+    }
+
+    const updatedUser = await this.usersService.changePassword(userId, dto.newPassword);
+    const payload = { sub: updatedUser.id, email: updatedUser.email, role: updatedUser.role, mustChangePassword: false };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: updatedUser,
     };
   }
 }

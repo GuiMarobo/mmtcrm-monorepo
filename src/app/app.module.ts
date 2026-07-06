@@ -7,6 +7,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ClientsModule } from '../clients/clients.module';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { MustChangePasswordGuard } from 'src/auth/guards/must-change-password.guard';
 
 @Module({
   imports: [UsersModule, AuthModule, ClientsModule],
@@ -20,6 +21,10 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: MustChangePasswordGuard,
     },
   ],
 })
