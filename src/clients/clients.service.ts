@@ -30,6 +30,35 @@ export class ClientsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private async metricsFor(clientId: string) {
+    const [neg] = await this.prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(id)::int AS count
+      FROM negotiations
+      WHERE client_id = ${clientId}
+    `;
+
+    const [ord] = await this.prisma.$queryRaw<
+      { orders_count: number; revenue: number }[]
+    >`
+      SELECT COUNT(o.id)::int AS orders_count,
+             COALESCE(SUM(o.total_value), 0)::float8 AS revenue
+      FROM orders o
+      JOIN negotiations n ON n.id = o.negotiation_id
+      WHERE n.client_id = ${clientId}
+        AND o.status = 'COMPRA_APROVADA'
+    `;
+
+    return {
+      negotiationsCount: neg?.count ?? 0,
+      ordersCount: ord?.orders_count ?? 0,
+      revenue: ord?.revenue ?? 0,
+    };
+  }
+
+  private async withMetrics<T extends { id: string }>(client: T) {
+    return { ...client, ...(await this.metricsFor(client.id)) };
+  }
+
   async create(dto: CreateClientDto) {
     if (dto.cpf) {
       const existing = await this.prisma.client.findUnique({
@@ -38,20 +67,22 @@ export class ClientsService {
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
 
-    return this.prisma.client.create({
+    const client = await this.prisma.client.create({
       data: {
         name: dto.name,
         email: dto.email,
         phone: dto.phone,
         cpf: dto.cpf,
         address: dto.address,
-        status: dto.status ?? 'LEAD',
-        qualification: dto.qualification ?? 'NAO_QUALIFICADO',
+        status: dto.status,
+        qualification: dto.qualification,
         origin: dto.origin,
         notes: dto.notes,
       },
       select: this.clientSelect,
     });
+
+    return { ...client, negotiationsCount: 0, ordersCount: 0, revenue: 0 };
   }
 
   async findAll() {
@@ -94,7 +125,7 @@ export class ClientsService {
     });
   }
 
-  async findOne(id: string) {
+  private async ensureExists(id: string) {
     const client = await this.prisma.client.findUnique({
       where: { id },
       select: this.clientSelect,
@@ -103,8 +134,12 @@ export class ClientsService {
     return client;
   }
 
+  async findOne(id: string) {
+    return this.withMetrics(await this.ensureExists(id));
+  }
+
   async replace(id: string, dto: ReplaceClientDto) {
-    await this.findOne(id);
+    await this.ensureExists(id);
 
     if (dto.cpf) {
       const existing = await this.prisma.client.findFirst({
@@ -113,7 +148,7 @@ export class ClientsService {
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
 
-    return this.prisma.client.update({
+    const client = await this.prisma.client.update({
       where: { id },
       data: {
         name: dto.name,
@@ -128,6 +163,8 @@ export class ClientsService {
       },
       select: this.clientSelect,
     });
+
+    return this.withMetrics(client);
   }
 
   async updatePartial(id: string, dto: UpdateClientDto) {
@@ -135,7 +172,14 @@ export class ClientsService {
       throw new BadRequestException('PATCH requer ao menos um campo');
     }
 
-    await this.findOne(id);
+    if ('name' in dto && !dto.name?.trim()) {
+      throw new BadRequestException('O nome não pode ficar em branco');
+    }
+    if ('phone' in dto && !dto.phone?.trim()) {
+      throw new BadRequestException('O telefone não pode ficar em branco');
+    }
+
+    await this.ensureExists(id);
 
     if (dto.cpf) {
       const existing = await this.prisma.client.findFirst({
@@ -144,60 +188,63 @@ export class ClientsService {
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
 
-    return this.prisma.client.update({
+    const client = await this.prisma.client.update({
       where: { id },
       data: dto,
       select: this.clientSelect,
     });
+
+    return this.withMetrics(client);
   }
 
   async remove(id: string) {
-    await this.findOne(id);
-    return this.prisma.client.delete({
-      where: { id },
-      select: this.clientSelect,
-    });
+    const client = await this.ensureExists(id);
+    await this.prisma.client.delete({ where: { id } });
+    return this.withMetrics(client);
   }
 
   async qualify(id: string, qualification: LeadQualificationEnum) {
-    await this.findOne(id);
-    return this.prisma.client.update({
+    await this.ensureExists(id);
+    const client = await this.prisma.client.update({
       where: { id },
       data: { qualification },
       select: this.clientSelect,
     });
+    return this.withMetrics(client);
   }
 
   async registerContact(id: string) {
-    await this.findOne(id);
-    return this.prisma.client.update({
+    await this.ensureExists(id);
+    const client = await this.prisma.client.update({
       where: { id },
       data: { lastContactAt: new Date() },
       select: this.clientSelect,
     });
+    return this.withMetrics(client);
   }
 
   async activate(id: string) {
-    await this.findOne(id);
-    return this.prisma.client.update({
+    await this.ensureExists(id);
+    const client = await this.prisma.client.update({
       where: { id },
       data: { status: 'ATIVO' },
       select: this.clientSelect,
     });
+    return this.withMetrics(client);
   }
 
   async deactivate(id: string) {
-    await this.findOne(id);
-    return this.prisma.client.update({
+    await this.ensureExists(id);
+    const client = await this.prisma.client.update({
       where: { id },
       data: { status: 'INATIVO' },
       select: this.clientSelect,
     });
+    return this.withMetrics(client);
   }
 
   async isLead(id: string) {
-    const client = await this.findOne(id);
+    const client = await this.ensureExists(id);
     return { isLead: client.status === 'LEAD' };
   }
-  
 }

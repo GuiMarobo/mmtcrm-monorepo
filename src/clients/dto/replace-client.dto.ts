@@ -6,13 +6,22 @@ export class ReplaceClientDto {
   @IsNotEmpty()
   name!: string;
 
+  @IsString()
+  @IsNotEmpty()
+  phone!: string;
+
+  @IsEnum(LeadOriginEnum)
+  origin!: LeadOriginEnum;
+
+  @IsEnum(ClientStatusEnum)
+  status!: ClientStatusEnum;
+
+  @IsEnum(LeadQualificationEnum)
+  qualification!: LeadQualificationEnum;
+
   @IsEmail()
   @IsOptional()
   email?: string;
-
-  @IsString()
-  @IsOptional()
-  phone?: string;
 
   @IsString()
   @IsOptional()
@@ -21,16 +30,6 @@ export class ReplaceClientDto {
   @IsString()
   @IsOptional()
   address?: string;
-
-  @IsEnum(ClientStatusEnum)
-  status!: ClientStatusEnum;
-
-  @IsEnum(LeadQualificationEnum)
-  qualification!: LeadQualificationEnum;
-
-  @IsEnum(LeadOriginEnum)
-  @IsOptional()
-  origin?: LeadOriginEnum;
 
   @IsString()
   @IsOptional()

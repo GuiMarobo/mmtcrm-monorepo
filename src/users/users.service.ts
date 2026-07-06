@@ -92,6 +92,7 @@ export class UsersService {
         phone: replaceUserDto.phone,
         role: replaceUserDto.role,
         status: replaceUserDto.status,
+        mustChangePassword: true,
       },
       select: this.userSelect,
     });
@@ -113,13 +114,15 @@ export class UsersService {
       await this.checkEmail(updateUserDto.email, id);
     }
 
+    const data: Prisma.UserUpdateInput = { ...updateUserDto };
     if (updateUserDto.password) {
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
+      data.password = await bcrypt.hash(updateUserDto.password, 10);
+      data.mustChangePassword = true;
     }
 
     return this.prisma.user.update({
       where: { id },
-      data: updateUserDto,
+      data,
       select: this.userSelect,
     });
   }
