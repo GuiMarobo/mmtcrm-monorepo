@@ -7,6 +7,7 @@ export interface User {
   phone: string | null
   role: Role
   status: UserStatus
+  mustChangePassword: boolean
   createdAt: string
   updatedAt: string
 }

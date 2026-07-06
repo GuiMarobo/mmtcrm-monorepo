@@ -48,14 +48,15 @@ function buildGroups(canManageUsers: boolean): NavGroup[] {
 interface SidebarProps {
   route: Route
   setRoute: (route: Route) => void
+  open: boolean
   canManageUsers: boolean
   onLogout: () => void
 }
 
-export function Sidebar({ route, setRoute, canManageUsers, onLogout }: SidebarProps) {
+export function Sidebar({ route, setRoute, open, canManageUsers, onLogout }: SidebarProps) {
   const groups = buildGroups(canManageUsers)
   return (
-    <aside className="sidebar">
+    <aside className={'sidebar' + (open ? ' open' : '')}>
       <div className="brand">
         <div>
           <div className="brand-name">MMT Urbana</div>

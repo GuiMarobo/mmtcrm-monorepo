@@ -11,6 +11,7 @@ export interface ImportReport {
   toCreate: number
   skipped: number
   failed: number
+  negotiationsCreated: number
   errors: ImportRowError[]
   ignoredColumns: string[]
 }

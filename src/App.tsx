@@ -5,6 +5,7 @@ import { Topbar } from './components/Topbar'
 import { Placeholder } from './components/Placeholder'
 import { Toast } from './components/ui'
 import { Login } from './pages/Login'
+import { ChangePassword } from './pages/ChangePassword'
 import { Dashboard } from './pages/Dashboard'
 import { Clientes } from './pages/Clientes'
 import { Usuarios } from './pages/Usuarios'
@@ -23,13 +24,20 @@ export default function App() {
 function AppRoot() {
   const { user, loading, logout } = useAuth()
   const [route, setRoute] = useState<Route>('dashboard')
+  const [menuOpen, setMenuOpen] = useState(false)
   const { toast, show } = useToast()
 
   if (loading) return <div className="app-loading">Carregando…</div>
   if (!user) return <Login />
+  if (user.mustChangePassword) return <ChangePassword />
 
   const canManageUsers = user.role === 'ADMIN'
   const safeRoute: Route = route === 'usuarios' && !canManageUsers ? 'dashboard' : route
+
+  const navigate = (next: Route) => {
+    setRoute(next)
+    setMenuOpen(false)
+  }
 
   const pages: Record<Route, ReactNode> = {
     dashboard: <Dashboard />,
@@ -47,18 +55,24 @@ function AppRoot() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={'app-shell' + (menuOpen ? ' menu-open' : '')}>
       <Sidebar
         route={safeRoute}
-        setRoute={setRoute}
+        setRoute={navigate}
+        open={menuOpen}
         canManageUsers={canManageUsers}
         onLogout={() => {
           logout()
-          setRoute('dashboard')
+          navigate('dashboard')
         }}
       />
+      <div
+        className="sidebar-scrim"
+        onClick={() => setMenuOpen(false)}
+        aria-hidden="true"
+      />
       <div className="main-col" data-screen-label={'App / ' + safeRoute}>
-        <Topbar user={user} />
+        <Topbar user={user} onMenuToggle={() => setMenuOpen((v) => !v)} />
         <div className="content">{pages[safeRoute]}</div>
       </div>
       {toast && <Toast text={toast.text} type={toast.type} />}

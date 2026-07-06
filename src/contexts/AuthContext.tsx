@@ -26,6 +26,7 @@ interface AuthContextValue {
   login: (payload: LoginPayload, remember: boolean) => Promise<AuthUser>
   logout: () => void
   setUser: (user: AuthUser) => void
+  refreshSession: (token: string, user: AuthUser) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -109,6 +110,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const refreshSession = useCallback((token: string, user: AuthUser) => {
+    const storage = window.localStorage.getItem(TOKEN_KEY)
+      ? window.localStorage
+      : window.sessionStorage
+    storage.setItem(TOKEN_KEY, token)
+    storage.setItem(USER_KEY, JSON.stringify(user))
+    setSession({ token, user })
+  }, [])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
@@ -117,8 +127,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       setUser: updateUser,
+      refreshSession,
     }),
-    [session, loading, login, logout, updateUser],
+    [session, loading, login, logout, updateUser, refreshSession],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -8,11 +8,20 @@ interface ModalProps {
   width?: number
   children: ReactNode
   footer?: ReactNode
+  closeOnBackdrop?: boolean
 }
 
-export function Modal({ title, subtitle, onClose, width = 560, children, footer }: ModalProps) {
+export function Modal({
+  title,
+  subtitle,
+  onClose,
+  width = 560,
+  children,
+  footer,
+  closeOnBackdrop = true,
+}: ModalProps) {
   return (
-    <div className="modal-scrim" onClick={onClose}>
+    <div className="modal-scrim" onClick={closeOnBackdrop ? onClose : undefined}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width }}>
         <div className="modal-head">
           <div className="modal-titles">

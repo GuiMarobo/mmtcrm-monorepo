@@ -11,6 +11,22 @@ interface ImportClientesModalProps {
   onImported: () => void
 }
 
+const REQUIRED_COLUMNS = ['Nome', 'Telefone ou CPF']
+
+const OPTIONAL_COLUMNS = [
+  'LTV',
+  'Endereço',
+  'Numero',
+  'Complemento',
+  'Bairro',
+  'Cidade',
+  'Estado',
+  'CEP',
+  'Data de Nascimento',
+  'Quem Indicou',
+  'Qtd Indicações',
+]
+
 export function ImportClientesModal({ onClose, onImported }: ImportClientesModalProps) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [file, setFile] = useState<File | null>(null)
@@ -69,10 +85,10 @@ export function ImportClientesModal({ onClose, onImported }: ImportClientesModal
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 720 }}>
         <div className="modal-head">
           <div className="modal-titles">
-            <div className="modal-title">Importar Clientes (CSV)</div>
+            <div className="modal-title">Importar Clientes</div>
             <div className="modal-sub">
-              Cabeçalho esperado: <code>name, email, phone, cpf, address, status, qualification,
-              origin, notes</code>. Apenas <code>name</code> é obrigatório.
+              Envie a planilha padrão da MMT Urbana em formato .csv. O arquivo é analisado antes de
+              salvar - nada é gravado sem a sua confirmação.
             </div>
           </div>
           <button className="row-action" onClick={onClose} aria-label="Fechar">
@@ -82,12 +98,15 @@ export function ImportClientesModal({ onClose, onImported }: ImportClientesModal
 
         <div className="modal-body">
           {(phase === 'idle' || phase === 'analyzing') && (
-            <Dropzone
-              fileInputRef={fileInputRef}
-              onFileChange={handleFileChange}
-              file={file}
-              busy={phase === 'analyzing'}
-            />
+            <>
+              <Dropzone
+                fileInputRef={fileInputRef}
+                onFileChange={handleFileChange}
+                file={file}
+                busy={phase === 'analyzing'}
+              />
+              <ColumnGuide />
+            </>
           )}
           {(phase === 'reviewing' || phase === 'importing') && report && (
             <ReportView report={report} importing={phase === 'importing'} />
@@ -133,6 +152,97 @@ export function ImportClientesModal({ onClose, onImported }: ImportClientesModal
   )
 }
 
+function ColumnGuide() {
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          padding: '10px 14px',
+          background: 'var(--gray-bg)',
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: 'var(--text-2)',
+        }}
+      >
+        Colunas reconhecidas
+      </div>
+      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <ColumnGroup
+          title="Obrigatórias"
+          hint="cada linha precisa do Nome e de ao menos um contato"
+          columns={REQUIRED_COLUMNS}
+          tone="required"
+        />
+        <ColumnGroup title="Opcionais" columns={OPTIONAL_COLUMNS} tone="optional" />
+      </div>
+      <div
+        style={{
+          padding: '10px 14px',
+          borderTop: '1px solid var(--border)',
+          fontSize: 12,
+          color: 'var(--text-3)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+        }}
+      >
+        <span>Linhas sem Telefone e sem CPF são ignoradas automaticamente.</span>
+        <span>Quando o LTV está preenchido, o cliente entra como Ativo com uma negociação fechada.</span>
+        <span>Colunas fora desta lista são descartadas e listadas no relatório.</span>
+      </div>
+    </div>
+  )
+}
+
+function ColumnGroup({
+  title,
+  hint,
+  columns,
+  tone,
+}: {
+  title: string
+  hint?: string
+  columns: string[]
+  tone: 'required' | 'optional'
+}) {
+  const chipStyle =
+    tone === 'required'
+      ? { background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid transparent' }
+      : { background: '#fff', color: 'var(--text-2)', border: '1px solid var(--border)' }
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+        {title}
+        {hint && <span style={{ fontWeight: 400, color: 'var(--text-3)' }}> - {hint}</span>}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {columns.map((col) => (
+          <span
+            key={col}
+            style={{
+              ...chipStyle,
+              padding: '3px 9px',
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {col}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 interface DropzoneProps {
   fileInputRef: React.RefObject<HTMLInputElement>
   onFileChange: (e: ChangeEvent<HTMLInputElement>) => void
@@ -163,7 +273,7 @@ function Dropzone({ fileInputRef, onFileChange, file, busy }: DropzoneProps) {
           {file ? file.name : 'Clique para selecionar um arquivo .csv'}
         </div>
         <div className="muted" style={{ fontSize: 12 }}>
-          Até 5 MB. UTF-8 recomendado.
+          Até 5 MB. Codificação UTF-8 recomendada.
         </div>
       </label>
       <input
@@ -187,17 +297,36 @@ function Dropzone({ fileInputRef, onFileChange, file, busy }: DropzoneProps) {
 function ReportView({ report, importing }: { report: ImportReport; importing: boolean }) {
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-        <SummaryCard label="Total" value={report.totalRows} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+        <SummaryCard label="Linhas lidas" value={report.totalRows} />
         <SummaryCard label="A criar" value={report.toCreate} tone="green" />
-        <SummaryCard label="Já existem" value={report.skipped} tone="amber" />
+        <SummaryCard label="Já cadastrados" value={report.skipped} tone="amber" />
         <SummaryCard label="Com erro" value={report.failed} tone="red" />
       </div>
+
+      {report.negotiationsCreated > 0 && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: '10px 12px',
+            background: 'var(--green-bg)',
+            color: 'var(--green)',
+            borderRadius: 8,
+            fontSize: 12.5,
+          }}
+        >
+          <b>{report.negotiationsCreated}</b>{' '}
+          {report.negotiationsCreated === 1
+            ? 'cliente com LTV vira negociação fechada'
+            : 'clientes com LTV viram negociações fechadas'}
+          .
+        </div>
+      )}
 
       {report.ignoredColumns.length > 0 && (
         <div
           style={{
-            marginTop: 12,
+            marginTop: 8,
             padding: '10px 12px',
             background: 'var(--amber-bg)',
             color: 'var(--amber)',
@@ -249,13 +378,27 @@ function ReportView({ report, importing }: { report: ImportReport; importing: bo
 
 function DoneView({ report }: { report: ImportReport }) {
   return (
-    <div style={{ textAlign: 'center', padding: '12px 0' }}>
-      <div style={{ fontSize: 28, marginBottom: 6 }}>✅</div>
+    <div style={{ textAlign: 'center', padding: '16px 0' }}>
+      <div
+        style={{
+          width: 48,
+          height: 48,
+          margin: '0 auto 10px',
+          borderRadius: '50%',
+          background: 'var(--green-bg)',
+          color: 'var(--green)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {I.check}
+      </div>
       <div style={{ fontSize: 16, fontWeight: 700 }}>Importação concluída</div>
       <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
         {report.toCreate} {report.toCreate === 1 ? 'cliente criado' : 'clientes criados'}
-        {report.skipped > 0 && ` · ${report.skipped} já existiam`}
-        {report.failed > 0 && ` · ${report.failed} com erro`}
+        {report.skipped > 0 && ` - ${report.skipped} já existiam`}
+        {report.failed > 0 && ` - ${report.failed} com erro`}
       </div>
     </div>
   )

@@ -38,6 +38,14 @@
 }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
+.field.has-error input, .field.has-error select, .field.has-error textarea {
+  border-color: var(--red);
+}
+.field.has-error input:focus, .field.has-error select:focus, .field.has-error textarea:focus {
+  border-color: var(--red); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+.field-error { color: var(--red); font-size: 12px; margin-top: -1px; }
+
 .form-error { color: var(--red); font-size: 12.5px; }
 .form-alert {
   margin-bottom: 10px; padding: 10px 12px;

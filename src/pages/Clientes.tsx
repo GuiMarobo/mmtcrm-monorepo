@@ -337,6 +337,7 @@ export function Clientes({ toast }: ClientesProps) {
           </TableError>
         )}
 
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr>
@@ -345,11 +346,11 @@ export function Clientes({ toast }: ClientesProps) {
               </th>
               <th>Nome</th>
               <th>Telefone</th>
-              <th>Forma de Contato</th>
+              <th className="col-md">Forma de Contato</th>
               <th>Status</th>
-              <th>Qualificação</th>
-              <th>Último Contato</th>
-              <th />
+              <th className="col-sm">Qualificação</th>
+              <th className="col-md">Último Contato</th>
+              <th className="col-actions" />
             </tr>
           </thead>
           <tbody>
@@ -376,15 +377,15 @@ export function Clientes({ toast }: ClientesProps) {
                     </div>
                   </td>
                   <td>{maskPhone(c.phone) || '-'}</td>
-                  <td>{c.origin ? LEAD_ORIGIN_LABELS[c.origin] : '-'}</td>
+                  <td className="col-md">{c.origin ? LEAD_ORIGIN_LABELS[c.origin] : '-'}</td>
                   <td>
                     <ClientStatusBadge status={c.status} />
                   </td>
-                  <td>
+                  <td className="col-sm">
                     <ClientQualificationBadge value={c.qualification} />
                   </td>
-                  <td>{formatDate(c.lastContactAt)}</td>
-                  <td style={{ position: 'relative', width: 48 }}>
+                  <td className="col-md">{formatDate(c.lastContactAt)}</td>
+                  <td className="col-actions">
                     <Menu
                       open={menuFor === c.id}
                       onToggle={() => setMenuFor((m) => (m === c.id ? null : c.id))}
@@ -423,6 +424,7 @@ export function Clientes({ toast }: ClientesProps) {
               ))}
           </tbody>
         </table>
+        </div>
 
         <Pagination
           page={currentPage}

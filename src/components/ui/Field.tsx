@@ -5,16 +5,21 @@ interface FieldProps {
   children: ReactNode
   inline?: boolean
   required?: boolean
+  error?: string | null
 }
 
-export function Field({ label, children, inline = false, required = false }: FieldProps) {
+export function Field({ label, children, inline = false, required = false, error }: FieldProps) {
+  const className = ['field', inline ? 'inline' : '', error ? 'has-error' : '']
+    .filter(Boolean)
+    .join(' ')
   return (
-    <div className={inline ? 'field inline' : 'field'}>
+    <div className={className}>
       <label>
         {label}
         {required && <span className="req"> *</span>}
       </label>
       {children}
+      {error && <div className="field-error">{error}</div>}
     </div>
   )
 }

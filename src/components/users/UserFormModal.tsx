@@ -45,9 +45,14 @@ interface UserFormModalProps {
   onSubmit: (user: User | null, payload: CreateUserPayload | UpdateUserPayload) => Promise<void>
 }
 
+type FieldKey = 'name' | 'email' | 'phone' | 'password' | 'confirm'
+
+const ALL_FIELDS: FieldKey[] = ['name', 'email', 'phone', 'password', 'confirm']
+
 export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
   const [form, setForm] = useState<FormState>(user ? toForm(user) : EMPTY_FORM)
   const [error, setError] = useState<string | null>(null)
+  const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [saving, setSaving] = useState(false)
   const isEdit = !!user
 
@@ -55,28 +60,51 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const validate = (): string | null => {
-    if (!form.name.trim()) return 'Informe o nome.'
-    if (!form.email.trim()) return 'Informe o e-mail.'
-    if (!isValidEmail(form.email)) return 'E-mail inválido.'
-    if (form.phone && !isValidPhone(form.phone)) return 'Telefone inválido - informe DDD + número.'
-    if (!isEdit || form.password) {
-      if (form.password.length < 8) {
-        return isEdit
-          ? 'A nova senha deve ter ao menos 8 caracteres.'
-          : 'A senha deve ter ao menos 8 caracteres.'
-      }
-      if (form.password !== form.confirm) return 'As senhas não conferem.'
+  const computeError = (key: FieldKey): string | undefined => {
+    switch (key) {
+      case 'name':
+        return form.name.trim() ? undefined : 'Informe o nome.'
+      case 'email':
+        if (!form.email.trim()) return 'Informe o e-mail.'
+        return isValidEmail(form.email) ? undefined : 'E-mail inválido.'
+      case 'phone':
+        return !form.phone || isValidPhone(form.phone)
+          ? undefined
+          : 'Telefone inválido - informe DDD + número.'
+      case 'password':
+        if (isEdit && !form.password) return undefined
+        return form.password.length >= 8
+          ? undefined
+          : isEdit
+            ? 'A nova senha deve ter ao menos 8 caracteres.'
+            : 'A senha deve ter ao menos 8 caracteres.'
+      case 'confirm':
+        if (isEdit && !form.password) return undefined
+        return form.password === form.confirm ? undefined : 'As senhas não conferem.'
     }
-    return null
+  }
+
+  const isComplete = (key: FieldKey): boolean => {
+    if (key === 'phone') return onlyDigits(form.phone).length >= 10
+    return false
+  }
+
+  const displayError = (key: FieldKey): string | undefined => {
+    if (!touched[key] && !isComplete(key)) return undefined
+    return computeError(key)
+  }
+
+  const handleBlur = (key: FieldKey) => {
+    setTouched((prev) => ({ ...prev, [key]: true }))
+  }
+
+  const validateAll = (): boolean => {
+    setTouched({ name: true, email: true, phone: true, password: true, confirm: true })
+    return ALL_FIELDS.every((key) => !computeError(key))
   }
 
   const submit = async () => {
-    const validationError = validate()
-    if (validationError) {
-      setError(validationError)
-      return
-    }
+    if (!validateAll()) return
     setError(null)
     setSaving(true)
     try {
@@ -114,6 +142,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
       subtitle="Defina credenciais, perfil de acesso e status."
       onClose={onClose}
       width={640}
+      closeOnBackdrop={false}
       footer={
         <>
           <Button onClick={onClose} disabled={saving}>
@@ -125,42 +154,51 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
         </>
       }
     >
-      <Field label="Nome Completo" required>
-        <input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Ex.: João da Silva" />
+      <Field label="Nome Completo" required error={displayError('name')}>
+        <input
+          value={form.name}
+          onChange={(e) => set('name', e.target.value)}
+          onBlur={() => handleBlur('name')}
+          placeholder="Ex.: João da Silva"
+        />
       </Field>
       <FieldRow>
-        <Field label="E-mail corporativo" required>
+        <Field label="E-mail corporativo" required error={displayError('email')}>
           <input
             type="email"
             value={form.email}
             onChange={(e) => set('email', e.target.value)}
+            onBlur={() => handleBlur('email')}
             placeholder="nome@mmturbana.com"
           />
         </Field>
-        <Field label="Telefone">
+        <Field label="Telefone" error={displayError('phone')}>
           <input
             value={maskPhone(form.phone)}
             onChange={(e) => set('phone', onlyDigits(e.target.value).slice(0, 11))}
+            onBlur={() => handleBlur('phone')}
             placeholder="(00) 00000-0000"
             inputMode="numeric"
           />
         </Field>
       </FieldRow>
       <FieldRow>
-        <Field label={isEdit ? 'Nova senha (opcional)' : 'Senha'} required={!isEdit}>
+        <Field label={isEdit ? 'Nova senha (opcional)' : 'Senha'} required={!isEdit} error={displayError('password')}>
           <input
             type="password"
             value={form.password}
             onChange={(e) => set('password', e.target.value)}
+            onBlur={() => handleBlur('password')}
             placeholder="Mín. 8 caracteres"
             autoComplete="new-password"
           />
         </Field>
-        <Field label="Confirmar Senha">
+        <Field label="Confirmar Senha" error={displayError('confirm')}>
           <input
             type="password"
             value={form.confirm}
             onChange={(e) => set('confirm', e.target.value)}
+            onBlur={() => handleBlur('confirm')}
             placeholder="Repita a senha"
             autoComplete="new-password"
           />

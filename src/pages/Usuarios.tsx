@@ -10,13 +10,13 @@ import {
   FilterPopover,
   Menu,
   MenuItem,
+  Pagination,
   SearchInput,
   Stat,
   StatGrid,
   TableCard,
   TableEmpty,
   TableError,
-  TableResult,
   TableToolbar,
 } from '../components/ui'
 import { downloadCsv } from '../utils/csv'
@@ -45,6 +45,8 @@ export function Usuarios({ toast }: UsuariosProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const activeFiltersCount = (roleFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0)
 
@@ -92,6 +94,13 @@ export function Usuarios({ toast }: UsuariosProps) {
     })
   }, [list, query, roleFilter, statusFilter])
 
+  useEffect(() => {
+    setPage(1)
+  }, [query, roleFilter, statusFilter, pageSize])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const stats = useMemo(() => {
     const total = list.length
@@ -235,15 +244,16 @@ export function Usuarios({ toast }: UsuariosProps) {
           </TableError>
         )}
 
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr>
               <th>Nome</th>
-              <th>E-mail</th>
+              <th className="col-sm">E-mail</th>
               <th>Perfil</th>
               <th>Status</th>
-              <th>Cadastro</th>
-              <th />
+              <th className="col-md">Cadastro</th>
+              <th className="col-actions" />
             </tr>
           </thead>
           <tbody>
@@ -252,7 +262,7 @@ export function Usuarios({ toast }: UsuariosProps) {
               <TableEmpty colSpan={COLUMN_COUNT}>Nenhum usuário encontrado.</TableEmpty>
             )}
             {!loading &&
-              filtered.map((u) => (
+              paged.map((u) => (
                   <tr key={u.id}>
                     <td>
                       <div className="cell-user">
@@ -262,15 +272,15 @@ export function Usuarios({ toast }: UsuariosProps) {
                         </div>
                       </div>
                     </td>
-                    <td>{u.email}</td>
+                    <td className="col-sm">{u.email}</td>
                     <td>
                       <UserRoleBadge role={u.role} />
                     </td>
                     <td>
                       <UserStatusBadge status={u.status} />
                     </td>
-                    <td>{formatDate(u.createdAt)}</td>
-                    <td style={{ position: 'relative', width: 48 }}>
+                    <td className="col-md">{formatDate(u.createdAt)}</td>
+                    <td className="col-actions">
                       <Menu
                         open={menuFor === u.id}
                         onToggle={() => setMenuFor((m) => (m === u.id ? null : u.id))}
@@ -304,12 +314,15 @@ export function Usuarios({ toast }: UsuariosProps) {
                 ))}
           </tbody>
         </table>
+        </div>
 
-        <TableResult>
-          {filtered.length === 0
-            ? '0 usuários'
-            : `Mostrando 1-${filtered.length} de ${list.length} usuários`}
-        </TableResult>
+        <Pagination
+          page={currentPage}
+          pageSize={pageSize}
+          total={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </TableCard>
 
       {(creating || editing) && (

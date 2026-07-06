@@ -80,14 +80,15 @@ export function Dashboard() {
           <div className="chart-title">Clientes recentes</div>
         </TableToolbar>
         {loadError && <TableError>{loadError}</TableError>}
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr>
               <th>Nome</th>
-              <th>E-mail</th>
+              <th className="col-sm">E-mail</th>
               <th>Status</th>
               <th className="num">Negociações</th>
-              <th>Cadastro</th>
+              <th className="col-md">Cadastro</th>
             </tr>
           </thead>
           <tbody>
@@ -103,18 +104,19 @@ export function Dashboard() {
                         <div className="name">{c.name}</div>
                       </div>
                     </td>
-                    <td>{c.email ?? '-'}</td>
+                    <td className="col-sm">{c.email ?? '-'}</td>
                     <td>
                       <ClientStatusBadge status={c.status} />
                     </td>
                     <td className="num">
                       <b>{c.negotiationsCount}</b>
                     </td>
-                    <td>{formatDate(c.createdAt)}</td>
+                    <td className="col-md">{formatDate(c.createdAt)}</td>
                   </tr>
                 ))}
           </tbody>
         </table>
+        </div>
       </TableCard>
     </div>
   )
