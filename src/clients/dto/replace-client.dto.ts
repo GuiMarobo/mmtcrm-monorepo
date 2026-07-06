@@ -1,9 +1,10 @@
-import { IsString, IsNotEmpty, IsEmail, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, IsOptional, IsEnum, Matches } from 'class-validator';
 import { ClientStatusEnum, LeadQualificationEnum, LeadOriginEnum } from './create-client.dto';
 
 export class ReplaceClientDto {
   @IsString()
   @IsNotEmpty()
+  @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
   name!: string;
 
   @IsString()

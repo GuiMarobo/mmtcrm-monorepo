@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum, IsOptional } from 'class-validator'
+import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum, IsOptional, Matches } from 'class-validator'
 
 export enum RoleEnum {
   ADMIN = 'ADMIN',
@@ -15,6 +15,7 @@ export enum UserStatusEnum {
 export class CreateUserDto {
     @IsString()
     @IsNotEmpty()
+    @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
     name!: string
 
     @IsEmail()

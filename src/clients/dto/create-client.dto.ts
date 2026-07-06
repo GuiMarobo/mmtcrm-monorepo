@@ -4,6 +4,7 @@ import {
     IsEmail,
     IsOptional,
     IsEnum,
+    Matches,
 } from 'class-validator';
 
 export enum ClientStatusEnum{
@@ -29,6 +30,7 @@ export enum LeadOriginEnum {
 export class CreateClientDto {
     @IsString()
     @IsNotEmpty()
+    @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
     name!: string;
 
     @IsString()
