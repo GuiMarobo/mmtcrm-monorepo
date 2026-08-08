@@ -34,3 +34,7 @@
 .confirm-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
 .confirm-text { margin-top: 8px; color: var(--text-2); font-size: 13.5px; line-height: 1.55; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.confirm-text p { margin: 0; }
+.confirm-text p + p { margin-top: 10px; }
+.confirm-text .erase-rule { color: var(--text-3); }
+.confirm-text .field { margin-top: 16px; margin-bottom: 0; }

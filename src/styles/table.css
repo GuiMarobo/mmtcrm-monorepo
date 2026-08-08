@@ -24,7 +24,7 @@
 .tbl .checkbox-col { width: 36px; padding-right: 0; }
 
 .cell-user { display: flex; align-items: center; gap: 10px; }
-.cell-user .name { font-weight: 600; color: var(--text); }
+.cell-user .name { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
 .cell-user .sub { color: var(--text-3); font-size: 12px; }
 
 .table-empty { padding: 24px; text-align: center; color: var(--text-3); }

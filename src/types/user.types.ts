@@ -10,6 +10,7 @@ export interface User {
   mustChangePassword: boolean
   createdAt: string
   updatedAt: string
+  anonymizedAt: string | null
 }
 
 export interface CreateUserPayload {

@@ -1,5 +1,5 @@
 import { http } from './http'
-import type { CreateUserPayload, UpdateUserPayload, User } from '../types'
+import type { CreateUserPayload, EraseResult, UpdateUserPayload, User } from '../types'
 
 export const usersApi = {
   list(): Promise<User[]> {
@@ -20,6 +20,10 @@ export const usersApi = {
 
   remove(id: number): Promise<User> {
     return http.delete<User>(`/users/${id}`)
+  },
+
+  erase(id: number, reason: string): Promise<EraseResult> {
+    return http.post<EraseResult>(`/users/${id}/erase`, { reason })
   },
 
   activate(id: number): Promise<User> {

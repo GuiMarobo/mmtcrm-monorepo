@@ -14,6 +14,7 @@ export interface Client {
   lastContactAt: string | null
   createdAt: string
   updatedAt: string
+  anonymizedAt: string | null
   negotiationsCount: number
   ordersCount: number
   revenue: number

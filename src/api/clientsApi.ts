@@ -2,6 +2,7 @@ import { http } from './http'
 import type {
   Client,
   CreateClientPayload,
+  EraseResult,
   ImportReport,
   LeadQualification,
   UpdateClientPayload,
@@ -30,6 +31,10 @@ export const clientsApi = {
 
   remove(id: string): Promise<Client> {
     return http.delete<Client>(`/clients/${id}`)
+  },
+
+  erase(id: string, reason: string): Promise<EraseResult> {
+    return http.post<EraseResult>(`/clients/${id}/erase`, { reason })
   },
 
   qualify(id: string, qualification: LeadQualification): Promise<Client> {

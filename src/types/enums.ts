@@ -76,3 +76,25 @@ export const LEAD_ORIGIN_LABELS: Record<LeadOrigin, string> = {
 
 export const LEAD_ORIGIN_OPTIONS: { value: LeadOrigin; label: string }[] =
   LEAD_ORIGINS.map((v) => ({ value: v, label: LEAD_ORIGIN_LABELS[v] }))
+
+export const ERASURE_SUBJECTS = ['CLIENTE', 'USUARIO'] as const
+export type ErasureSubject = (typeof ERASURE_SUBJECTS)[number]
+
+export const ERASURE_SUBJECT_LABELS: Record<ErasureSubject, string> = {
+  CLIENTE: 'Cliente',
+  USUARIO: 'Usuário',
+}
+
+export const ERASURE_SUBJECT_OPTIONS: { value: ErasureSubject; label: string }[] =
+  ERASURE_SUBJECTS.map((v) => ({ value: v, label: ERASURE_SUBJECT_LABELS[v] }))
+
+export const ERASURE_ACTIONS = ['ELIMINADO', 'ANONIMIZADO'] as const
+export type ErasureAction = (typeof ERASURE_ACTIONS)[number]
+
+export const ERASURE_ACTION_LABELS: Record<ErasureAction, string> = {
+  ELIMINADO: 'Eliminado',
+  ANONIMIZADO: 'Anonimizado',
+}
+
+export const ERASURE_ACTION_OPTIONS: { value: ErasureAction; label: string }[] =
+  ERASURE_ACTIONS.map((v) => ({ value: v, label: ERASURE_ACTION_LABELS[v] }))

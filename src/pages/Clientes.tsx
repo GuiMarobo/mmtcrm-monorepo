@@ -5,7 +5,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { ImportClientesModal } from '../components/clients/ImportClientesModal'
 import { ClientFormModal } from '../components/clients/ClientFormModal'
 import { ClientStatusBadge, ClientQualificationBadge } from '../components/clients/ClientBadges'
+import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
 import {
+  Badge,
   Button,
   Checkbox,
   ConfirmDialog,
@@ -58,6 +60,8 @@ export function Clientes({ toast }: ClientesProps) {
   const [exporting, setExporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [confirmErase, setConfirmErase] = useState<Client | null>(null)
+  const [erasing, setErasing] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -188,6 +192,25 @@ export function Clientes({ toast }: ClientesProps) {
       toast(err instanceof ApiError ? err.message : 'Erro ao excluir cliente', 'error')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const eraseData = async (reason: string) => {
+    if (!confirmErase) return
+    setErasing(true)
+    try {
+      const result = await clientsApi.erase(confirmErase.id, reason)
+      toast(
+        result.action === 'ELIMINADO'
+          ? `Dados de "${confirmErase.name}" eliminados do sistema`
+          : `Dados pessoais de "${confirmErase.name}" anonimizados; o histórico foi preservado`,
+      )
+      setConfirmErase(null)
+      await reload()
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Erro ao eliminar dados', 'error')
+    } finally {
+      setErasing(false)
     }
   }
 
@@ -371,7 +394,10 @@ export function Clientes({ toast }: ClientesProps) {
                   <td>
                     <div className="cell-user">
                       <div>
-                        <div className="name">{c.name}</div>
+                        <div className="name">
+                          {c.name}
+                          {c.anonymizedAt && <Badge tone="gray">Anonimizado</Badge>}
+                        </div>
                         {c.cpf && <div className="sub">CPF {maskCpf(c.cpf)}</div>}
                       </div>
                     </div>
@@ -391,23 +417,27 @@ export function Clientes({ toast }: ClientesProps) {
                       onToggle={() => setMenuFor((m) => (m === c.id ? null : c.id))}
                       onClose={() => setMenuFor(null)}
                     >
-                      <MenuItem
-                        icon={I.edit}
-                        onClick={() => {
-                          setEditing(c)
-                          setMenuFor(null)
-                        }}
-                      >
-                        Editar
-                      </MenuItem>
-                      {c.qualification === 'NAO_QUALIFICADO' && (
+                      {!c.anonymizedAt && (
+                        <MenuItem
+                          icon={I.edit}
+                          onClick={() => {
+                            setEditing(c)
+                            setMenuFor(null)
+                          }}
+                        >
+                          Editar
+                        </MenuItem>
+                      )}
+                      {!c.anonymizedAt && c.qualification === 'NAO_QUALIFICADO' && (
                         <MenuItem icon={I.star} onClick={() => qualificar(c)}>
                           Qualificar lead
                         </MenuItem>
                       )}
-                      <MenuItem icon={I.phone} onClick={() => registrarContato(c)}>
-                        Registrar contato
-                      </MenuItem>
+                      {!c.anonymizedAt && (
+                        <MenuItem icon={I.phone} onClick={() => registrarContato(c)}>
+                          Registrar contato
+                        </MenuItem>
+                      )}
                       <MenuItem
                         icon={I.trash}
                         danger
@@ -418,6 +448,18 @@ export function Clientes({ toast }: ClientesProps) {
                       >
                         Excluir
                       </MenuItem>
+                      {user?.role === 'ADMIN' && !c.anonymizedAt && (
+                        <MenuItem
+                          icon={I.shield}
+                          danger
+                          onClick={() => {
+                            setConfirmErase(c)
+                            setMenuFor(null)
+                          }}
+                        >
+                          Eliminar dados pessoais (LGPD)
+                        </MenuItem>
+                      )}
                     </Menu>
                   </td>
                 </tr>
@@ -469,6 +511,16 @@ export function Clientes({ toast }: ClientesProps) {
           loading={deleting}
           onConfirm={confirmRemove}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {confirmErase && (
+        <EraseDataDialog
+          subject="cliente"
+          name={confirmErase.name}
+          loading={erasing}
+          onConfirm={(reason) => void eraseData(reason)}
+          onCancel={() => setConfirmErase(null)}
         />
       )}
     </div>

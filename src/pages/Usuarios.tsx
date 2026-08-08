@@ -3,7 +3,10 @@ import { I } from '../icons'
 import { ApiError, usersApi } from '../api'
 import { UserFormModal } from '../components/users/UserFormModal'
 import { UserRoleBadge, UserStatusBadge } from '../components/users/UserBadges'
+import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
+import { useAuth } from '../contexts/AuthContext'
 import {
+  Badge,
   Button,
   ConfirmDialog,
   Field,
@@ -31,6 +34,7 @@ interface UsuariosProps {
 }
 
 export function Usuarios({ toast }: UsuariosProps) {
+  const { user: currentUser } = useAuth()
   const [list, setList] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -45,6 +49,8 @@ export function Usuarios({ toast }: UsuariosProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [confirmErase, setConfirmErase] = useState<User | null>(null)
+  const [erasing, setErasing] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -149,6 +155,25 @@ export function Usuarios({ toast }: UsuariosProps) {
       toast(err instanceof ApiError ? err.message : 'Erro ao excluir usuário', 'error')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const eraseData = async (reason: string) => {
+    if (!confirmErase) return
+    setErasing(true)
+    try {
+      const result = await usersApi.erase(confirmErase.id, reason)
+      toast(
+        result.action === 'ELIMINADO'
+          ? `Dados de "${confirmErase.name}" eliminados do sistema`
+          : `Dados pessoais de "${confirmErase.name}" anonimizados; o histórico de vendas foi preservado`,
+      )
+      setConfirmErase(null)
+      await reload()
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Erro ao eliminar dados', 'error')
+    } finally {
+      setErasing(false)
     }
   }
 
@@ -267,7 +292,10 @@ export function Usuarios({ toast }: UsuariosProps) {
                     <td>
                       <div className="cell-user">
                         <div>
-                          <div className="name">{u.name}</div>
+                          <div className="name">
+                            {u.name}
+                            {u.anonymizedAt && <Badge tone="gray">Anonimizado</Badge>}
+                          </div>
                           <div className="sub">{maskPhone(u.phone) || '-'}</div>
                         </div>
                       </div>
@@ -286,18 +314,22 @@ export function Usuarios({ toast }: UsuariosProps) {
                         onToggle={() => setMenuFor((m) => (m === u.id ? null : u.id))}
                         onClose={() => setMenuFor(null)}
                       >
-                        <MenuItem
-                          icon={I.edit}
-                          onClick={() => {
-                            setEditing(u)
-                            setMenuFor(null)
-                          }}
-                        >
-                          Editar
-                        </MenuItem>
-                        <MenuItem icon={I.power} onClick={() => toggleStatus(u)}>
-                          {u.status === 'ATIVO' ? 'Desativar' : 'Ativar'} usuário
-                        </MenuItem>
+                        {!u.anonymizedAt && (
+                          <MenuItem
+                            icon={I.edit}
+                            onClick={() => {
+                              setEditing(u)
+                              setMenuFor(null)
+                            }}
+                          >
+                            Editar
+                          </MenuItem>
+                        )}
+                        {!u.anonymizedAt && (
+                          <MenuItem icon={I.power} onClick={() => toggleStatus(u)}>
+                            {u.status === 'ATIVO' ? 'Desativar' : 'Ativar'} usuário
+                          </MenuItem>
+                        )}
                         <MenuItem
                           icon={I.trash}
                           danger
@@ -308,6 +340,18 @@ export function Usuarios({ toast }: UsuariosProps) {
                         >
                           Excluir
                         </MenuItem>
+                        {!u.anonymizedAt && u.id !== currentUser?.id && (
+                          <MenuItem
+                            icon={I.shield}
+                            danger
+                            onClick={() => {
+                              setConfirmErase(u)
+                              setMenuFor(null)
+                            }}
+                          >
+                            Eliminar dados pessoais (LGPD)
+                          </MenuItem>
+                        )}
                       </Menu>
                     </td>
                   </tr>
@@ -350,6 +394,16 @@ export function Usuarios({ toast }: UsuariosProps) {
           loading={deleting}
           onConfirm={confirmRemove}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {confirmErase && (
+        <EraseDataDialog
+          subject="usuário"
+          name={confirmErase.name}
+          loading={erasing}
+          onConfirm={(reason) => void eraseData(reason)}
+          onCancel={() => setConfirmErase(null)}
         />
       )}
     </div>
