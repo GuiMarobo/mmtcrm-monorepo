@@ -1,8 +1,13 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ReplaceUserDto } from './dto/replace-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from '../prisma/prisma.service';
+import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -18,13 +23,14 @@ export class UsersService {
     mustChangePassword: true,
     createdAt: true,
     updatedAt: true,
+    anonymizedAt: true,
   } as const;
 
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: createUserDto.email },
+    const user = await this.prisma.user.findFirst({
+      where: { ...NOT_DELETED, email: createUserDto.email },
     });
     if (user) {
       throw new ConflictException('E-mail already exists');
@@ -47,20 +53,28 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
+    return this.prisma.user.findFirst({
+      where: { ...NOT_DELETED, email },
     });
   }
 
   async findAll() {
     return this.prisma.user.findMany({
+      where: { ...NOT_DELETED },
+      select: this.userSelect,
+    });
+  }
+
+  async findActiveById(id: number) {
+    return this.prisma.user.findFirst({
+      where: { ...NOT_DELETED, id, status: 'ATIVO' },
       select: this.userSelect,
     });
   }
 
   async findOne(id: number) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+    const user = await this.prisma.user.findFirst({
+      where: { ...NOT_DELETED, id },
       select: this.userSelect,
     });
     if (!user) {
@@ -69,13 +83,18 @@ export class UsersService {
     return user;
   }
 
-  async replace(id: number, replaceUserDto: ReplaceUserDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
+  private async ensureEditable(id: number) {
+    const user = await this.findOne(id);
+    if (user.anonymizedAt) {
+      throw new ConflictException(
+        'Usuário com dados pessoais eliminados (LGPD) não pode ser alterado',
+      );
     }
+    return user;
+  }
+
+  async replace(id: number, replaceUserDto: ReplaceUserDto) {
+    const user = await this.ensureEditable(id);
 
     if (replaceUserDto.email !== user.email) {
       await this.checkEmail(replaceUserDto.email, id);
@@ -100,15 +119,12 @@ export class UsersService {
 
   async updatePartial(id: number, updateUserDto: UpdateUserDto) {
     if (!updateUserDto || Object.keys(updateUserDto).length === 0) {
-      throw new BadRequestException('PATCH requires at least one field to update');
+      throw new BadRequestException(
+        'PATCH requires at least one field to update',
+      );
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    const user = await this.ensureEditable(id);
 
     if (updateUserDto.email && updateUserDto.email !== user.email) {
       await this.checkEmail(updateUserDto.email, id);
@@ -128,22 +144,18 @@ export class UsersService {
   }
 
   async remove(id: number) {
-    try {
-      return await this.prisma.user.delete({
-        where: { id },
-        select: this.userSelect,
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        throw new NotFoundException(`User with id ${id} not found`);
-      }
-      throw error;
-    }
+    await this.findOne(id);
+    return this.prisma.user.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+      select: this.userSelect,
+    });
   }
 
   private async checkEmail(email: string, userId?: number) {
     const existingUser = await this.prisma.user.findFirst({
       where: {
+        ...NOT_DELETED,
         email,
         NOT: userId ? { id: userId } : undefined,
       },
@@ -155,7 +167,7 @@ export class UsersService {
   }
 
   async activate(id: number) {
-    await this.findOne(id);
+    await this.ensureEditable(id);
     return this.prisma.user.update({
       where: { id },
       data: { status: 'ATIVO' },
@@ -164,7 +176,7 @@ export class UsersService {
   }
 
   async deactivate(id: number) {
-    await this.findOne(id);
+    await this.ensureEditable(id);
     return this.prisma.user.update({
       where: { id },
       data: { status: 'INATIVO' },
@@ -173,13 +185,15 @@ export class UsersService {
   }
 
   async verifyPassword(id: number, password: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findFirst({
+      where: { ...NOT_DELETED, id },
+    });
     if (!user) return false;
     return bcrypt.compare(password, user.password);
   }
 
   async changePassword(id: number, newPassword: string) {
-    await this.findOne(id);
+    await this.ensureEditable(id);
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     return this.prisma.user.update({
       where: { id },
@@ -187,5 +201,4 @@ export class UsersService {
       select: this.userSelect,
     });
   }
-
 }

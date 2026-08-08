@@ -1,16 +1,19 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
-import { parse } from 'csv-parse/sync'
-import { ClientStatus, LeadQualification } from '../../../generated/prisma/client'
-import { PrismaService } from '../../prisma/prisma.service'
-import { parseClientRow } from './parsers/client-row.parser'
-import { ImportReportDto } from './dto/import-report.dto'
-import { ImportRowErrorDto } from './dto/import-row-error.dto'
-import { ImportClientRowDto } from './dto/import-client-row.dto'
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { parse } from 'csv-parse/sync';
+import {
+  ClientStatus,
+  LeadQualification,
+} from '../../../generated/prisma/client';
+import { NOT_DELETED, PrismaService } from '../../prisma/prisma.service';
+import { parseClientRow } from './parsers/client-row.parser';
+import { ImportReportDto } from './dto/import-report.dto';
+import { ImportRowErrorDto } from './dto/import-row-error.dto';
+import { ImportClientRowDto } from './dto/import-client-row.dto';
 
 interface QueuedRow {
-  rowNumber: number
-  rawData: Record<string, string>
-  dto: ImportClientRowDto
+  rowNumber: number;
+  rawData: Record<string, string>;
+  dto: ImportClientRowDto;
 }
 
 const KNOWN_COLUMNS = new Set<string>([
@@ -29,76 +32,81 @@ const KNOWN_COLUMNS = new Set<string>([
   'cidade',
   'estado',
   'pais',
-])
+]);
 
 @Injectable()
 export class ClientsImportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async importCsv(buffer: Buffer, dryRun: boolean): Promise<ImportReportDto> {
-    const records = this.parseCsv(buffer)
-    const ignoredColumns = this.extractIgnoredColumns(records)
+    const records = this.parseCsv(buffer);
+    const ignoredColumns = this.extractIgnoredColumns(records);
 
-    const errors: ImportRowErrorDto[] = []
-    const queued: QueuedRow[] = []
-    const cpfsInFile = new Set<string>()
-    let failedRows = 0
+    const errors: ImportRowErrorDto[] = [];
+    const queued: QueuedRow[] = [];
+    const cpfsInFile = new Set<string>();
+    let failedRows = 0;
 
     records.forEach((rawData, index) => {
-      const rowNumber = index + 5
+      const rowNumber = index + 5;
 
-      const result = parseClientRow(rawData)
+      const result = parseClientRow(rawData);
 
       if (!result.ok) {
-        failedRows++
+        failedRows++;
         result.errors.forEach((e) =>
-          errors.push({ rowNumber, field: e.field, message: e.message, rawData }),
-        )
-        return
+          errors.push({
+            rowNumber,
+            field: e.field,
+            message: e.message,
+            rawData,
+          }),
+        );
+        return;
       }
 
-      const cpf = result.data.cpf
+      const cpf = result.data.cpf;
       if (cpf && cpfsInFile.has(cpf)) {
-        failedRows++
+        failedRows++;
         errors.push({
           rowNumber,
           field: 'cpf',
           message: 'CPF duplicado no próprio arquivo',
           rawData,
-        })
-        return
+        });
+        return;
       }
-      if (cpf) cpfsInFile.add(cpf)
+      if (cpf) cpfsInFile.add(cpf);
 
-      queued.push({ rowNumber, rawData, dto: result.data })
-    })
+      queued.push({ rowNumber, rawData, dto: result.data });
+    });
 
     const cpfsToCheck = queued
       .map((r) => r.dto.cpf)
-      .filter((c): c is string => !!c)
+      .filter((c): c is string => !!c);
 
     const existing = cpfsToCheck.length
       ? await this.prisma.client.findMany({
-          where: { cpf: { in: cpfsToCheck } },
+          where: { ...NOT_DELETED, cpf: { in: cpfsToCheck } },
           select: { cpf: true },
         })
-      : []
+      : [];
     const existingCpfs = new Set(
       existing.map((c) => c.cpf).filter((c): c is string => !!c),
-    )
+    );
 
-    const toCreate: QueuedRow[] = []
-    let skipped = 0
+    const toCreate: QueuedRow[] = [];
+    let skipped = 0;
     queued.forEach((row) => {
       if (row.dto.cpf && existingCpfs.has(row.dto.cpf)) {
-        skipped++
-        return
+        skipped++;
+        return;
       }
-      toCreate.push(row)
-    })
+      toCreate.push(row);
+    });
 
-    const withLtv = toCreate.filter((r) => r.dto.ltv !== undefined)
-    const withoutLtv = toCreate.filter((r) => r.dto.ltv === undefined)
+    const withLtv = toCreate.filter((r) => r.dto.ltv !== undefined);
+    const withoutLtv = toCreate.filter((r) => r.dto.ltv === undefined);
 
     if (!dryRun && toCreate.length > 0) {
       await this.prisma.$transaction(async (tx) => {
@@ -106,7 +114,7 @@ export class ClientsImportService {
           await tx.client.createMany({
             data: withoutLtv.map((r) => this.toClientData(r.dto)),
             skipDuplicates: true,
-          })
+          });
         }
 
         if (withLtv.length > 0) {
@@ -135,9 +143,9 @@ export class ClientsImportService {
                 select: { id: true },
               }),
             ),
-          )
+          );
         }
-      })
+      });
     }
 
     return {
@@ -149,7 +157,7 @@ export class ClientsImportService {
       negotiationsCreated: dryRun ? 0 : withLtv.length,
       errors,
       ignoredColumns,
-    }
+    };
   }
 
   private toClientData(dto: ImportClientRowDto) {
@@ -160,25 +168,27 @@ export class ClientsImportService {
       cpf: dto.cpf,
       address: dto.address,
       status: (dto.status ?? 'LEAD') as ClientStatus,
-      qualification: (dto.qualification ?? 'NAO_QUALIFICADO') as LeadQualification,
+      qualification: (dto.qualification ??
+        'NAO_QUALIFICADO') as LeadQualification,
       origin: dto.origin,
       notes: dto.notes,
-    }
+    };
   }
 
   private parseCsv(buffer: Buffer): Record<string, string>[] {
     try {
       return parse(buffer, {
-        columns: (headers: string[]) => headers.map((h) => this.normalizeColumnName(h)),
+        columns: (headers: string[]) =>
+          headers.map((h) => this.normalizeColumnName(h)),
         trim: true,
         skip_empty_lines: true,
         bom: true,
         from_line: 4,
-      })
+      });
     } catch (err) {
       throw new BadRequestException(
         `CSV inválido: ${err instanceof Error ? err.message : 'erro desconhecido'}`,
-      )
+      );
     }
   }
 
@@ -188,31 +198,31 @@ export class ClientsImportService {
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
+      .trim();
 
     const map: Record<string, string> = {
-      'nome': 'nome',
-      'ltv': 'ltv',
+      nome: 'nome',
+      ltv: 'ltv',
       'data de nascimento': 'nascimento',
       'cpf cnpj': 'cpf',
-      'telefone': 'telefone',
+      telefone: 'telefone',
       'quem indicou': 'indicado_por',
       'qtd indicacoes': 'qtd_indicacoes',
-      'cep': 'cep',
-      'endereco': 'endereco',
-      'numero': 'numero',
-      'complemento': 'complemento',
-      'bairro': 'bairro',
-      'cidade': 'cidade',
-      'estado': 'estado',
-      'pais': 'pais',
-    }
+      cep: 'cep',
+      endereco: 'endereco',
+      numero: 'numero',
+      complemento: 'complemento',
+      bairro: 'bairro',
+      cidade: 'cidade',
+      estado: 'estado',
+      pais: 'pais',
+    };
 
-    return map[key] ?? key
+    return map[key] ?? key;
   }
 
   private extractIgnoredColumns(records: Record<string, string>[]): string[] {
-    if (records.length === 0) return []
-    return Object.keys(records[0]).filter((k) => !KNOWN_COLUMNS.has(k))
+    if (records.length === 0) return [];
+    return Object.keys(records[0]).filter((k) => !KNOWN_COLUMNS.has(k));
   }
 }

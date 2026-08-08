@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum, IsOptional, Matches } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsEmail,
+  MinLength,
+  IsEnum,
+  IsOptional,
+  Matches,
+} from 'class-validator';
 import { RoleEnum, UserStatusEnum } from './create-user.dto';
 
 export class ReplaceUserDto {

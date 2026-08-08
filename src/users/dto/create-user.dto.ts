@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsString, IsEmail, MinLength, IsEnum, IsOptional, Matches } from 'class-validator'
+import {
+  IsNotEmpty,
+  IsString,
+  IsEmail,
+  MinLength,
+  IsEnum,
+  IsOptional,
+  Matches,
+} from 'class-validator';
 
 export enum RoleEnum {
   ADMIN = 'ADMIN',
@@ -13,27 +21,27 @@ export enum UserStatusEnum {
 }
 
 export class CreateUserDto {
-    @IsString()
-    @IsNotEmpty()
-    @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
-    name!: string
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
+  name!: string;
 
-    @IsEmail()
-    email!: string
+  @IsEmail()
+  email!: string;
 
-    @IsString()
-    @MinLength(8)
-    password!: string
+  @IsString()
+  @MinLength(8)
+  password!: string;
 
-    @IsString()
-    @IsOptional()
-    phone?: string
+  @IsString()
+  @IsOptional()
+  phone?: string;
 
-    @IsEnum(RoleEnum)
-    @IsOptional()
-    role?: RoleEnum
+  @IsEnum(RoleEnum)
+  @IsOptional()
+  role?: RoleEnum;
 
-    @IsEnum(UserStatusEnum)
-    @IsOptional()
-    status?: UserStatusEnum
+  @IsEnum(UserStatusEnum)
+  @IsOptional()
+  status?: UserStatusEnum;
 }

@@ -17,8 +17,10 @@ export class AuthController {
 
   @SkipMustChangePassword()
   @Patch('change-password')
-  changePassword(@Req() req: { user: { id: number } }, @Body() dto: ChangePasswordDto) {
+  changePassword(
+    @Req() req: { user: { id: number } },
+    @Body() dto: ChangePasswordDto,
+  ) {
     return this.authService.changePassword(req.user.id, dto);
   }
 }
-

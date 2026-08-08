@@ -11,7 +11,7 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   const email = 'admin@mmturbana.com';
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findFirst({ where: { email, deletedAt: null } });
   if (existing) {
     console.log('Admin já existe:', email);
     return;

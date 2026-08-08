@@ -1,49 +1,56 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import {
   ClientStatusEnum,
   LeadOriginEnum,
   LeadQualificationEnum,
-} from '../../dto/create-client.dto'
+} from '../../dto/create-client.dto';
 
 export class ImportClientRowDto {
   @IsString()
   @IsNotEmpty()
-  name!: string
+  name!: string;
 
   @IsString()
   @IsOptional()
-  phone?: string
+  phone?: string;
 
   @IsString()
   @IsOptional()
-  email?: string
+  email?: string;
 
   @IsString()
   @IsOptional()
-  cpf?: string
+  cpf?: string;
 
   @IsString()
   @IsOptional()
-  address?: string
+  address?: string;
 
   @IsNumber()
   @Min(0.01)
   @IsOptional()
-  ltv?: number
+  ltv?: number;
 
   @IsEnum(ClientStatusEnum)
   @IsOptional()
-  status?: ClientStatusEnum
+  status?: ClientStatusEnum;
 
   @IsEnum(LeadQualificationEnum)
   @IsOptional()
-  qualification?: LeadQualificationEnum
+  qualification?: LeadQualificationEnum;
 
   @IsEnum(LeadOriginEnum)
   @IsOptional()
-  origin?: LeadOriginEnum
+  origin?: LeadOriginEnum;
 
   @IsString()
   @IsOptional()
-  notes?: string
+  notes?: string;
 }

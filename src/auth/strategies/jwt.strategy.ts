@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { UsersService } from '../../users/users.service';
 
 export interface JwtPayload {
   sub: number;
@@ -11,7 +12,7 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly usersService: UsersService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -19,7 +20,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: JwtPayload) {
-    return { id: payload.sub, email: payload.email, role: payload.role, mustChangePassword: payload.mustChangePassword ?? false };
+  async validate(payload: JwtPayload) {
+    const user = await this.usersService.findActiveById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('Usuário sem acesso ao sistema');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+    };
   }
 }

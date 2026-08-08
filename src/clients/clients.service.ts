@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { ReplaceClientDto } from './dto/replace-client.dto';
@@ -26,6 +26,7 @@ export class ClientsService {
     lastContactAt: true,
     createdAt: true,
     updatedAt: true,
+    anonymizedAt: true,
   } as const;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -35,6 +36,7 @@ export class ClientsService {
       SELECT COUNT(id)::int AS count
       FROM negotiations
       WHERE client_id = ${clientId}
+        AND deleted_at IS NULL
     `;
 
     const [ord] = await this.prisma.$queryRaw<
@@ -43,9 +45,10 @@ export class ClientsService {
       SELECT COUNT(o.id)::int AS orders_count,
              COALESCE(SUM(o.total_value), 0)::float8 AS revenue
       FROM orders o
-      JOIN negotiations n ON n.id = o.negotiation_id
+      JOIN negotiations n ON n.id = o.negotiation_id AND n.deleted_at IS NULL
       WHERE n.client_id = ${clientId}
         AND o.status = 'COMPRA_APROVADA'
+        AND o.deleted_at IS NULL
     `;
 
     return {
@@ -61,8 +64,8 @@ export class ClientsService {
 
   async create(dto: CreateClientDto) {
     if (dto.cpf) {
-      const existing = await this.prisma.client.findUnique({
-        where: { cpf: dto.cpf },
+      const existing = await this.prisma.client.findFirst({
+        where: { ...NOT_DELETED, cpf: dto.cpf },
       });
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
@@ -87,6 +90,7 @@ export class ClientsService {
 
   async findAll() {
     const clients = await this.prisma.client.findMany({
+      where: { ...NOT_DELETED },
       select: this.clientSelect,
       orderBy: { createdAt: 'desc' },
     });
@@ -96,6 +100,7 @@ export class ClientsService {
     >`
       SELECT client_id, COUNT(id)::int AS count
       FROM negotiations
+      WHERE deleted_at IS NULL
       GROUP BY client_id
     `;
 
@@ -106,12 +111,15 @@ export class ClientsService {
              COUNT(o.id)::int AS orders_count,
              COALESCE(SUM(o.total_value), 0)::float8 AS revenue
       FROM orders o
-      JOIN negotiations n ON n.id = o.negotiation_id
+      JOIN negotiations n ON n.id = o.negotiation_id AND n.deleted_at IS NULL
       WHERE o.status = 'COMPRA_APROVADA'
+        AND o.deleted_at IS NULL
       GROUP BY n.client_id
     `;
 
-    const negByClient = new Map(negotiations.map((row) => [row.client_id, row.count]));
+    const negByClient = new Map(
+      negotiations.map((row) => [row.client_id, row.count]),
+    );
     const ordByClient = new Map(orders.map((row) => [row.client_id, row]));
 
     return clients.map((client) => {
@@ -126,11 +134,21 @@ export class ClientsService {
   }
 
   private async ensureExists(id: string) {
-    const client = await this.prisma.client.findUnique({
-      where: { id },
+    const client = await this.prisma.client.findFirst({
+      where: { ...NOT_DELETED, id },
       select: this.clientSelect,
     });
     if (!client) throw new NotFoundException('Cliente não encontrado');
+    return client;
+  }
+
+  private async ensureEditable(id: string) {
+    const client = await this.ensureExists(id);
+    if (client.anonymizedAt) {
+      throw new ConflictException(
+        'Cliente com dados pessoais eliminados (LGPD) não pode ser alterado',
+      );
+    }
     return client;
   }
 
@@ -139,11 +157,11 @@ export class ClientsService {
   }
 
   async replace(id: string, dto: ReplaceClientDto) {
-    await this.ensureExists(id);
+    await this.ensureEditable(id);
 
     if (dto.cpf) {
       const existing = await this.prisma.client.findFirst({
-        where: { cpf: dto.cpf, NOT: { id } },
+        where: { ...NOT_DELETED, cpf: dto.cpf, NOT: { id } },
       });
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
@@ -179,11 +197,11 @@ export class ClientsService {
       throw new BadRequestException('O telefone não pode ficar em branco');
     }
 
-    await this.ensureExists(id);
+    await this.ensureEditable(id);
 
     if (dto.cpf) {
       const existing = await this.prisma.client.findFirst({
-        where: { cpf: dto.cpf, NOT: { id } },
+        where: { ...NOT_DELETED, cpf: dto.cpf, NOT: { id } },
       });
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
@@ -199,12 +217,35 @@ export class ClientsService {
 
   async remove(id: string) {
     const client = await this.ensureExists(id);
-    await this.prisma.client.delete({ where: { id } });
-    return this.withMetrics(client);
+    const result = await this.withMetrics(client);
+    const deletedAt = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      const negotiations = await tx.negotiation.findMany({
+        where: { ...NOT_DELETED, clientId: id },
+        select: { id: true },
+      });
+      const negotiationIds = negotiations.map((negotiation) => negotiation.id);
+
+      if (negotiationIds.length > 0) {
+        await tx.order.updateMany({
+          where: { ...NOT_DELETED, negotiationId: { in: negotiationIds } },
+          data: { deletedAt },
+        });
+        await tx.negotiation.updateMany({
+          where: { id: { in: negotiationIds } },
+          data: { deletedAt },
+        });
+      }
+
+      await tx.client.update({ where: { id }, data: { deletedAt } });
+    });
+
+    return result;
   }
 
   async qualify(id: string, qualification: LeadQualificationEnum) {
-    await this.ensureExists(id);
+    await this.ensureEditable(id);
     const client = await this.prisma.client.update({
       where: { id },
       data: { qualification },
@@ -214,7 +255,7 @@ export class ClientsService {
   }
 
   async registerContact(id: string) {
-    await this.ensureExists(id);
+    await this.ensureEditable(id);
     const client = await this.prisma.client.update({
       where: { id },
       data: { lastContactAt: new Date() },
@@ -224,7 +265,7 @@ export class ClientsService {
   }
 
   async activate(id: string) {
-    await this.ensureExists(id);
+    await this.ensureEditable(id);
     const client = await this.prisma.client.update({
       where: { id },
       data: { status: 'ATIVO' },
@@ -234,7 +275,7 @@ export class ClientsService {
   }
 
   async deactivate(id: string) {
-    await this.ensureExists(id);
+    await this.ensureEditable(id);
     const client = await this.prisma.client.update({
       where: { id },
       data: { status: 'INATIVO' },

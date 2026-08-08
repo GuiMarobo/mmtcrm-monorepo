@@ -43,7 +43,7 @@ enum LeadOrigin {
 model User {
   id          Int     @id @default(autoincrement())
   name        String
-  email       String     @unique
+  email       String     // unico por indice parcial (WHERE deleted_at IS NULL)
   password    String     // bcrypt
   phone       String?
   role               Role       @default(VENDEDOR)
@@ -51,9 +51,14 @@ model User {
   mustChangePassword Boolean    @default(false) @map("must_change_password")
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  anonymizedAt DateTime? @map("anonymized_at")
 
   negotiations Negotiation[]
+  erasuresPerformed DataErasureLog[]
 
+  @@index([email])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -62,7 +67,7 @@ model Client {
   name            String
   email           String?
   phone           String?
-  cpf             String?            @unique
+  cpf             String?            // unico por indice parcial (WHERE deleted_at IS NULL)
   address         String?
   status          ClientStatus       @default(LEAD)
   qualification   LeadQualification  @default(NAO_QUALIFICADO)
@@ -71,9 +76,13 @@ model Client {
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
   lastContactAt   DateTime?          @map("last_contact_at")
+  deletedAt       DateTime?          @map("deleted_at")
+  anonymizedAt    DateTime?          @map("anonymized_at")
 
   negotiations    Negotiation[]
 
+  @@index([cpf])
+  @@index([deletedAt])
   @@map("clients")
 }
 
@@ -99,12 +108,14 @@ model Negotiation {
   closedAt    DateTime?         @map("closed_at")
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
+  deletedAt   DateTime?         @map("deleted_at")
 
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   vendedor User?  @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
   order    Order?
 
   @@index([clientId])
+  @@index([deletedAt])
   @@map("negotiations")
 }
 
@@ -118,8 +129,36 @@ model Order {
   notes         String?
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
+  deletedAt     DateTime?   @map("deleted_at")
 
   negotiation Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
 
+  @@index([deletedAt])
   @@map("orders")
+}
+
+enum ErasureSubject {
+  CLIENTE
+  USUARIO
+}
+
+enum ErasureAction {
+  ELIMINADO
+  ANONIMIZADO
+}
+
+model DataErasureLog {
+  id            Int            @id @default(autoincrement())
+  subject       ErasureSubject
+  subjectId     String         @map("subject_id")
+  subjectLabel  String         @map("subject_label") // rotulo nao identificavel, nunca o nome do titular
+  action        ErasureAction
+  reason        String?
+  performedById Int?           @map("performed_by_id")
+  performedAt   DateTime       @default(now()) @map("performed_at")
+
+  performedBy User? @relation(fields: [performedById], references: [id], onDelete: SetNull)
+
+  @@index([subject, subjectId])
+  @@map("data_erasure_logs")
 }

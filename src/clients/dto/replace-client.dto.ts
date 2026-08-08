@@ -1,5 +1,16 @@
-import { IsString, IsNotEmpty, IsEmail, IsOptional, IsEnum, Matches } from 'class-validator';
-import { ClientStatusEnum, LeadQualificationEnum, LeadOriginEnum } from './create-client.dto';
+import {
+  IsString,
+  IsNotEmpty,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  Matches,
+} from 'class-validator';
+import {
+  ClientStatusEnum,
+  LeadQualificationEnum,
+  LeadOriginEnum,
+} from './create-client.dto';
 
 export class ReplaceClientDto {
   @IsString()

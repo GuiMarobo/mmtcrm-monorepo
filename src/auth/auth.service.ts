@@ -33,7 +33,12 @@ export class AuthService {
   async login(loginDto: LoginUserDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
-    const payload = { sub: user.id, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+    };
     const { password, ...publicUser } = user;
 
     return {
@@ -43,13 +48,24 @@ export class AuthService {
   }
 
   async changePassword(userId: number, dto: ChangePasswordDto) {
-    const valid = await this.usersService.verifyPassword(userId, dto.currentPassword);
+    const valid = await this.usersService.verifyPassword(
+      userId,
+      dto.currentPassword,
+    );
     if (!valid) {
       throw new UnauthorizedException('Senha atual incorreta');
     }
 
-    const updatedUser = await this.usersService.changePassword(userId, dto.newPassword);
-    const payload = { sub: updatedUser.id, email: updatedUser.email, role: updatedUser.role, mustChangePassword: false };
+    const updatedUser = await this.usersService.changePassword(
+      userId,
+      dto.newPassword,
+    );
+    const payload = {
+      sub: updatedUser.id,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      mustChangePassword: false,
+    };
 
     return {
       access_token: this.jwtService.sign(payload),
