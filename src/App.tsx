@@ -8,6 +8,7 @@ import { Login } from './pages/Login'
 import { ChangePassword } from './pages/ChangePassword'
 import { Dashboard } from './pages/Dashboard'
 import { Clientes } from './pages/Clientes'
+import { Negociacoes } from './pages/Negociacoes'
 import { Usuarios } from './pages/Usuarios'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { useToast } from './hooks/useToast'
@@ -47,7 +48,7 @@ function AppRoot() {
     ) : (
       <Placeholder title="Acesso negado" hint="Apenas administradores podem gerenciar usuários." />
     ),
-    negociacoes: <Placeholder title="Negociações" hint="Pipeline de vendas com trade-in." />,
+    negociacoes: <Negociacoes toast={show} />,
     orcamentos: <Placeholder title="Orçamentos" hint="Simulador de orçamento e propostas." />,
     pedidos: <Placeholder title="Pedidos" hint="Gerenciamento de pedidos e entregas." />,
     produtos: <Placeholder title="Produtos" hint="Catálogo de dispositivos Apple." />,

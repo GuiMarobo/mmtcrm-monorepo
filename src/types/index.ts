@@ -1,6 +1,7 @@
 export * from './enums'
 export * from './user.types'
 export * from './client.types'
+export * from './negotiation.types'
 export * from './auth.types'
 export * from './route.types'
 export * from './import.types'
