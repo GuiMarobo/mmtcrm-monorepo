@@ -1,89 +1,52 @@
 import { useEffect, useMemo, useState } from 'react'
+import {
+  useGridApiRef,
+  gridFilteredSortedRowEntriesSelector,
+} from '@mui/x-data-grid-premium'
+import type { GridRowSelectionModel } from '@mui/x-data-grid-premium'
 import { I } from '../icons'
 import { ApiError, clientsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { ImportClientesModal } from '../components/clients/ImportClientesModal'
 import { ClientFormModal } from '../components/clients/ClientFormModal'
-import { ClientStatusBadge, ClientQualificationBadge } from '../components/clients/ClientBadges'
+import { ClientsDataGrid } from '../components/clients/ClientsDataGrid'
 import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
 import {
-  Badge,
   Button,
-  Checkbox,
   ConfirmDialog,
-  Field,
-  FilterPopover,
-  Menu,
-  MenuItem,
-  Pagination,
   SearchInput,
   Stat,
   StatGrid,
   TableCard,
-  TableEmpty,
   TableError,
   TableToolbar,
 } from '../components/ui'
 import { downloadClientesXlsx } from '../utils/xlsx'
-import { formatCurrency, formatDate, maskCpf, maskPhone } from '../utils/format'
-import type { Client, ClientStatus, CreateClientPayload, LeadQualification } from '../types'
-import {
-  CLIENT_STATUS_LABELS,
-  CLIENT_STATUS_OPTIONS,
-  LEAD_ORIGIN_LABELS,
-  LEAD_QUALIFICATION_LABELS,
-  LEAD_QUALIFICATION_OPTIONS,
-} from '../types'
-
-const COLUMN_COUNT = 8
+import { formatCurrency } from '../utils/format'
+import type { Client, CreateClientPayload } from '../types'
 
 interface ClientesProps {
   toast: (msg: string, type?: 'success' | 'error') => void
 }
 
+const EMPTY_SELECTION: GridRowSelectionModel = { type: 'include', ids: new Set() }
+
 export function Clientes({ toast }: ClientesProps) {
   const { user } = useAuth()
+  const apiRef = useGridApiRef()
   const [list, setList] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | ClientStatus>('ALL')
-  const [qualificationFilter, setQualificationFilter] = useState<'ALL' | LeadQualification>('ALL')
-  const [draftStatus, setDraftStatus] = useState<'ALL' | ClientStatus>('ALL')
-  const [draftQualification, setDraftQualification] = useState<'ALL' | LeadQualification>('ALL')
+  const [selection, setSelection] = useState<GridRowSelectionModel>(EMPTY_SELECTION)
   const [editing, setEditing] = useState<Client | null>(null)
   const [creating, setCreating] = useState(false)
-  const [menuFor, setMenuFor] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [confirmErase, setConfirmErase] = useState<Client | null>(null)
   const [erasing, setErasing] = useState(false)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-
-  const activeFiltersCount =
-    (statusFilter !== 'ALL' ? 1 : 0) + (qualificationFilter !== 'ALL' ? 1 : 0)
-
-  const openFilters = () => {
-    setDraftStatus(statusFilter)
-    setDraftQualification(qualificationFilter)
-    setFiltersOpen(true)
-  }
-
-  const applyFilters = () => {
-    setStatusFilter(draftStatus)
-    setQualificationFilter(draftQualification)
-    setFiltersOpen(false)
-  }
-
-  const clearFilters = () => {
-    setDraftStatus('ALL')
-    setDraftQualification('ALL')
-  }
 
   const reload = async () => {
     setLoading(true)
@@ -101,28 +64,12 @@ export function Clientes({ toast }: ClientesProps) {
     void reload()
   }, [])
 
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase()
-    return list.filter((c) => {
-      const matchesTerm =
-        !term ||
-        c.name.toLowerCase().includes(term) ||
-        (c.email ?? '').toLowerCase().includes(term) ||
-        (c.phone ?? '').includes(term)
-      const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter
-      const matchesQualification =
-        qualificationFilter === 'ALL' || c.qualification === qualificationFilter
-      return matchesTerm && matchesStatus && matchesQualification
-    })
-  }, [list, query, statusFilter, qualificationFilter])
-
-  useEffect(() => {
-    setPage(1)
-  }, [query, statusFilter, qualificationFilter, pageSize])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const selectedIds = useMemo(() => {
+    if (selection.type === 'include') return selection.ids
+    const all = new Set(list.map((c) => c.id))
+    selection.ids.forEach((id) => all.delete(String(id)))
+    return all
+  }, [selection, list])
 
   const stats = useMemo(() => {
     const total = list.length
@@ -132,12 +79,16 @@ export function Clientes({ toast }: ClientesProps) {
     return { leads, ativos, pct }
   }, [list])
 
-  const selectionActive = selected.size > 0
-  const aggregated = selectionActive ? list.filter((c) => selected.has(c.id)) : list
+  const selectionActive = selectedIds.size > 0
+  const aggregated = selectionActive
+    ? list.filter((c) => selectedIds.has(c.id))
+    : list
   const faturamento = aggregated.reduce((sum, c) => sum + (c.revenue ?? 0), 0)
   const pedidos = aggregated.reduce((sum, c) => sum + (c.ordersCount ?? 0), 0)
-  const selectionSuffix = selectionActive ? ` (${selected.size} sel.)` : ''
-  const selectionHint = selectionActive ? 'do(s) cliente(s) selecionado(s)' : 'pedidos aprovados'
+  const selectionSuffix = selectionActive ? ` (${selectedIds.size} sel.)` : ''
+  const selectionHint = selectionActive
+    ? 'do(s) cliente(s) selecionado(s)'
+    : 'pedidos aprovados'
 
   const saveClient = async (payload: CreateClientPayload) => {
     if (editing) {
@@ -154,7 +105,6 @@ export function Clientes({ toast }: ClientesProps) {
   }
 
   const qualificar = async (client: Client) => {
-    setMenuFor(null)
     try {
       const updated = await clientsApi.qualify(client.id, 'QUALIFICADO')
       setList((prev) => prev.map((c) => (c.id === client.id ? { ...c, ...updated } : c)))
@@ -165,7 +115,6 @@ export function Clientes({ toast }: ClientesProps) {
   }
 
   const registrarContato = async (client: Client) => {
-    setMenuFor(null)
     try {
       const updated = await clientsApi.registerContact(client.id)
       setList((prev) => prev.map((c) => (c.id === client.id ? { ...c, ...updated } : c)))
@@ -181,11 +130,6 @@ export function Clientes({ toast }: ClientesProps) {
     try {
       await clientsApi.remove(confirmDelete.id)
       setList((prev) => prev.filter((c) => c.id !== confirmDelete.id))
-      setSelected((prev) => {
-        const next = new Set(prev)
-        next.delete(confirmDelete.id)
-        return next
-      })
       toast(`"${confirmDelete.name}" removido`)
       setConfirmDelete(null)
     } catch (err) {
@@ -214,41 +158,31 @@ export function Clientes({ toast }: ClientesProps) {
     }
   }
 
-  const allSelected = paged.length > 0 && paged.every((c) => selected.has(c.id))
-  const toggleAll = () =>
-    setSelected((prev) => {
-      const next = new Set(prev)
-      const allOnPage = paged.every((c) => next.has(c.id))
-      paged.forEach((c) => (allOnPage ? next.delete(c.id) : next.add(c.id)))
-      return next
-    })
-  const toggleOne = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-
   const exportar = async () => {
-    if (filtered.length === 0) {
+    const visiveis = apiRef.current
+      ? gridFilteredSortedRowEntriesSelector(apiRef).map((entry) => entry.model as Client)
+      : list
+
+    if (visiveis.length === 0) {
       toast('Nada para exportar com os filtros atuais.')
       return
     }
+
     setExporting(true)
     try {
       const filtersApplied: string[] = []
       if (query.trim()) filtersApplied.push(`Busca: "${query.trim()}"`)
-      if (statusFilter !== 'ALL') filtersApplied.push(`Status: ${CLIENT_STATUS_LABELS[statusFilter]}`)
-      if (qualificationFilter !== 'ALL') filtersApplied.push(`Qualificação: ${LEAD_QUALIFICATION_LABELS[qualificationFilter]}`)
+      if (visiveis.length !== list.length) {
+        filtersApplied.push(`Filtros da grade: ${visiveis.length} de ${list.length} registros`)
+      }
 
-      await downloadClientesXlsx(filtered, {
+      await downloadClientesXlsx(visiveis, {
         exportedAt: new Date(),
         exportedBy: user?.name ?? 'Desconhecido',
         totalInSystem: list.length,
         filtersApplied,
       })
-      toast(`${filtered.length} clientes exportados em XLSX`)
+      toast(`${visiveis.length} clientes exportados em XLSX`)
     } catch {
       toast('Erro ao gerar o arquivo XLSX', 'error')
     } finally {
@@ -308,41 +242,6 @@ export function Clientes({ toast }: ClientesProps) {
             onChange={setQuery}
             placeholder="Buscar por nome, telefone ou e-mail…"
           />
-          <FilterPopover
-            open={filtersOpen}
-            activeCount={activeFiltersCount}
-            onToggle={() => (filtersOpen ? setFiltersOpen(false) : openFilters())}
-            onClose={() => setFiltersOpen(false)}
-            onClear={clearFilters}
-            onApply={applyFilters}
-          >
-            <Field label="Status" inline>
-              <select
-                value={draftStatus}
-                onChange={(e) => setDraftStatus(e.target.value as 'ALL' | ClientStatus)}
-              >
-                <option value="ALL">Todos</option>
-                {CLIENT_STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Qualificação" inline>
-              <select
-                value={draftQualification}
-                onChange={(e) => setDraftQualification(e.target.value as 'ALL' | LeadQualification)}
-              >
-                <option value="ALL">Todas</option>
-                {LEAD_QUALIFICATION_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </FilterPopover>
         </TableToolbar>
 
         {loadError && (
@@ -360,120 +259,19 @@ export function Clientes({ toast }: ClientesProps) {
           </TableError>
         )}
 
-        <div className="table-scroll">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th className="checkbox-col">
-                <Checkbox checked={allSelected} onChange={toggleAll} aria-label="Selecionar todos" />
-              </th>
-              <th>Nome</th>
-              <th>Telefone</th>
-              <th className="col-md">Forma de Contato</th>
-              <th>Status</th>
-              <th className="col-sm">Qualificação</th>
-              <th className="col-md">Último Contato</th>
-              <th className="col-actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <TableEmpty colSpan={COLUMN_COUNT}>Carregando clientes…</TableEmpty>}
-            {!loading && filtered.length === 0 && (
-              <TableEmpty colSpan={COLUMN_COUNT}>Nenhum cliente encontrado.</TableEmpty>
-            )}
-            {!loading &&
-              paged.map((c) => (
-                <tr key={c.id}>
-                  <td className="checkbox-col">
-                    <Checkbox
-                      checked={selected.has(c.id)}
-                      onChange={() => toggleOne(c.id)}
-                      aria-label={`Selecionar ${c.name}`}
-                    />
-                  </td>
-                  <td>
-                    <div className="cell-user">
-                      <div>
-                        <div className="name">
-                          {c.name}
-                          {c.anonymizedAt && <Badge tone="gray">Anonimizado</Badge>}
-                        </div>
-                        {c.cpf && <div className="sub">CPF {maskCpf(c.cpf)}</div>}
-                      </div>
-                    </div>
-                  </td>
-                  <td>{maskPhone(c.phone) || '-'}</td>
-                  <td className="col-md">{c.origin ? LEAD_ORIGIN_LABELS[c.origin] : '-'}</td>
-                  <td>
-                    <ClientStatusBadge status={c.status} />
-                  </td>
-                  <td className="col-sm">
-                    <ClientQualificationBadge value={c.qualification} />
-                  </td>
-                  <td className="col-md">{formatDate(c.lastContactAt)}</td>
-                  <td className="col-actions">
-                    <Menu
-                      open={menuFor === c.id}
-                      onToggle={() => setMenuFor((m) => (m === c.id ? null : c.id))}
-                      onClose={() => setMenuFor(null)}
-                    >
-                      {!c.anonymizedAt && (
-                        <MenuItem
-                          icon={I.edit}
-                          onClick={() => {
-                            setEditing(c)
-                            setMenuFor(null)
-                          }}
-                        >
-                          Editar
-                        </MenuItem>
-                      )}
-                      {!c.anonymizedAt && c.qualification === 'NAO_QUALIFICADO' && (
-                        <MenuItem icon={I.star} onClick={() => qualificar(c)}>
-                          Qualificar lead
-                        </MenuItem>
-                      )}
-                      {!c.anonymizedAt && (
-                        <MenuItem icon={I.phone} onClick={() => registrarContato(c)}>
-                          Registrar contato
-                        </MenuItem>
-                      )}
-                      <MenuItem
-                        icon={I.trash}
-                        danger
-                        onClick={() => {
-                          setConfirmDelete(c)
-                          setMenuFor(null)
-                        }}
-                      >
-                        Excluir
-                      </MenuItem>
-                      {user?.role === 'ADMIN' && !c.anonymizedAt && (
-                        <MenuItem
-                          icon={I.shield}
-                          danger
-                          onClick={() => {
-                            setConfirmErase(c)
-                            setMenuFor(null)
-                          }}
-                        >
-                          Eliminar dados pessoais (LGPD)
-                        </MenuItem>
-                      )}
-                    </Menu>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-        </div>
-
-        <Pagination
-          page={currentPage}
-          pageSize={pageSize}
-          total={filtered.length}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
+        <ClientsDataGrid
+          apiRef={apiRef}
+          rows={list}
+          loading={loading}
+          quickFilter={query}
+          selection={selection}
+          onSelectionChange={setSelection}
+          role={user?.role}
+          onEdit={setEditing}
+          onQualify={(c) => void qualificar(c)}
+          onRegisterContact={(c) => void registrarContato(c)}
+          onDelete={setConfirmDelete}
+          onErase={setConfirmErase}
         />
       </TableCard>
 

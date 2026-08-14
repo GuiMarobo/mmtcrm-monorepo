@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Box, CssBaseline, ThemeProvider } from '@mui/material'
 import { theme } from './theme'
@@ -9,12 +9,17 @@ import { Toast } from './components/ui'
 import { Login } from './pages/Login'
 import { ChangePassword } from './pages/ChangePassword'
 import { Dashboard } from './pages/Dashboard'
-import { Clientes } from './pages/Clientes'
-import { Negociacoes } from './pages/Negociacoes'
 import { Usuarios } from './pages/Usuarios'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { useToast } from './hooks/useToast'
 import type { Route } from './types'
+
+const Clientes = lazy(() =>
+  import('./pages/Clientes').then((m) => ({ default: m.Clientes })),
+)
+const Negociacoes = lazy(() =>
+  import('./pages/Negociacoes').then((m) => ({ default: m.Negociacoes })),
+)
 
 export default function App() {
   return (
@@ -84,7 +89,17 @@ function AppRoot() {
       />
       <div className="main-col" data-screen-label={'App / ' + safeRoute}>
         <Topbar user={user} onMenuToggle={() => setMenuOpen((v) => !v)} />
-        <div className="content">{pages[safeRoute]}</div>
+        <div className="content">
+          <Suspense
+            fallback={
+              <Box sx={{ p: 6, textAlign: 'center', color: 'text.disabled' }}>
+                Carregando…
+              </Box>
+            }
+          >
+            {pages[safeRoute]}
+          </Suspense>
+        </div>
       </div>
       {toast && <Toast text={toast.text} type={toast.type} />}
     </div>
