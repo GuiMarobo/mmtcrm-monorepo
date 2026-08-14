@@ -1,4 +1,4 @@
-import type { DragEvent } from 'react'
+import { useDraggable } from '@dnd-kit/core'
 import { I } from '../../icons'
 import { Menu, MenuItem } from '../ui'
 import { formatCurrency } from '../../utils/format'
@@ -15,11 +15,8 @@ const TARGET_ICON: Record<NegotiationStatus, typeof I.reopen> = {
 interface NegotiationCardProps {
   negotiation: Negotiation
   status: NegotiationStatus
-  dragging: boolean
   menuOpen: boolean
   onMenuToggle: (id: number | null) => void
-  onDragStart: (negotiation: Negotiation) => void
-  onDragEnd: () => void
   onMove: (negotiation: Negotiation, target: NegotiationStatus) => void
   onEdit: (negotiation: Negotiation) => void
   onDelete: (negotiation: Negotiation) => void
@@ -28,36 +25,33 @@ interface NegotiationCardProps {
 export function NegotiationCard({
   negotiation,
   status,
-  dragging,
   menuOpen,
   onMenuToggle,
-  onDragStart,
-  onDragEnd,
   onMove,
   onEdit,
   onDelete,
 }: NegotiationCardProps) {
-  const targets = ALLOWED_TRANSITIONS[status]
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: negotiation.id,
+    data: { status },
+  })
 
-  const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', String(negotiation.id))
-    onDragStart(negotiation)
-  }
+  const clientName = negotiation.client?.name ?? 'Cliente removido'
 
   return (
     <div
-      className={dragging ? 'board-card dragging' : 'board-card'}
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={onDragEnd}
-      aria-label={`Negociação de ${negotiation.client?.name ?? 'cliente removido'}, ${NEGOTIATION_STATUS_LABELS[status]}`}
+      ref={setNodeRef}
+      className={isDragging ? 'board-card dragging' : 'board-card'}
+      aria-label={`Negociação de ${clientName}, ${NEGOTIATION_STATUS_LABELS[status]}, ${formatCurrency(negotiation.totalValue)}`}
+      {...listeners}
+      {...attributes}
     >
       <div className="board-card-head">
-        <div className="board-card-client">
-          {negotiation.client?.name ?? 'Cliente removido'}
-        </div>
-        <div onDragStart={(e) => e.preventDefault()} draggable={false}>
+        <div className="board-card-client">{clientName}</div>
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           <Menu
             open={menuOpen}
             onToggle={() => onMenuToggle(menuOpen ? null : negotiation.id)}
@@ -68,7 +62,7 @@ export function NegotiationCard({
                 Editar
               </MenuItem>
             )}
-            {targets.map((target) => (
+            {ALLOWED_TRANSITIONS[status].map((target) => (
               <MenuItem
                 key={target}
                 icon={TARGET_ICON[target]}
@@ -93,6 +87,25 @@ export function NegotiationCard({
         {negotiation.order && (
           <span className="board-card-order">{negotiation.order.code}</span>
         )}
+      </div>
+    </div>
+  )
+}
+
+export function NegotiationCardOverlay({
+  negotiation,
+}: {
+  negotiation: Negotiation
+}) {
+  return (
+    <div className="board-card overlay">
+      <div className="board-card-head">
+        <div className="board-card-client">
+          {negotiation.client?.name ?? 'Cliente removido'}
+        </div>
+      </div>
+      <div className="board-card-value">
+        {formatCurrency(negotiation.totalValue)}
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { DragEvent, ReactNode } from 'react'
+import { useDroppable } from '@dnd-kit/core'
+import type { ReactNode } from 'react'
 import { formatCurrency } from '../../utils/format'
 import type { NegotiationStatus } from '../../types'
 import { NEGOTIATION_STATUS_LABELS } from '../../types'
@@ -15,7 +15,6 @@ interface NegotiationColumnProps {
   count: number
   total: number
   accepting: boolean
-  onDrop: (status: NegotiationStatus) => void
   children: ReactNode
 }
 
@@ -24,31 +23,16 @@ export function NegotiationColumn({
   count,
   total,
   accepting,
-  onDrop,
   children,
 }: NegotiationColumnProps) {
-  const [over, setOver] = useState(false)
-
-  const handleDragOver = (event: DragEvent<HTMLElement>) => {
-    if (!accepting) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-    setOver(true)
-  }
-
-  const handleDrop = (event: DragEvent<HTMLElement>) => {
-    event.preventDefault()
-    setOver(false)
-    if (accepting) onDrop(status)
-  }
+  const { setNodeRef, isOver } = useDroppable({ id: status })
+  const highlight = isOver && accepting
 
   return (
     <section
-      className={over && accepting ? 'board-col over' : 'board-col'}
+      ref={setNodeRef}
+      className={highlight ? 'board-col over' : 'board-col'}
       aria-label={NEGOTIATION_STATUS_LABELS[status]}
-      onDragOver={handleDragOver}
-      onDragLeave={() => setOver(false)}
-      onDrop={handleDrop}
     >
       <div className="board-col-head">
         <div className="board-col-title">
