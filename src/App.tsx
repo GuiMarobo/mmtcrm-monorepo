@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { Box, CssBaseline, ThemeProvider } from '@mui/material'
+import { theme } from './theme'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 import { Placeholder } from './components/Placeholder'
@@ -16,9 +18,12 @@ import type { Route } from './types'
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoot />
-    </AuthProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <AppRoot />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 
@@ -28,7 +33,12 @@ function AppRoot() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { toast, show } = useToast()
 
-  if (loading) return <div className="app-loading">Carregando…</div>
+  if (loading)
+    return (
+      <Box sx={{ height: '100vh', display: 'grid', placeItems: 'center', color: 'text.disabled' }}>
+        Carregando…
+      </Box>
+    )
   if (!user) return <Login />
   if (user.mustChangePassword) return <ChangePassword />
 
