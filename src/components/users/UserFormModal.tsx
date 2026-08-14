@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { I } from '../../icons'
 import { ApiError } from '../../api'
-import { Button, Field, FieldRow, Modal } from '../ui'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import MenuItem from '@mui/material/MenuItem'
+import TextField from '@mui/material/TextField'
+import { Button, Modal } from '../ui'
+import { FormRow } from '../clients/ClientFormModal'
 import { maskPhone, onlyDigits } from '../../utils/format'
 import { isValidEmail, isValidPhone } from '../../utils/validators'
 import type { CreateUserPayload, Role, UpdateUserPayload, User, UserStatus } from '../../types'
@@ -154,81 +159,104 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
         </>
       }
     >
-      <Field label="Nome Completo" required error={displayError('name')}>
-        <input
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+        <TextField
+          label="Nome Completo"
+          required
           value={form.name}
           onChange={(e) => set('name', e.target.value)}
           onBlur={() => handleBlur('name')}
           placeholder="Ex.: João da Silva"
+          error={!!displayError('name')}
+          helperText={displayError('name')}
+          fullWidth
         />
-      </Field>
-      <FieldRow>
-        <Field label="E-mail corporativo" required error={displayError('email')}>
-          <input
+
+        <FormRow>
+          <TextField
+            label="E-mail corporativo"
             type="email"
+            required
             value={form.email}
             onChange={(e) => set('email', e.target.value)}
             onBlur={() => handleBlur('email')}
             placeholder="nome@mmturbana.com"
+            error={!!displayError('email')}
+            helperText={displayError('email')}
+            fullWidth
           />
-        </Field>
-        <Field label="Telefone" error={displayError('phone')}>
-          <input
+          <TextField
+            label="Telefone"
             value={maskPhone(form.phone)}
             onChange={(e) => set('phone', onlyDigits(e.target.value).slice(0, 11))}
             onBlur={() => handleBlur('phone')}
             placeholder="(00) 00000-0000"
-            inputMode="numeric"
+            error={!!displayError('phone')}
+            helperText={displayError('phone')}
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+            fullWidth
           />
-        </Field>
-      </FieldRow>
-      <FieldRow>
-        <Field label={isEdit ? 'Nova senha (opcional)' : 'Senha'} required={!isEdit} error={displayError('password')}>
-          <input
+        </FormRow>
+
+        <FormRow>
+          <TextField
+            label={isEdit ? 'Nova senha (opcional)' : 'Senha'}
             type="password"
+            required={!isEdit}
             value={form.password}
             onChange={(e) => set('password', e.target.value)}
             onBlur={() => handleBlur('password')}
             placeholder="Mín. 8 caracteres"
             autoComplete="new-password"
+            error={!!displayError('password')}
+            helperText={displayError('password')}
+            fullWidth
           />
-        </Field>
-        <Field label="Confirmar Senha" error={displayError('confirm')}>
-          <input
+          <TextField
+            label="Confirmar Senha"
             type="password"
             value={form.confirm}
             onChange={(e) => set('confirm', e.target.value)}
             onBlur={() => handleBlur('confirm')}
             placeholder="Repita a senha"
             autoComplete="new-password"
+            error={!!displayError('confirm')}
+            helperText={displayError('confirm')}
+            fullWidth
           />
-        </Field>
-      </FieldRow>
-      <FieldRow>
-        <Field label="Perfil">
-          <select value={form.role} onChange={(e) => set('role', e.target.value as Role)}>
+        </FormRow>
+
+        <FormRow>
+          <TextField
+            select
+            label="Perfil"
+            value={form.role}
+            onChange={(e) => set('role', e.target.value as Role)}
+            fullWidth
+          >
             {ROLE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+              <MenuItem key={o.value} value={o.value}>
                 {o.label}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </Field>
-        <Field label="Status">
-          <select value={form.status} onChange={(e) => set('status', e.target.value as UserStatus)}>
+          </TextField>
+          <TextField
+            select
+            label="Status"
+            value={form.status}
+            onChange={(e) => set('status', e.target.value as UserStatus)}
+            fullWidth
+          >
             {USER_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+              <MenuItem key={o.value} value={o.value}>
                 {o.label}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </Field>
-      </FieldRow>
-      {error && (
-        <div className="form-alert" role="alert">
-          {error}
-        </div>
-      )}
+          </TextField>
+        </FormRow>
+
+        {error && <Alert severity="error">{error}</Alert>}
+      </Box>
     </Modal>
   )
 }
