@@ -9,7 +9,6 @@ import { Toast } from './components/ui'
 import { Login } from './pages/Login'
 import { ChangePassword } from './pages/ChangePassword'
 import { Dashboard } from './pages/Dashboard'
-import { Usuarios } from './pages/Usuarios'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { useToast } from './hooks/useToast'
 import type { Route } from './types'
@@ -19,6 +18,9 @@ const Clientes = lazy(() =>
 )
 const Negociacoes = lazy(() =>
   import('./pages/Negociacoes').then((m) => ({ default: m.Negociacoes })),
+)
+const Usuarios = lazy(() =>
+  import('./pages/Usuarios').then((m) => ({ default: m.Usuarios })),
 )
 
 export default function App() {
