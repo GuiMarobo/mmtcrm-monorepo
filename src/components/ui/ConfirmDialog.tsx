@@ -1,3 +1,7 @@
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
 import { Button } from './Button'
 
@@ -25,23 +29,44 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   return (
-    <div className="modal-scrim" onClick={loading ? undefined : onCancel}>
-      <div className="confirm" onClick={(e) => e.stopPropagation()}>
-        <div className="confirm-title">{title}</div>
-        {description && <div className="confirm-text">{description}</div>}
-        <div className="confirm-actions">
-          <Button onClick={onCancel} disabled={loading}>
-            {cancelLabel}
-          </Button>
-          <Button
-            variant={danger ? 'destructive' : 'primary'}
-            onClick={onConfirm}
-            disabled={loading || confirmDisabled}
+    <Dialog
+      open
+      onClose={loading ? undefined : onCancel}
+      slotProps={{ paper: { sx: { width: 440, maxWidth: '100%' } } }}
+    >
+      <DialogContent sx={{ p: '24px 24px 0' }}>
+        <Typography
+          sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em' }}
+        >
+          {title}
+        </Typography>
+        {description && (
+          <Typography
+            component="div"
+            sx={{
+              mt: 1,
+              color: 'text.secondary',
+              fontSize: 13.5,
+              lineHeight: 1.55,
+            }}
           >
-            {loading ? 'Aguarde…' : confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </div>
+            {description}
+          </Typography>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ p: '22px 24px 24px', gap: 1 }}>
+        <Button onClick={onCancel} disabled={loading}>
+          {cancelLabel}
+        </Button>
+        <Button
+          variant={danger ? 'destructive' : 'primary'}
+          onClick={onConfirm}
+          disabled={loading || confirmDisabled}
+        >
+          {loading ? 'Aguarde…' : confirmLabel}
+        </Button>
+      </DialogActions>
+    </Dialog>
   )
 }

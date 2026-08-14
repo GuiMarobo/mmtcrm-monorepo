@@ -1,14 +1,19 @@
+import Paper from '@mui/material/Paper'
 import type { HTMLAttributes } from 'react'
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   pad?: boolean
 }
 
-export function Card({ pad = false, className = '', children, ...rest }: CardProps) {
-  const classes = ['card', pad ? 'card-pad' : '', className].filter(Boolean).join(' ')
+export function Card({ pad = false, className, children, ...rest }: CardProps) {
   return (
-    <div className={classes} {...rest}>
+    <Paper
+      variant="outlined"
+      className={className}
+      sx={{ boxShadow: 'none', p: pad ? '18px 20px' : 0 }}
+      {...rest}
+    >
       {children}
-    </div>
+    </Paper>
   )
 }
