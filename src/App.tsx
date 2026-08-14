@@ -73,25 +73,29 @@ function AppRoot() {
   }
 
   return (
-    <div className={'app-shell' + (menuOpen ? ' menu-open' : '')}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar
         route={safeRoute}
         setRoute={navigate}
         open={menuOpen}
+        onClose={() => setMenuOpen(false)}
         canManageUsers={canManageUsers}
         onLogout={() => {
           logout()
           navigate('dashboard')
         }}
       />
-      <div
-        className="sidebar-scrim"
-        onClick={() => setMenuOpen(false)}
-        aria-hidden="true"
-      />
-      <div className="main-col" data-screen-label={'App / ' + safeRoute}>
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Topbar user={user} onMenuToggle={() => setMenuOpen((v) => !v)} />
-        <div className="content">
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: { xs: '16px 12px 24px', sm: '20px 16px 28px', lg: '24px 28px 32px' } }}>
           <Suspense
             fallback={
               <Box sx={{ p: 6, textAlign: 'center', color: 'text.disabled' }}>
@@ -101,9 +105,9 @@ function AppRoot() {
           >
             {pages[safeRoute]}
           </Suspense>
-        </div>
-      </div>
+        </Box>
+      </Box>
       {toast && <Toast text={toast.text} type={toast.type} />}
-    </div>
+    </Box>
   )
 }

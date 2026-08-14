@@ -1,6 +1,0 @@
-.placeholder {
-  margin-top: 18px; padding: 60px; background: #fff;
-  border: 1px dashed var(--border-strong); border-radius: var(--radius);
-  text-align: center; color: var(--text-3);
-}
-.placeholder h3 { font-size: 18px; color: var(--text); font-weight: 700; margin: 0 0 6px; }
