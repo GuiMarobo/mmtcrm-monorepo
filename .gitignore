@@ -12,7 +12,7 @@ node_modules
 dist
 dist-ssr
 /build
-/generated/prisma
+apps/api/generated/prisma
 
 # Vite
 .vite
