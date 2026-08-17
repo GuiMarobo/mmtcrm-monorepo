@@ -1,33 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
+import {
+  useGridApiRef,
+  gridFilteredSortedRowEntriesSelector,
+} from '@mui/x-data-grid-premium'
 import { I } from '../icons'
 import { ApiError, usersApi } from '../api'
 import { UserFormModal } from '../components/users/UserFormModal'
-import { UserRoleBadge, UserStatusBadge } from '../components/users/UserBadges'
+import { UsersDataGrid } from '../components/users/UsersDataGrid'
 import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  Badge,
   Button,
   ConfirmDialog,
-  Field,
-  FilterPopover,
-  Menu,
-  MenuItem,
-  Pagination,
   SearchInput,
   Stat,
   StatGrid,
   TableCard,
-  TableEmpty,
   TableError,
   TableToolbar,
 } from '../components/ui'
 import { downloadCsv } from '../utils/csv'
-import { formatDate, maskPhone } from '../utils/format'
-import type { CreateUserPayload, Role, UpdateUserPayload, User, UserStatus } from '../types'
-import { ROLE_OPTIONS, USER_STATUS_OPTIONS } from '../types'
-
-const COLUMN_COUNT = 6
+import type { CreateUserPayload, UpdateUserPayload, User } from '../types'
 
 interface UsuariosProps {
   toast: (msg: string, type?: 'success' | 'error') => void
@@ -35,43 +28,17 @@ interface UsuariosProps {
 
 export function Usuarios({ toast }: UsuariosProps) {
   const { user: currentUser } = useAuth()
+  const apiRef = useGridApiRef()
   const [list, setList] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState<'ALL' | Role>('ALL')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | UserStatus>('ALL')
-  const [draftRole, setDraftRole] = useState<'ALL' | Role>('ALL')
-  const [draftStatus, setDraftStatus] = useState<'ALL' | UserStatus>('ALL')
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
-  const [menuFor, setMenuFor] = useState<number | null>(null)
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [confirmErase, setConfirmErase] = useState<User | null>(null)
   const [erasing, setErasing] = useState(false)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-
-  const activeFiltersCount = (roleFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0)
-
-  const openFilters = () => {
-    setDraftRole(roleFilter)
-    setDraftStatus(statusFilter)
-    setFiltersOpen(true)
-  }
-
-  const applyFilters = () => {
-    setRoleFilter(draftRole)
-    setStatusFilter(draftStatus)
-    setFiltersOpen(false)
-  }
-
-  const clearFilters = () => {
-    setDraftRole('ALL')
-    setDraftStatus('ALL')
-  }
 
   const reload = async () => {
     setLoading(true)
@@ -88,25 +55,6 @@ export function Usuarios({ toast }: UsuariosProps) {
   useEffect(() => {
     void reload()
   }, [])
-
-  const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase()
-    return list.filter((u) => {
-      const matchesTerm =
-        !term || u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
-      const matchesRole = roleFilter === 'ALL' || u.role === roleFilter
-      const matchesStatus = statusFilter === 'ALL' || u.status === statusFilter
-      return matchesTerm && matchesRole && matchesStatus
-    })
-  }, [list, query, roleFilter, statusFilter])
-
-  useEffect(() => {
-    setPage(1)
-  }, [query, roleFilter, statusFilter, pageSize])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const stats = useMemo(() => {
     const total = list.length
@@ -130,7 +78,6 @@ export function Usuarios({ toast }: UsuariosProps) {
   }
 
   const toggleStatus = async (user: User) => {
-    setMenuFor(null)
     try {
       const updated =
         user.status === 'ATIVO'
@@ -178,17 +125,22 @@ export function Usuarios({ toast }: UsuariosProps) {
   }
 
   const exportar = () => {
-    if (filtered.length === 0) {
+    const visiveis = apiRef.current
+      ? gridFilteredSortedRowEntriesSelector(apiRef).map((entry) => entry.model as User)
+      : list
+
+    if (visiveis.length === 0) {
       toast('Nada para exportar com os filtros atuais.')
       return
     }
+
     const today = new Date().toISOString().slice(0, 10)
     downloadCsv<User>({
-      rows: filtered,
+      rows: visiveis,
       filename: `usuarios-${today}.csv`,
       columns: ['id', 'name', 'email', 'phone', 'role', 'status', { key: 'createdAt', header: 'created_at' }],
     })
-    toast(`${filtered.length} usuários exportados`)
+    toast(`${visiveis.length} usuários exportados`)
   }
 
   return (
@@ -209,49 +161,25 @@ export function Usuarios({ toast }: UsuariosProps) {
       </div>
 
       <StatGrid columns={2}>
-        <Stat label="Total de Usuários" value={stats.total} />
+        <Stat
+          label="Total de Usuários"
+          value={stats.total}
+          delta={<>{I.spark}<span>equipe cadastrada</span></>}
+        />
         <Stat
           label="Usuários Ativos"
           value={stats.ativos}
-          delta={<>{I.spark}<span>{stats.pctAtivos}% da equipe</span></>}
+          delta={<>{I.spark}<span>{stats.pctAtivos}% do total</span></>}
         />
       </StatGrid>
 
       <TableCard>
         <TableToolbar>
-          <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nome ou e-mail…" />
-          <FilterPopover
-            open={filtersOpen}
-            activeCount={activeFiltersCount}
-            onToggle={() => (filtersOpen ? setFiltersOpen(false) : openFilters())}
-            onClose={() => setFiltersOpen(false)}
-            onClear={clearFilters}
-            onApply={applyFilters}
-          >
-            <Field label="Perfil" inline>
-              <select value={draftRole} onChange={(e) => setDraftRole(e.target.value as 'ALL' | Role)}>
-                <option value="ALL">Todos</option>
-                {ROLE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Status" inline>
-              <select
-                value={draftStatus}
-                onChange={(e) => setDraftStatus(e.target.value as 'ALL' | UserStatus)}
-              >
-                <option value="ALL">Todos</option>
-                {USER_STATUS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </FilterPopover>
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Buscar por nome ou e-mail…"
+          />
         </TableToolbar>
 
         {loadError && (
@@ -269,103 +197,16 @@ export function Usuarios({ toast }: UsuariosProps) {
           </TableError>
         )}
 
-        <div className="table-scroll">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th className="col-sm">E-mail</th>
-              <th>Perfil</th>
-              <th>Status</th>
-              <th className="col-md">Cadastro</th>
-              <th className="col-actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <TableEmpty colSpan={COLUMN_COUNT}>Carregando usuários…</TableEmpty>}
-            {!loading && filtered.length === 0 && (
-              <TableEmpty colSpan={COLUMN_COUNT}>Nenhum usuário encontrado.</TableEmpty>
-            )}
-            {!loading &&
-              paged.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <div className="cell-user">
-                        <div>
-                          <div className="name">
-                            {u.name}
-                            {u.anonymizedAt && <Badge tone="gray">Anonimizado</Badge>}
-                          </div>
-                          <div className="sub">{maskPhone(u.phone) || '-'}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="col-sm">{u.email}</td>
-                    <td>
-                      <UserRoleBadge role={u.role} />
-                    </td>
-                    <td>
-                      <UserStatusBadge status={u.status} />
-                    </td>
-                    <td className="col-md">{formatDate(u.createdAt)}</td>
-                    <td className="col-actions">
-                      <Menu
-                        open={menuFor === u.id}
-                        onToggle={() => setMenuFor((m) => (m === u.id ? null : u.id))}
-                        onClose={() => setMenuFor(null)}
-                      >
-                        {!u.anonymizedAt && (
-                          <MenuItem
-                            icon={I.edit}
-                            onClick={() => {
-                              setEditing(u)
-                              setMenuFor(null)
-                            }}
-                          >
-                            Editar
-                          </MenuItem>
-                        )}
-                        {!u.anonymizedAt && (
-                          <MenuItem icon={I.power} onClick={() => toggleStatus(u)}>
-                            {u.status === 'ATIVO' ? 'Desativar' : 'Ativar'} usuário
-                          </MenuItem>
-                        )}
-                        <MenuItem
-                          icon={I.trash}
-                          danger
-                          onClick={() => {
-                            setConfirmDelete(u)
-                            setMenuFor(null)
-                          }}
-                        >
-                          Excluir
-                        </MenuItem>
-                        {!u.anonymizedAt && u.id !== currentUser?.id && (
-                          <MenuItem
-                            icon={I.shield}
-                            danger
-                            onClick={() => {
-                              setConfirmErase(u)
-                              setMenuFor(null)
-                            }}
-                          >
-                            Eliminar dados pessoais (LGPD)
-                          </MenuItem>
-                        )}
-                      </Menu>
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-        </div>
-
-        <Pagination
-          page={currentPage}
-          pageSize={pageSize}
-          total={filtered.length}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
+        <UsersDataGrid
+          apiRef={apiRef}
+          rows={list}
+          loading={loading}
+          quickFilter={query}
+          currentUserId={currentUser?.id}
+          onEdit={setEditing}
+          onToggleStatus={(u) => void toggleStatus(u)}
+          onDelete={setConfirmDelete}
+          onErase={setConfirmErase}
         />
       </TableCard>
 

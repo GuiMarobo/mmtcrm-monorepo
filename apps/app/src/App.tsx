@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Box, CssBaseline, ThemeProvider } from '@mui/material'
+import { theme } from './theme'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 import { Placeholder } from './components/Placeholder'
@@ -7,18 +9,28 @@ import { Toast } from './components/ui'
 import { Login } from './pages/Login'
 import { ChangePassword } from './pages/ChangePassword'
 import { Dashboard } from './pages/Dashboard'
-import { Clientes } from './pages/Clientes'
-import { Negociacoes } from './pages/Negociacoes'
-import { Usuarios } from './pages/Usuarios'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { useToast } from './hooks/useToast'
 import type { Route } from './types'
 
+const Clientes = lazy(() =>
+  import('./pages/Clientes').then((m) => ({ default: m.Clientes })),
+)
+const Negociacoes = lazy(() =>
+  import('./pages/Negociacoes').then((m) => ({ default: m.Negociacoes })),
+)
+const Usuarios = lazy(() =>
+  import('./pages/Usuarios').then((m) => ({ default: m.Usuarios })),
+)
+
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoot />
-    </AuthProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <AppRoot />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 
@@ -28,7 +40,12 @@ function AppRoot() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { toast, show } = useToast()
 
-  if (loading) return <div className="app-loading">Carregando…</div>
+  if (loading)
+    return (
+      <Box sx={{ height: '100vh', display: 'grid', placeItems: 'center', color: 'text.disabled' }}>
+        Carregando…
+      </Box>
+    )
   if (!user) return <Login />
   if (user.mustChangePassword) return <ChangePassword />
 
@@ -56,27 +73,41 @@ function AppRoot() {
   }
 
   return (
-    <div className={'app-shell' + (menuOpen ? ' menu-open' : '')}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar
         route={safeRoute}
         setRoute={navigate}
         open={menuOpen}
+        onClose={() => setMenuOpen(false)}
         canManageUsers={canManageUsers}
         onLogout={() => {
           logout()
           navigate('dashboard')
         }}
       />
-      <div
-        className="sidebar-scrim"
-        onClick={() => setMenuOpen(false)}
-        aria-hidden="true"
-      />
-      <div className="main-col" data-screen-label={'App / ' + safeRoute}>
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Topbar user={user} onMenuToggle={() => setMenuOpen((v) => !v)} />
-        <div className="content">{pages[safeRoute]}</div>
-      </div>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', p: { xs: '16px 12px 24px', sm: '20px 16px 28px', lg: '24px 28px 32px' } }}>
+          <Suspense
+            fallback={
+              <Box sx={{ p: 6, textAlign: 'center', color: 'text.disabled' }}>
+                Carregando…
+              </Box>
+            }
+          >
+            {pages[safeRoute]}
+          </Suspense>
+        </Box>
+      </Box>
       {toast && <Toast text={toast.text} type={toast.type} />}
-    </div>
+    </Box>
   )
 }

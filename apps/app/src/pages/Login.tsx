@@ -1,15 +1,22 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { I } from '../icons'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Link from '@mui/material/Link'
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
+import { AuthLayout } from '../components/auth/AuthLayout'
+import { PasswordField } from '../components/auth/PasswordField'
 import { useAuth } from '../contexts/AuthContext'
 import { ApiError } from '../api'
-import { Button, Checkbox, Field } from '../components/ui'
 
 export function Login() {
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,82 +39,81 @@ export function Login() {
   }
 
   return (
-    <div className="login-shell">
-      <div className="login-left">
-        <div className="login-orb" />
-        <div className="login-orb b" />
-        <div className="login-layer">
-          <div className="brand">
-            <div>
-              <div className="brand-name">MMT Urbana</div>
-              <div className="brand-sub">CRM Comercial</div>
-            </div>
-          </div>
-        </div>
-        <div className="login-pitch login-layer">
-          <h2>Gestão comercial completa para revendedores Apple.</h2>
-          <p>
-            Acompanhe negociações, orçamentos e trade-in em um único lugar. Da chegada do lead à
-            entrega do dispositivo, tudo conectado.
-          </p>
-        </div>
-      </div>
-      <div className="login-right">
-        <form className="login-card" onSubmit={submit}>
-          <h1>Entrar</h1>
-          <div className="lead">Use suas credenciais corporativas para acessar o sistema.</div>
-          <div className="login-spacer" />
-          <Field label="E-mail">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu.email@mmturbana.com.br"
-              autoComplete="email"
-              autoFocus
+    <AuthLayout
+      headline="Gestão comercial completa para revendedores Apple."
+      pitch="Acompanhe negociações, orçamentos e trade-in em um único lugar. Da chegada do lead à entrega do dispositivo, tudo conectado."
+      title="Entrar"
+      lead="Use suas credenciais corporativas para acessar o sistema."
+      onSubmit={(e) => void submit(e)}
+    >
+      <TextField
+        label="E-mail"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="seu.email@mmturbana.com.br"
+        autoComplete="email"
+        autoFocus
+        fullWidth
+        margin="dense"
+      />
+
+      <PasswordField
+        label="Senha"
+        value={password}
+        onChange={setPassword}
+        placeholder="Sua senha"
+        autoComplete="current-password"
+      />
+
+      <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, mb: 2 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
             />
-          </Field>
-          <Field label="Senha">
-            <div className="password-field">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Sua senha"
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-              >
-                {showPassword ? I.eyeOff : I.eye}
-              </button>
-            </div>
-          </Field>
-          <div className="login-row">
-            <div className="remember">
-              <Checkbox checked={remember} onChange={() => setRemember((v) => !v)} aria-label="Lembrar de mim" />
-              <span onClick={() => setRemember((v) => !v)}>Lembrar de mim</span>
-            </div>
-            <a className="forgot" href="#" onClick={(e) => e.preventDefault()}>
-              Esqueci minha senha
-            </a>
-          </div>
-          {error && (
-            <div className="form-alert" role="alert">
-              {error}
-            </div>
-          )}
-          <Button variant="primary" type="submit" disabled={loading}>
-            {loading ? 'Entrando…' : 'Entrar'}
-          </Button>
-          <div className="login-hint">
-            Acesso restrito a colaboradores MMT Urbana. Solicite credenciais ao administrador.
-          </div>
-        </form>
-      </div>
-    </div>
+          }
+          label="Lembrar de mim"
+          slotProps={{ typography: { sx: { fontSize: 12.5, color: 'text.secondary' } } }}
+        />
+        <Link
+          href="#"
+          onClick={(e) => e.preventDefault()}
+          sx={{ ml: 'auto', fontSize: 12.5, textDecoration: 'none' }}
+        >
+          Esqueci minha senha
+        </Link>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 1.5 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Button
+        type="submit"
+        variant="contained"
+        disabled={loading}
+        fullWidth
+        sx={{ height: 46, fontSize: 14 }}
+      >
+        {loading ? 'Entrando…' : 'Entrar'}
+      </Button>
+
+      <Typography
+        sx={{
+          mt: 1.75,
+          p: '10px 12px',
+          backgroundColor: 'primary.light',
+          borderRadius: '9px',
+          fontSize: 12,
+          color: '#1d4ed8',
+        }}
+      >
+        Acesso restrito a colaboradores MMT Urbana. Solicite credenciais ao administrador.
+      </Typography>
+    </AuthLayout>
   )
 }

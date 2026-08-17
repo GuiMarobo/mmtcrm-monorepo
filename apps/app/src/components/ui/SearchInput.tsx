@@ -1,3 +1,5 @@
+import TextField from '@mui/material/TextField'
+import InputAdornment from '@mui/material/InputAdornment'
 import { I } from '../../icons'
 
 interface SearchInputProps {
@@ -8,9 +10,20 @@ interface SearchInputProps {
 
 export function SearchInput({ value, onChange, placeholder }: SearchInputProps) {
   return (
-    <div className="input grow">
-      <span className="input-ico">{I.search}</span>
-      <input placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
-    </div>
+    <TextField
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      sx={{ flex: 1, maxWidth: 320 }}
+      slotProps={{
+        input: {
+          startAdornment: (
+            <InputAdornment position="start" sx={{ color: 'text.disabled' }}>
+              {I.search}
+            </InputAdornment>
+          ),
+        },
+      }}
+    />
   )
 }

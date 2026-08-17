@@ -1,36 +1,49 @@
+import MuiButton from '@mui/material/Button'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 type Variant = 'default' | 'primary' | 'ghost' | 'danger' | 'destructive'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'color'> {
   variant?: Variant
   size?: 'md' | 'sm'
   icon?: ReactNode
 }
 
-const VARIANT_CLASS: Record<Variant, string> = {
-  default: '',
+const MUI_VARIANT = {
+  default: 'outlined',
+  primary: 'contained',
+  ghost: 'text',
+  danger: 'text',
+  destructive: 'contained',
+} as const
+
+const MUI_COLOR = {
+  default: 'inherit',
   primary: 'primary',
-  ghost: 'ghost',
-  danger: 'danger',
-  destructive: 'destructive',
-}
+  ghost: 'inherit',
+  danger: 'error',
+  destructive: 'error',
+} as const
 
 export function Button({
   variant = 'default',
   size = 'md',
   icon,
   children,
-  className = '',
+  className,
   ...rest
 }: ButtonProps) {
-  const classes = ['btn', VARIANT_CLASS[variant], size === 'sm' ? 'sm' : '', className]
-    .filter(Boolean)
-    .join(' ')
   return (
-    <button className={classes} {...rest}>
-      {icon}
-      {children != null && <span>{children}</span>}
-    </button>
+    <MuiButton
+      variant={MUI_VARIANT[variant]}
+      color={MUI_COLOR[variant]}
+      size={size === 'sm' ? 'small' : 'medium'}
+      startIcon={icon}
+      className={className}
+      {...rest}
+    >
+      {children}
+    </MuiButton>
   )
 }

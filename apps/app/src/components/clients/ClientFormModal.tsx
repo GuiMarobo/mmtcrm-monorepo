@@ -1,7 +1,11 @@
 import { useState } from 'react'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import MenuItem from '@mui/material/MenuItem'
+import TextField from '@mui/material/TextField'
 import { I } from '../../icons'
 import { ApiError } from '../../api'
-import { Button, Field, FieldRow, Modal } from '../ui'
+import { Button, Modal } from '../ui'
 import { maskCpf, maskPhone, onlyDigits } from '../../utils/format'
 import { isValidCpf, isValidEmail, isValidPhone } from '../../utils/validators'
 import type { Client, ClientStatus, CreateClientPayload, LeadOrigin, LeadQualification } from '../../types'
@@ -79,6 +83,20 @@ function isComplete(key: FieldKey, form: CreateClientPayload): boolean {
   return false
 }
 
+export function FormRow({ children }: { children: React.ReactNode }) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+        gap: 1.75,
+      }}
+    >
+      {children}
+    </Box>
+  )
+}
+
 export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProps) {
   const [form, setForm] = useState<CreateClientPayload>(client ? toForm(client) : EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -135,89 +153,114 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
         </>
       }
     >
-      <Field label="Nome Completo" required error={displayError('name')}>
-        <input
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+        <TextField
+          label="Nome Completo"
+          required
           value={form.name}
           onChange={(e) => set('name', e.target.value)}
           onBlur={() => handleBlur('name')}
           placeholder="Ex.: João da Silva"
+          error={!!displayError('name')}
+          helperText={displayError('name')}
+          fullWidth
         />
-      </Field>
-      <FieldRow>
-        <Field label="E-mail" error={displayError('email')}>
-          <input
+
+        <FormRow>
+          <TextField
+            label="E-mail"
             type="email"
             value={form.email ?? ''}
             onChange={(e) => set('email', e.target.value)}
             onBlur={() => handleBlur('email')}
             placeholder="cliente@email.com"
+            error={!!displayError('email')}
+            helperText={displayError('email')}
+            fullWidth
           />
-        </Field>
-        <Field label="Telefone" required error={displayError('phone')}>
-          <input
+          <TextField
+            label="Telefone"
+            required
             value={maskPhone(form.phone)}
             onChange={(e) => set('phone', onlyDigits(e.target.value).slice(0, 11))}
             onBlur={() => handleBlur('phone')}
             placeholder="(00) 00000-0000"
-            inputMode="numeric"
+            error={!!displayError('phone')}
+            helperText={displayError('phone')}
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+            fullWidth
           />
-        </Field>
-      </FieldRow>
-      <FieldRow>
-        <Field label="CPF" error={displayError('cpf')}>
-          <input
+        </FormRow>
+
+        <FormRow>
+          <TextField
+            label="CPF"
             value={maskCpf(form.cpf)}
             onChange={(e) => set('cpf', onlyDigits(e.target.value).slice(0, 11))}
             onBlur={() => handleBlur('cpf')}
             placeholder="000.000.000-00"
-            inputMode="numeric"
+            error={!!displayError('cpf')}
+            helperText={displayError('cpf')}
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+            fullWidth
           />
-        </Field>
-        <Field label="Canal de Origem" required>
-          <select value={form.origin ?? 'WHATSAPP'} onChange={(e) => set('origin', e.target.value as LeadOrigin)}>
+          <TextField
+            select
+            label="Canal de Origem"
+            required
+            value={form.origin ?? 'WHATSAPP'}
+            onChange={(e) => set('origin', e.target.value as LeadOrigin)}
+            fullWidth
+          >
             {LEAD_ORIGIN_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+              <MenuItem key={o.value} value={o.value}>
                 {o.label}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </Field>
-      </FieldRow>
-      <Field label="Endereço">
-        <input
+          </TextField>
+        </FormRow>
+
+        <TextField
+          label="Endereço"
           value={form.address ?? ''}
           onChange={(e) => set('address', e.target.value)}
           placeholder="Rua, nº - Bairro, Cidade/UF"
+          fullWidth
         />
-      </Field>
-      <FieldRow>
-        <Field label="Status" required>
-          <select value={form.status ?? 'LEAD'} onChange={(e) => set('status', e.target.value as ClientStatus)}>
+
+        <FormRow>
+          <TextField
+            select
+            label="Status"
+            required
+            value={form.status ?? 'LEAD'}
+            onChange={(e) => set('status', e.target.value as ClientStatus)}
+            fullWidth
+          >
             {CLIENT_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+              <MenuItem key={o.value} value={o.value}>
                 {o.label}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </Field>
-        <Field label="Qualificação" required>
-          <select
+          </TextField>
+          <TextField
+            select
+            label="Qualificação"
+            required
             value={form.qualification ?? 'NAO_QUALIFICADO'}
             onChange={(e) => set('qualification', e.target.value as LeadQualification)}
+            fullWidth
           >
             {LEAD_QUALIFICATION_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+              <MenuItem key={o.value} value={o.value}>
                 {o.label}
-              </option>
+              </MenuItem>
             ))}
-          </select>
-        </Field>
-      </FieldRow>
-      {error && (
-        <div className="form-alert" role="alert">
-          {error}
-        </div>
-      )}
+          </TextField>
+        </FormRow>
+
+        {error && <Alert severity="error">{error}</Alert>}
+      </Box>
     </Modal>
   )
 }

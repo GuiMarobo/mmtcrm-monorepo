@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { ApiError } from '../../api'
-import { Button, Field, Modal } from '../ui'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import MenuItem from '@mui/material/MenuItem'
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
+import { Button, Modal } from '../ui'
 import { formatCurrency } from '../../utils/format'
 import type {
   Client,
@@ -82,51 +87,57 @@ export function NegotiationFormModal({
         </>
       }
     >
-      {error && (
-        <div className="form-alert" role="alert">
-          {error}
-        </div>
-      )}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+        {error && <Alert severity="error">{error}</Alert>}
 
-      <Field label="Cliente" required>
-        <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-          <option value="">Selecione um cliente…</option>
+        <TextField
+          select
+          label="Cliente"
+          required
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          fullWidth
+        >
+          <MenuItem value="">Selecione um cliente…</MenuItem>
           {clients.map((c) => (
-            <option key={c.id} value={c.id}>
+            <MenuItem key={c.id} value={c.id}>
               {c.name}
-            </option>
+            </MenuItem>
           ))}
-        </select>
-      </Field>
+        </TextField>
 
-      <Field
-        label="Valor total"
-        required
-        error={valueInvalid ? 'Valor inválido' : null}
-      >
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={totalValue}
-          onChange={(e) => setTotalValue(e.target.value)}
-          placeholder="0,00"
-          autoFocus={!isEdit}
-        />
-      </Field>
+        <Box>
+          <TextField
+            label="Valor total"
+            type="number"
+            required
+            value={totalValue}
+            onChange={(e) => setTotalValue(e.target.value)}
+            placeholder="0,00"
+            autoFocus={!isEdit}
+            error={valueInvalid}
+            helperText={valueInvalid ? 'Valor inválido' : undefined}
+            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+            fullWidth
+          />
+          {!valueInvalid && totalValue.trim() !== '' && (
+            <Typography sx={{ mt: 0.5, color: 'text.disabled', fontSize: 12.5 }}>
+              {formatCurrency(parsed)}
+            </Typography>
+          )}
+        </Box>
 
-      {!valueInvalid && totalValue.trim() !== '' && (
-        <div className="muted">{formatCurrency(parsed)}</div>
-      )}
-
-      <Field label="Observações">
-        <textarea
+        <TextField
+          label="Observações"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Contexto da tratativa, condições combinadas…"
-          maxLength={1000}
+          multiline
+          minRows={3}
+          slotProps={{ htmlInput: { maxLength: 1000 } }}
+          fullWidth
         />
-      </Field>
+      </Box>
     </Modal>
   )
 }
