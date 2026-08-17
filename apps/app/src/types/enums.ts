@@ -77,6 +77,61 @@ export const LEAD_ORIGIN_LABELS: Record<LeadOrigin, string> = {
 export const LEAD_ORIGIN_OPTIONS: { value: LeadOrigin; label: string }[] =
   LEAD_ORIGINS.map((v) => ({ value: v, label: LEAD_ORIGIN_LABELS[v] }))
 
+export const NEGOTIATION_STATUSES = ['ABERTA', 'GANHA', 'PERDIDA'] as const
+export type NegotiationStatus = (typeof NEGOTIATION_STATUSES)[number]
+
+export const NEGOTIATION_STATUS_LABELS: Record<NegotiationStatus, string> = {
+  ABERTA: 'Aberta',
+  GANHA: 'Ganha',
+  PERDIDA: 'Perdida',
+}
+
+export const NEGOTIATION_STATUS_OPTIONS: {
+  value: NegotiationStatus
+  label: string
+}[] = NEGOTIATION_STATUSES.map((v) => ({
+  value: v,
+  label: NEGOTIATION_STATUS_LABELS[v],
+}))
+
+export const ORDER_STATUSES = [
+  'EM_NEGOCIACAO',
+  'COMPRA_APROVADA',
+  'DESISTENCIA',
+] as const
+export type OrderStatus = (typeof ORDER_STATUSES)[number]
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  EM_NEGOCIACAO: 'Em Negociação',
+  COMPRA_APROVADA: 'Compra Aprovada',
+  DESISTENCIA: 'Desistência',
+}
+
+export const ORDER_STATUS_OPTIONS: { value: OrderStatus; label: string }[] =
+  ORDER_STATUSES.map((v) => ({ value: v, label: ORDER_STATUS_LABELS[v] }))
+
+export const PAYMENT_METHODS = [
+  'PIX',
+  'DINHEIRO',
+  'CARTAO_CREDITO',
+  'CARTAO_DEBITO',
+  'BOLETO',
+  'TRANSFERENCIA',
+] as const
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  PIX: 'PIX',
+  DINHEIRO: 'Dinheiro',
+  CARTAO_CREDITO: 'Cartão de Crédito',
+  CARTAO_DEBITO: 'Cartão de Débito',
+  BOLETO: 'Boleto',
+  TRANSFERENCIA: 'Transferência',
+}
+
+export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] =
+  PAYMENT_METHODS.map((v) => ({ value: v, label: PAYMENT_METHOD_LABELS[v] }))
+
 export const ERASURE_SUBJECTS = ['CLIENTE', 'USUARIO'] as const
 export type ErasureSubject = (typeof ERASURE_SUBJECTS)[number]
 
