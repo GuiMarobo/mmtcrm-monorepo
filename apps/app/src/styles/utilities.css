@@ -1,0 +1,7 @@
+.divider { height: 1px; background: var(--border); margin: 18px 0; }
+.muted { color: var(--text-3); }
+.kbd-row { display: flex; align-items: center; gap: 6px; }
+.tag-pill {
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border-radius: 6px; background: #f1f3f5; font-size: 11px; color: var(--text-2);
+}
