@@ -98,6 +98,15 @@ enum OrderStatus {
   DESISTENCIA
 }
 
+enum PaymentMethod {
+  PIX
+  DINHEIRO
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  BOLETO
+  TRANSFERENCIA
+}
+
 model Negotiation {
   id          Int               @id @default(autoincrement())
   clientId    String            @map("client_id")
@@ -121,10 +130,10 @@ model Negotiation {
 
 model Order {
   id            Int         @id @default(autoincrement())
-  negotiationId Int         @unique @map("negotiation_id")
+  negotiationId Int            @unique @map("negotiation_id")
   code          String
-  status        OrderStatus @default(EM_NEGOCIACAO)
-  paymentMethod String?     @map("payment_method")
+  status        OrderStatus    @default(EM_NEGOCIACAO)
+  paymentMethod PaymentMethod? @map("payment_method")
   totalValue    Decimal     @default(0) @map("total_value") @db.Decimal(12, 2)
   notes         String?
   createdAt     DateTime    @default(now()) @map("created_at")
