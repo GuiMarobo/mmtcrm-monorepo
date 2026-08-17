@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat    = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN        // Administrador - privilégios máximos
+  VENDEDOR     // Vendedor - negociações, orçamentos, clientes
+  ATENDENTE    // Atendente - atendimento e qualificação de leads
+  TECNICO      // Técnico - avaliação de dispositivos usados
+}
+
+enum UserStatus {
+  ATIVO
+  INATIVO
+}
+
+enum ClientStatus {
+  LEAD         // Lead - ainda não qualificado
+  ATIVO        // Cliente ativo com negociações
+  INATIVO      // Cliente sem atividade recente
+}
+
+enum LeadQualification {
+  NAO_QUALIFICADO
+  QUALIFICADO
+  ALTA_INTENCAO  // Alta intenção de compra
+}
+
+enum LeadOrigin {
+  WHATSAPP
+  INSTAGRAM
+  SITE
+  INDICACAO
+  OUTRO
+}
+
+model User {
+  id          Int     @id @default(autoincrement())
+  name        String
+  email       String     // unico por indice parcial (WHERE deleted_at IS NULL)
+  password    String     // bcrypt
+  phone       String?
+  role               Role       @default(VENDEDOR)
+  status             UserStatus @default(ATIVO)
+  mustChangePassword Boolean    @default(false) @map("must_change_password")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  anonymizedAt DateTime? @map("anonymized_at")
+
+  negotiations Negotiation[]
+  erasuresPerformed DataErasureLog[]
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Client {
+  id              String             @id @default(uuid())
+  name            String
+  email           String?
+  phone           String?
+  cpf             String?            // unico por indice parcial (WHERE deleted_at IS NULL)
+  address         String?
+  status          ClientStatus       @default(LEAD)
+  qualification   LeadQualification  @default(NAO_QUALIFICADO)
+  origin          LeadOrigin?
+  notes           String?
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  lastContactAt   DateTime?          @map("last_contact_at")
+  deletedAt       DateTime?          @map("deleted_at")
+  anonymizedAt    DateTime?          @map("anonymized_at")
+
+  negotiations    Negotiation[]
+
+  @@index([cpf])
+  @@index([deletedAt])
+  @@map("clients")
+}
+
+enum NegotiationStatus {
+  ABERTA
+  GANHA
+  PERDIDA
+}
+
+enum OrderStatus {
+  EM_NEGOCIACAO
+  COMPRA_APROVADA
+  DESISTENCIA
+}
+
+model Negotiation {
+  id          Int               @id @default(autoincrement())
+  clientId    String            @map("client_id")
+  vendedorId  Int?              @map("vendedor_id")
+  status      NegotiationStatus @default(ABERTA)
+  totalValue  Decimal           @default(0) @map("total_value") @db.Decimal(12, 2)
+  notes       String?
+  closedAt    DateTime?         @map("closed_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  deletedAt   DateTime?         @map("deleted_at")
+
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vendedor User?  @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
+  order    Order?
+
+  @@index([clientId])
+  @@index([deletedAt])
+  @@map("negotiations")
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  negotiationId Int         @unique @map("negotiation_id")
+  code          String
+  status        OrderStatus @default(EM_NEGOCIACAO)
+  paymentMethod String?     @map("payment_method")
+  totalValue    Decimal     @default(0) @map("total_value") @db.Decimal(12, 2)
+  notes         String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  deletedAt     DateTime?   @map("deleted_at")
+
+  negotiation Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+
+  @@index([deletedAt])
+  @@map("orders")
+}
+
+enum ErasureSubject {
+  CLIENTE
+  USUARIO
+}
+
+enum ErasureAction {
+  ELIMINADO
+  ANONIMIZADO
+}
+
+model DataErasureLog {
+  id            Int            @id @default(autoincrement())
+  subject       ErasureSubject
+  subjectId     String         @map("subject_id")
+  subjectLabel  String         @map("subject_label") // rotulo nao identificavel, nunca o nome do titular
+  action        ErasureAction
+  reason        String?
+  performedById Int?           @map("performed_by_id")
+  performedAt   DateTime       @default(now()) @map("performed_at")
+
+  performedBy User? @relation(fields: [performedById], references: [id], onDelete: SetNull)
+
+  @@index([subject, subjectId])
+  @@map("data_erasure_logs")
+}
