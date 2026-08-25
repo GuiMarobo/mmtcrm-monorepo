@@ -1,4 +1,5 @@
-import { I } from '../../icons'
+import Box from '@mui/material/Box'
+import TablePagination from '@mui/material/TablePagination'
 
 interface PaginationProps {
   page: number
@@ -7,20 +8,6 @@ interface PaginationProps {
   onPageChange: (page: number) => void
   onPageSizeChange: (size: number) => void
   pageSizeOptions?: number[]
-}
-
-function pageItems(current: number, totalPages: number): (number | 'gap')[] {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1)
-  }
-  const items: (number | 'gap')[] = [1]
-  if (current > 3) items.push('gap')
-  const start = Math.max(2, current - 1)
-  const end = Math.min(totalPages - 1, current + 1)
-  for (let i = start; i <= end; i++) items.push(i)
-  if (current < totalPages - 2) items.push('gap')
-  items.push(totalPages)
-  return items
 }
 
 export function Pagination({
@@ -33,58 +20,26 @@ export function Pagination({
 }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const current = Math.min(page, totalPages)
-  const from = total === 0 ? 0 : (current - 1) * pageSize + 1
-  const to = Math.min(current * pageSize, total)
 
   return (
-    <div className="pagination">
-      <div className="result">
-        {total === 0 ? 'Nenhum registro' : `Mostrando ${from}-${to} de ${total}`}
-      </div>
-      <div className="page-controls">
-        <select
-          className="select"
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-        >
-          {pageSizeOptions.map((n) => (
-            <option key={n} value={n}>
-              {n} por página
-            </option>
-          ))}
-        </select>
-        <button
-          className="page-btn"
-          disabled={current <= 1}
-          onClick={() => onPageChange(current - 1)}
-          aria-label="Página anterior"
-        >
-          {I.chevL}
-        </button>
-        {pageItems(current, totalPages).map((item, i) =>
-          item === 'gap' ? (
-            <span key={`gap-${i}`} className="page-ellipsis">
-              …
-            </span>
-          ) : (
-            <button
-              key={item}
-              className={item === current ? 'page-btn active' : 'page-btn'}
-              onClick={() => onPageChange(item)}
-            >
-              {item}
-            </button>
-          ),
-        )}
-        <button
-          className="page-btn"
-          disabled={current >= totalPages}
-          onClick={() => onPageChange(current + 1)}
-          aria-label="Próxima página"
-        >
-          {I.chevR}
-        </button>
-      </div>
-    </div>
+    <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
+      <TablePagination
+        component="div"
+        count={total}
+        page={total === 0 ? 0 : current - 1}
+        onPageChange={(_, next) => onPageChange(next + 1)}
+        rowsPerPage={pageSize}
+        onRowsPerPageChange={(e) => onPageSizeChange(Number(e.target.value))}
+        rowsPerPageOptions={pageSizeOptions}
+        labelRowsPerPage="Por página"
+        labelDisplayedRows={({ from, to, count }) =>
+          count === 0 ? 'Nenhum registro' : `Mostrando ${from}-${to} de ${count}`
+        }
+        getItemAriaLabel={(type) =>
+          type === 'previous' ? 'Página anterior' : 'Próxima página'
+        }
+        sx={{ '& .MuiTablePagination-toolbar': { minHeight: 54 } }}
+      />
+    </Box>
   )
 }

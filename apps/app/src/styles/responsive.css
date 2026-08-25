@@ -71,13 +71,6 @@
   .tbl tbody tr:hover .col-actions { background: #fafbfc; }
   .tbl thead .col-actions { background: #fafbfc; }
 
-  .field-row { grid-template-columns: 1fr; }
-
-  .modal-scrim { padding: 12px; }
-  .modal-head { padding: 16px; }
-  .modal-body { padding: 16px; }
-  .modal-foot { padding: 12px 16px; flex-wrap: wrap; }
-
   .pagination { flex-wrap: wrap; gap: 10px; }
   .pagination .page-controls { margin-left: 0; width: 100%; justify-content: space-between; }
 }

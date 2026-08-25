@@ -1,4 +1,4 @@
-import { I } from '../../icons'
+import MuiCheckbox from '@mui/material/Checkbox'
 
 interface CheckboxProps {
   checked: boolean
@@ -8,14 +8,11 @@ interface CheckboxProps {
 
 export function Checkbox({ checked, onChange, ...rest }: CheckboxProps) {
   return (
-    <button
-      type="button"
-      className={checked ? 'checkbox checked' : 'checkbox'}
-      onClick={onChange}
-      aria-pressed={checked}
-      {...rest}
-    >
-      {checked && I.check}
-    </button>
+    <MuiCheckbox
+      checked={checked}
+      onChange={onChange}
+      slotProps={{ input: { 'aria-label': rest['aria-label'] } }}
+      sx={{ padding: 0 }}
+    />
   )
 }

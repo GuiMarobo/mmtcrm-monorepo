@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs'
+import type * as ExcelJS from 'exceljs'
 import type { Client } from '../types'
 import {
   CLIENT_STATUS_LABELS,
@@ -206,7 +206,8 @@ function buildResumoSheet(wb: ExcelJS.Workbook, rows: Client[], meta: ExportMeta
 }
 
 export async function downloadClientesXlsx(rows: Client[], meta: ExportMeta): Promise<void> {
-  const wb = new ExcelJS.Workbook()
+  const { default: Excel } = await import('exceljs')
+  const wb = new Excel.Workbook()
   wb.creator = 'MMT Urbana CRM'
   wb.created = meta.exportedAt
 

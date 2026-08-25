@@ -1,17 +1,7 @@
 @import './tokens.css';
-@import './base.css';
 @import './layout.css';
-@import './buttons.css';
-@import './forms.css';
-@import './badges.css';
-@import './cards.css';
-@import './stats.css';
 @import './table.css';
 @import './board.css';
-@import './menu.css';
-@import './modal.css';
 @import './login.css';
-@import './dashboard.css';
-@import './feedback.css';
 @import './utilities.css';
 @import './responsive.css';

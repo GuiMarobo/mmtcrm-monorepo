@@ -1,3 +1,7 @@
+import FormControl from '@mui/material/FormControl'
+import FormLabel from '@mui/material/FormLabel'
+import FormHelperText from '@mui/material/FormHelperText'
+import Box from '@mui/material/Box'
 import type { ReactNode } from 'react'
 
 interface FieldProps {
@@ -8,19 +12,26 @@ interface FieldProps {
   error?: string | null
 }
 
-export function Field({ label, children, inline = false, required = false, error }: FieldProps) {
+export function Field({
+  label,
+  children,
+  inline = false,
+  required = false,
+  error,
+}: FieldProps) {
   const className = ['field', inline ? 'inline' : '', error ? 'has-error' : '']
     .filter(Boolean)
     .join(' ')
+
   return (
-    <div className={className}>
-      <label>
+    <FormControl className={className} error={!!error} fullWidth>
+      <FormLabel sx={{ color: 'text.secondary', mb: '6px' }}>
         {label}
-        {required && <span className="req"> *</span>}
-      </label>
+        {required && <Box component="span" sx={{ color: 'error.main' }}> *</Box>}
+      </FormLabel>
       {children}
-      {error && <div className="field-error">{error}</div>}
-    </div>
+      {error && <FormHelperText>{error}</FormHelperText>}
+    </FormControl>
   )
 }
 

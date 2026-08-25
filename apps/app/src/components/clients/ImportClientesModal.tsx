@@ -1,6 +1,12 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import Alert from '@mui/material/Alert'
+import LinearProgress from '@mui/material/LinearProgress'
+import Step from '@mui/material/Step'
+import StepLabel from '@mui/material/StepLabel'
+import Stepper from '@mui/material/Stepper'
 import { I } from '../../icons'
+import { Button, Modal } from '../ui'
 import { ApiError, clientsApi } from '../../api'
 import type { ImportReport } from '../../types'
 
@@ -80,75 +86,85 @@ export function ImportClientesModal({ onClose, onImported }: ImportClientesModal
     onClose()
   }
 
+  const activeStep =
+    phase === 'idle' || phase === 'analyzing'
+      ? 0
+      : phase === 'reviewing' || phase === 'importing'
+        ? 1
+        : 2
+
   return (
-    <div className="modal-scrim" onClick={phase === 'importing' ? undefined : onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 720 }}>
-        <div className="modal-head">
-          <div className="modal-titles">
-            <div className="modal-title">Importar Clientes</div>
-            <div className="modal-sub">
-              Envie a planilha padrão da MMT Urbana em formato .csv. O arquivo é analisado antes de
-              salvar - nada é gravado sem a sua confirmação.
-            </div>
-          </div>
-          <button className="row-action" onClick={onClose} aria-label="Fechar">
-            {I.x}
-          </button>
-        </div>
-
-        <div className="modal-body">
-          {(phase === 'idle' || phase === 'analyzing') && (
-            <>
-              <Dropzone
-                fileInputRef={fileInputRef}
-                onFileChange={handleFileChange}
-                file={file}
-                busy={phase === 'analyzing'}
-              />
-              <ColumnGuide />
-            </>
-          )}
-          {(phase === 'reviewing' || phase === 'importing') && report && (
-            <ReportView report={report} importing={phase === 'importing'} />
-          )}
-          {phase === 'done' && report && <DoneView report={report} />}
-          {error && (
-            <div className="form-alert" role="alert" style={{ marginTop: 12 }}>
-              {error}
-            </div>
-          )}
-        </div>
-
-        <div className="modal-foot">
+    <Modal
+      title="Importar Clientes"
+      subtitle="Envie a planilha padrão da MMT Urbana em formato .csv. O arquivo é analisado antes de salvar - nada é gravado sem a sua confirmação."
+      onClose={onClose}
+      width={720}
+      closeOnBackdrop={phase !== 'importing'}
+      footer={
+        <>
           {phase === 'reviewing' && (
             <>
-              <button className="btn" onClick={reset}>
-                Trocar arquivo
-              </button>
-              <button
-                className="btn primary"
+              <Button onClick={reset}>Trocar arquivo</Button>
+              <Button
+                variant="primary"
+                icon={I.check}
                 onClick={confirm}
                 disabled={!report || report.toCreate === 0}
               >
-                {I.check}
-                <span>Confirmar importação ({report?.toCreate ?? 0})</span>
-              </button>
+                Confirmar importação ({report?.toCreate ?? 0})
+              </Button>
             </>
           )}
           {phase === 'done' && (
-            <button className="btn primary" onClick={finishAndClose}>
-              {I.check}
-              <span>Concluir</span>
-            </button>
+            <Button variant="primary" icon={I.check} onClick={finishAndClose}>
+              Concluir
+            </Button>
           )}
           {(phase === 'idle' || phase === 'analyzing' || phase === 'importing') && (
-            <button className="btn" onClick={onClose} disabled={phase === 'importing'}>
+            <Button onClick={onClose} disabled={phase === 'importing'}>
               Cancelar
-            </button>
+            </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+        <Step>
+          <StepLabel>Enviar arquivo</StepLabel>
+        </Step>
+        <Step>
+          <StepLabel>Revisar</StepLabel>
+        </Step>
+        <Step>
+          <StepLabel>Concluído</StepLabel>
+        </Step>
+      </Stepper>
+
+      {(phase === 'analyzing' || phase === 'importing') && (
+        <LinearProgress sx={{ mb: 2 }} />
+      )}
+
+      {(phase === 'idle' || phase === 'analyzing') && (
+        <>
+          <Dropzone
+            fileInputRef={fileInputRef}
+            onFileChange={handleFileChange}
+            file={file}
+            busy={phase === 'analyzing'}
+          />
+          <ColumnGuide />
+        </>
+      )}
+      {(phase === 'reviewing' || phase === 'importing') && report && (
+        <ReportView report={report} importing={phase === 'importing'} />
+      )}
+      {phase === 'done' && report && <DoneView report={report} />}
+      {error && (
+        <Alert severity="error" sx={{ mt: 1.5 }}>
+          {error}
+        </Alert>
+      )}
+    </Modal>
   )
 }
 

@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
+import Box from '@mui/material/Box'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import Typography from '@mui/material/Typography'
 import { I } from '../icons'
 import { ApiError, clientsApi } from '../api'
-import { Stat, StatGrid, TableCard, TableEmpty, TableError, TableToolbar } from '../components/ui'
+import { Stat, StatGrid, TableCard, TableError, TableToolbar } from '../components/ui'
 import { ClientStatusBadge } from '../components/clients/ClientBadges'
 import { formatDate } from '../utils/format'
 import type { Client } from '../types'
@@ -77,46 +84,64 @@ export function Dashboard() {
 
       <TableCard>
         <TableToolbar>
-          <div className="chart-title">Clientes recentes</div>
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+            Clientes recentes
+          </Typography>
         </TableToolbar>
+
         {loadError && <TableError>{loadError}</TableError>}
-        <div className="table-scroll">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th className="col-sm">E-mail</th>
-              <th>Status</th>
-              <th className="num">Negociações</th>
-              <th className="col-md">Cadastro</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <TableEmpty colSpan={5}>Carregando…</TableEmpty>}
-            {!loading && recent.length === 0 && (
-              <TableEmpty colSpan={5}>Nenhum cliente cadastrado ainda.</TableEmpty>
-            )}
-            {!loading &&
-              recent.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <div className="cell-user">
-                        <div className="name">{c.name}</div>
-                      </div>
-                    </td>
-                    <td className="col-sm">{c.email ?? '-'}</td>
-                    <td>
+
+        <Box sx={{ overflowX: 'auto' }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Nome</TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
+                  E-mail
+                </TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Negociações</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
+                  Cadastro
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading && (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ color: 'text.disabled', py: 3 }}>
+                    Carregando…
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loading && recent.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ color: 'text.disabled', py: 3 }}>
+                    Nenhum cliente cadastrado ainda.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loading &&
+                recent.map((c) => (
+                  <TableRow key={c.id} hover>
+                    <TableCell sx={{ fontWeight: 600 }}>{c.name}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
+                      {c.email ?? '-'}
+                    </TableCell>
+                    <TableCell>
                       <ClientStatusBadge status={c.status} />
-                    </td>
-                    <td className="num">
+                    </TableCell>
+                    <TableCell align="right">
                       <b>{c.negotiationsCount}</b>
-                    </td>
-                    <td className="col-md">{formatDate(c.createdAt)}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
+                      {formatDate(c.createdAt)}
+                    </TableCell>
+                  </TableRow>
                 ))}
-          </tbody>
-        </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Box>
       </TableCard>
     </div>
   )

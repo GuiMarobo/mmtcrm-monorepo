@@ -1,6 +1,10 @@
+import { useRef } from 'react'
+import MuiMenu from '@mui/material/Menu'
+import MuiMenuItem from '@mui/material/MenuItem'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import IconButton from '@mui/material/IconButton'
 import type { ReactNode } from 'react'
 import { I } from '../../icons'
-import { useClickOutside } from '../../hooks/useClickOutside'
 
 interface MenuProps {
   open: boolean
@@ -10,14 +14,23 @@ interface MenuProps {
 }
 
 export function Menu({ open, onToggle, onClose, children }: MenuProps) {
-  const ref = useClickOutside<HTMLDivElement>(open, onClose)
+  const anchor = useRef<HTMLButtonElement>(null)
+
   return (
-    <div className="anchor" ref={ref}>
-      <button className="row-action" onClick={onToggle} aria-label="Ações">
+    <>
+      <IconButton ref={anchor} onClick={onToggle} aria-label="Ações" size="small">
         {I.more}
-      </button>
-      {open && <div className="menu right">{children}</div>}
-    </div>
+      </IconButton>
+      <MuiMenu
+        open={open}
+        anchorEl={anchor.current}
+        onClose={onClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {children}
+      </MuiMenu>
+    </>
   )
 }
 
@@ -28,11 +41,30 @@ interface MenuItemProps {
   children: ReactNode
 }
 
-export function MenuItem({ icon, danger = false, onClick, children }: MenuItemProps) {
+export function MenuItem({
+  icon,
+  danger = false,
+  onClick,
+  children,
+}: MenuItemProps) {
   return (
-    <button className={danger ? 'menu-item danger' : 'menu-item'} onClick={onClick}>
-      {icon && <span className="menu-ico">{icon}</span>}
-      <span>{children}</span>
-    </button>
+    <MuiMenuItem
+      onClick={onClick}
+      sx={
+        danger
+          ? {
+              color: 'error.main',
+              '&:hover': { backgroundColor: '#fee2e2', color: 'error.main' },
+            }
+          : undefined
+      }
+    >
+      {icon && (
+        <ListItemIcon sx={danger ? { color: 'error.main' } : undefined}>
+          {icon}
+        </ListItemIcon>
+      )}
+      {children}
+    </MuiMenuItem>
   )
 }
