@@ -167,7 +167,11 @@ export function Sidebar({
       <Drawer
         variant="permanent"
         open
-        sx={{ display: { xs: 'none', lg: 'block' } }}
+        sx={{
+          display: { xs: 'none', lg: 'block' },
+          width: SIDEBAR_WIDTH,
+          flexShrink: 0,
+        }}
         slotProps={{ paper: { sx: paperSx } }}
       >
         {content}
