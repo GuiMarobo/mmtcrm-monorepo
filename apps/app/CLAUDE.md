@@ -1,1 +1,0 @@
-../../../mmturbana-setup/apps/app/CLAUDE.md
