@@ -1,8 +1,16 @@
 # LLM Context and Instructions
+# Vivem no repositorio privado mmturbana-setup, ao lado deste, e entram aqui por symlink.
+# Nao versionar: o andaime de agente nao vai junto no repositorio do codigo.
 /context
 /docs
 CLAUDE.md
+.claude/skills
 DOCUMENTACAO.md
+
+# Projeto UML (binario) - versionado no mmturbana-setup
+*.asta
+*.asta.bak
+*.asta.lock
 
 # Dependencies
 node_modules
@@ -71,3 +79,6 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Config de servidores MCP - vive no mmturbana-setup
+.mcp.json
