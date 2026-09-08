@@ -1,3 +1,4 @@
+import Alert from '@mui/material/Alert'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
@@ -6,6 +7,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog'
 interface EraseDataDialogProps {
   subject: 'cliente' | 'usuário'
   name: string
+  hasHistory?: boolean
   loading: boolean
   onConfirm: (reason: string) => void
   onCancel: () => void
@@ -14,12 +16,14 @@ interface EraseDataDialogProps {
 export function EraseDataDialog({
   subject,
   name,
+  hasHistory = true,
   loading,
   onConfirm,
   onCancel,
 }: EraseDataDialogProps) {
   const [reason, setReason] = useState('')
   const historyLabel = subject === 'cliente' ? 'negociação' : 'negociação conduzida'
+  const showWarning = hasHistory === false
 
   return (
     <ConfirmDialog
@@ -35,6 +39,12 @@ export function EraseDataDialog({
             dados pessoais são anonimizados e as negociações e pedidos são preservados, como exige a
             obrigação fiscal.
           </Typography>
+          {showWarning && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <b>⚠️ Atenção:</b> Este {subject} não tem histórico comercial e será{' '}
+              <b>removido permanentemente</b> do sistema.
+            </Alert>
+          )}
           <TextField
             label="Registro do pedido"
             required

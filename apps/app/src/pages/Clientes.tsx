@@ -315,6 +315,7 @@ export function Clientes({ toast }: ClientesProps) {
         <EraseDataDialog
           subject="cliente"
           name={confirmErase.name}
+          hasHistory={confirmErase.negotiationsCount > 0}
           loading={erasing}
           onConfirm={(reason) => void eraseData(reason)}
           onCancel={() => setConfirmErase(null)}
