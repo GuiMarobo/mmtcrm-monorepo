@@ -1,3 +1,12 @@
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined'
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
+import HandshakeOutlinedIcon from '@mui/icons-material/HandshakeOutlined'
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
+import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
+import PhoneIphoneOutlinedIcon from '@mui/icons-material/PhoneIphoneOutlined'
+import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined'
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
 import List from '@mui/material/List'
@@ -6,7 +15,6 @@ import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
-import { I } from '../icons'
 import type { Route } from '../types'
 
 export const SIDEBAR_WIDTH = 248
@@ -26,33 +34,50 @@ function buildGroups(canManageUsers: boolean): NavGroup[] {
   const groups: NavGroup[] = [
     {
       label: 'Principal',
-      items: [{ id: 'dashboard', label: 'Dashboard', icon: I.dashboard }],
+      items: [{ id: 'dashboard', label: 'Dashboard', icon: <DashboardOutlinedIcon /> }],
     },
     {
       label: 'Vendas',
       items: [
-        { id: 'negociacoes', label: 'Negociações', icon: I.deal },
-        { id: 'clientes', label: 'Clientes & Leads', icon: I.clients },
-        { id: 'orcamentos', label: 'Orçamentos', icon: I.quote },
-        { id: 'pedidos', label: 'Pedidos', icon: I.orders },
+        { id: 'negociacoes', label: 'Negociações', icon: <HandshakeOutlinedIcon /> },
+        { id: 'clientes', label: 'Clientes & Leads', icon: <PeopleAltOutlinedIcon /> },
+        { id: 'orcamentos', label: 'Orçamentos', icon: <DescriptionOutlinedIcon /> },
+        { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBagOutlinedIcon /> },
       ],
     },
     {
       label: 'Cadastros',
       items: [
-        { id: 'produtos', label: 'Produtos', icon: I.product },
-        { id: 'usados', label: 'Dispositivos Usados', icon: I.device },
+        { id: 'produtos', label: 'Produtos', icon: <Inventory2OutlinedIcon /> },
+        { id: 'usados', label: 'Dispositivos Usados', icon: <PhoneIphoneOutlinedIcon /> },
       ],
     },
   ]
   if (canManageUsers) {
     groups.push({
       label: 'Sistema',
-      items: [{ id: 'usuarios', label: 'Usuários', icon: I.users }],
+      items: [{ id: 'usuarios', label: 'Usuários', icon: <ManageAccountsOutlinedIcon /> }],
     })
   }
   return groups
 }
+
+const ITEM_SX = {
+  borderRadius: '8px',
+  py: '9px',
+  px: '10px',
+  gap: 1.25,
+  color: 'text.secondary',
+  '&:hover': { backgroundColor: '#f6f7f9', color: 'text.primary' },
+  '&.Mui-selected': {
+    backgroundColor: 'text.primary',
+    color: '#fff',
+    '& .MuiListItemIcon-root': { color: '#fff' },
+    '&:hover': { backgroundColor: 'text.primary' },
+  },
+}
+
+const LABEL_SLOT = { primary: { sx: { fontSize: 13.5, fontWeight: 500 } } }
 
 interface SidebarProps {
   route: Route
@@ -72,22 +97,6 @@ export function Sidebar({
   onLogout,
 }: SidebarProps) {
   const groups = buildGroups(canManageUsers)
-
-  const itemSx = {
-    borderRadius: '8px',
-    py: '9px',
-    px: '10px',
-    gap: 1.25,
-    color: 'text.secondary',
-    fontSize: 13.5,
-    '&:hover': { backgroundColor: '#f6f7f9', color: 'text.primary' },
-    '&.Mui-selected': {
-      backgroundColor: 'text.primary',
-      color: '#fff',
-      '& .MuiListItemIcon-root': { color: '#fff' },
-      '&:hover': { backgroundColor: 'text.primary' },
-    },
-  }
 
   const content = (
     <Box
@@ -130,13 +139,10 @@ export function Sidebar({
                 key={item.id}
                 selected={route === item.id}
                 onClick={() => setRoute(item.id)}
-                sx={itemSx}
+                sx={ITEM_SX}
               >
-                <ListItemIcon sx={{ minWidth: 0 }}>{item.icon}</ListItemIcon>
-                <ListItemText
-                  primary={item.label}
-                  slotProps={{ primary: { sx: { fontSize: 13.5, fontWeight: 500 } } }}
-                />
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.label} slotProps={LABEL_SLOT} />
               </ListItemButton>
             ))}
           </List>
@@ -144,12 +150,11 @@ export function Sidebar({
       ))}
 
       <Box sx={{ mt: 'auto', pt: 1 }}>
-        <ListItemButton onClick={onLogout} sx={itemSx}>
-          <ListItemIcon sx={{ minWidth: 0 }}>{I.power}</ListItemIcon>
-          <ListItemText
-            primary="Sair"
-            slotProps={{ primary: { sx: { fontSize: 13.5, fontWeight: 500 } } }}
-          />
+        <ListItemButton onClick={onLogout} sx={ITEM_SX}>
+          <ListItemIcon>
+            <LogoutOutlinedIcon />
+          </ListItemIcon>
+          <ListItemText primary="Sair" slotProps={LABEL_SLOT} />
         </ListItemButton>
       </Box>
     </Box>
@@ -167,11 +172,7 @@ export function Sidebar({
       <Drawer
         variant="permanent"
         open
-        sx={{
-          display: { xs: 'none', lg: 'block' },
-          width: SIDEBAR_WIDTH,
-          flexShrink: 0,
-        }}
+        sx={{ display: { xs: 'none', lg: 'block' }, width: SIDEBAR_WIDTH, flexShrink: 0 }}
         slotProps={{ paper: { sx: paperSx } }}
       >
         {content}

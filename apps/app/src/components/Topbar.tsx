@@ -1,9 +1,9 @@
+import MenuIcon from '@mui/icons-material/Menu'
 import AppBar from '@mui/material/AppBar'
-import Toolbar from '@mui/material/Toolbar'
-import IconButton from '@mui/material/IconButton'
-import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
-import { I } from '../icons'
+import IconButton from '@mui/material/IconButton'
+import Toolbar from '@mui/material/Toolbar'
+import Typography from '@mui/material/Typography'
 import type { AuthUser } from '../types'
 
 interface TopbarProps {
@@ -29,7 +29,7 @@ export function Topbar({ user, onMenuToggle }: TopbarProps) {
           aria-label="Abrir menu"
           sx={{ display: { xs: 'inline-flex', lg: 'none' } }}
         >
-          {I.menu}
+          <MenuIcon sx={{ fontSize: 20 }} />
         </IconButton>
 
         <Typography

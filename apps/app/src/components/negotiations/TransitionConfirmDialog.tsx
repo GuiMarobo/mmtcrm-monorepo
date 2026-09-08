@@ -1,4 +1,4 @@
-import { ConfirmDialog } from '../ui'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { Negotiation, NegotiationStatus } from '../../types'
 
 interface TransitionConfirmDialogProps {

@@ -1,5 +1,5 @@
-import { Badge } from '../ui'
-import type { BadgeTone } from '../ui'
+import { ToneChip } from '../common/ToneChip'
+import type { BadgeTone } from '../../theme/tones'
 import type { NegotiationStatus, OrderStatus } from '../../types'
 import { NEGOTIATION_STATUS_LABELS, ORDER_STATUS_LABELS } from '../../types'
 
@@ -15,18 +15,14 @@ const ORDER_TONE: Record<OrderStatus, BadgeTone> = {
   DESISTENCIA: 'red',
 }
 
-export function NegotiationStatusBadge({
-  status,
-}: {
-  status: NegotiationStatus
-}) {
+export function NegotiationStatusBadge({ status }: { status: NegotiationStatus }) {
   return (
-    <Badge tone={STATUS_TONE[status]} dot>
+    <ToneChip tone={STATUS_TONE[status]} dot>
       {NEGOTIATION_STATUS_LABELS[status]}
-    </Badge>
+    </ToneChip>
   )
 }
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  return <Badge tone={ORDER_TONE[status]}>{ORDER_STATUS_LABELS[status]}</Badge>
+  return <ToneChip tone={ORDER_TONE[status]}>{ORDER_STATUS_LABELS[status]}</ToneChip>
 }

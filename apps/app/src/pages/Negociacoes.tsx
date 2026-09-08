@@ -1,5 +1,8 @@
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
-import { I } from '../icons'
 import { ApiError, clientsApi, negotiationsApi } from '../api'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
@@ -13,7 +16,9 @@ import {
   canTransition,
   TRANSITION_REFUSAL,
 } from '../components/negotiations/transitions'
-import { Button, ConfirmDialog, TableCard, TableError } from '../components/ui'
+import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { PageHeader } from '../components/common/PageHeader'
+import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
 import type {
   Client,
   CreateNegotiationPayload,
@@ -37,7 +42,6 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [view, setView] = useState<NegotiationView>('quadro')
-  const [menuFor, setMenuFor] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Negotiation | null>(null)
   const [converting, setConverting] = useState<Negotiation | null>(null)
@@ -95,7 +99,6 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     negotiation: Negotiation,
     target: NegotiationStatus,
   ): Promise<boolean> => {
-    setMenuFor(null)
     if (negotiation.status === target) return Promise.resolve(false)
     if (!canTransition(negotiation.status, target)) {
       toast(TRANSITION_REFUSAL, 'error')
@@ -171,67 +174,48 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     }
   }
 
-  const openEdit = (negotiation: Negotiation) => {
-    setEditing(negotiation)
-    setMenuFor(null)
-  }
-
-  const openDelete = (negotiation: Negotiation) => {
-    setConfirmDelete(negotiation)
-    setMenuFor(null)
-  }
-
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-title">Negociações</div>
-          <div className="page-sub">
-            Acompanhe as tratativas comerciais da abertura ao fechamento.
-          </div>
-        </div>
-        <div className="page-actions">
-          <ViewSwitch view={view} onChange={setView} />
-          <Button variant="primary" icon={I.plus} onClick={() => setCreating(true)}>
-            Nova negociação
-          </Button>
-        </div>
-      </div>
+    <Box>
+      <PageHeader
+        title="Negociações"
+        subtitle="Acompanhe as tratativas comerciais da abertura ao fechamento."
+        actions={
+          <>
+            <ViewSwitch view={view} onChange={setView} />
+            <Button
+              variant="contained"
+              startIcon={<AddOutlinedIcon />}
+              onClick={() => setCreating(true)}
+            >
+              Nova negociação
+            </Button>
+          </>
+        }
+      />
 
       <NegotiationStats list={list} />
 
       {loadError && (
-        <TableCard>
-          <TableError>
-            {loadError} -{' '}
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                void reload()
-              }}
-            >
-              tentar novamente
-            </a>
-          </TableError>
-        </TableCard>
+        <SectionCard>
+          <ErrorBanner message={loadError} onRetry={() => void reload()} />
+        </SectionCard>
       )}
 
       {!loadError &&
         view === 'quadro' &&
         (loading ? (
-          <TableCard>
-            <div className="board-empty">Carregando negociações…</div>
-          </TableCard>
+          <SectionCard>
+            <Typography sx={{ p: 3, textAlign: 'center', color: 'text.disabled', fontSize: 13 }}>
+              Carregando negociações…
+            </Typography>
+          </SectionCard>
         ) : (
           <NegotiationBoard
             items={list}
-            menuFor={menuFor}
-            onMenuToggle={setMenuFor}
             onMove={requestTransition}
             onRefuse={() => toast(TRANSITION_REFUSAL, 'error')}
-            onEdit={openEdit}
-            onDelete={openDelete}
+            onEdit={setEditing}
+            onDelete={setConfirmDelete}
           />
         ))}
 
@@ -239,11 +223,9 @@ export function Negociacoes({ toast }: NegociacoesProps) {
         <NegotiationListView
           items={list}
           loading={loading}
-          menuFor={menuFor}
-          onMenuToggle={setMenuFor}
-          onEdit={openEdit}
+          onEdit={setEditing}
           onRequestTransition={(n, t) => void requestTransition(n, t)}
-          onDelete={openDelete}
+          onDelete={setConfirmDelete}
         />
       )}
 
@@ -300,6 +282,6 @@ export function Negociacoes({ toast }: NegociacoesProps) {
           onCancel={() => setConfirmDelete(null)}
         />
       )}
-    </div>
+    </Box>
   )
 }

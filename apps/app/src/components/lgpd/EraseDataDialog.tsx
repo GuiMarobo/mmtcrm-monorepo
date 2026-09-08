@@ -1,5 +1,7 @@
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
 import { useState } from 'react'
-import { ConfirmDialog, Field } from '../ui'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 
 interface EraseDataDialogProps {
   subject: 'cliente' | 'usuário'
@@ -24,24 +26,26 @@ export function EraseDataDialog({
       title="Eliminar dados pessoais?"
       description={
         <>
-          <p>
+          <Typography sx={{ fontSize: 13.5, lineHeight: 1.55 }}>
             Atende ao pedido do titular <b>{name}</b> pelo Art. 18, VI da LGPD.{' '}
             <b>Não há como desfazer.</b>
-          </p>
-          <p className="erase-rule">
-            Sem nenhuma {historyLabel}, o registro é eliminado do sistema. Havendo
-            histórico, os dados pessoais são anonimizados e as negociações e pedidos são
-            preservados, como exige a obrigação fiscal.
-          </p>
-          <Field label="Registro do pedido" required>
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ex.: solicitação por WhatsApp em 07/08/2026"
-              maxLength={500}
-              autoFocus
-            />
-          </Field>
+          </Typography>
+          <Typography sx={{ fontSize: 13.5, lineHeight: 1.55, color: 'text.disabled', mt: 1 }}>
+            Sem nenhuma {historyLabel}, o registro é eliminado do sistema. Havendo histórico, os
+            dados pessoais são anonimizados e as negociações e pedidos são preservados, como exige a
+            obrigação fiscal.
+          </Typography>
+          <TextField
+            label="Registro do pedido"
+            required
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Ex.: solicitação por WhatsApp em 07/08/2026"
+            slotProps={{ htmlInput: { maxLength: 500 } }}
+            autoFocus
+            fullWidth
+            sx={{ mt: 2 }}
+          />
         </>
       }
       confirmLabel="Eliminar dados"

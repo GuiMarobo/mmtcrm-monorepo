@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
-import { I } from '../../icons'
+import { useState } from 'react'
 import { ApiError } from '../../api'
-import { Button, Modal } from '../ui'
+import { FormDialog } from '../common/FormDialog'
+import { FormRow } from '../common/FormRow'
 import { maskCpf, maskPhone, onlyDigits } from '../../utils/format'
 import { isValidCpf, isValidEmail, isValidPhone } from '../../utils/validators'
-import type { Client, ClientStatus, CreateClientPayload, LeadOrigin, LeadQualification } from '../../types'
+import type {
+  Client,
+  ClientStatus,
+  CreateClientPayload,
+  LeadOrigin,
+  LeadQualification,
+} from '../../types'
 import {
   CLIENT_STATUS_OPTIONS,
   LEAD_ORIGIN_OPTIONS,
@@ -83,22 +91,6 @@ function isComplete(key: FieldKey, form: CreateClientPayload): boolean {
   return false
 }
 
-export function FormRow({ children }: { children: React.ReactNode }) {
-  return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-        columnGap: 2,
-        rowGap: { xs: 1.25, sm: 0 },
-        alignItems: 'start',
-      }}
-    >
-      {children}
-    </Box>
-  )
-}
-
 export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProps) {
   const [form, setForm] = useState<CreateClientPayload>(client ? toForm(client) : EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -138,7 +130,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
   }
 
   return (
-    <Modal
+    <FormDialog
       title={isEdit ? 'Editar Cliente' : 'Novo Cliente / Lead'}
       subtitle="Preencha os dados de contato e classificação."
       onClose={onClose}
@@ -146,10 +138,10 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
       closeOnBackdrop={false}
       footer={
         <>
-          <Button onClick={onClose} disabled={saving}>
+          <Button variant="outlined" color="inherit" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button variant="primary" icon={I.check} onClick={submit} disabled={saving}>
+          <Button variant="contained" startIcon={<CheckOutlinedIcon />} onClick={submit} disabled={saving}>
             {saving ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Cadastrar cliente'}
           </Button>
         </>
@@ -267,6 +259,6 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
 
         {error && <Alert severity="error">{error}</Alert>}
       </Box>
-    </Modal>
+    </FormDialog>
   )
 }

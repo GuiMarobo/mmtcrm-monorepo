@@ -1,14 +1,20 @@
 import { createTheme } from '@mui/material/styles'
+import { ptBR } from '@mui/x-data-grid/locales'
+import type {} from '@mui/x-data-grid-premium/themeAugmentation'
 
-export const BORDER = '#ececef'
+const BORDER = '#ececef'
 export const BORDER_STRONG = '#e1e3e6'
-export const SURFACE_HOVER = '#fafbfc'
-export const SUBTLE_HOVER = '#f1f3f5'
-export const HEADER_BG = '#fafbfc'
+const SURFACE_HOVER = '#fafbfc'
+const SUBTLE_HOVER = '#f1f3f5'
+const HEADER_BG = '#fafbfc'
+export const CANVAS = '#f7f8fa'
+export const INK = '#0e1116'
 export const SHADOW_SM = '0 1px 2px rgba(15, 17, 22, 0.04)'
 export const SHADOW_MD = '0 4px 12px rgba(15, 17, 22, 0.06)'
-export const SHADOW_DIALOG = '0 24px 60px rgba(15, 17, 22, 0.18)'
-export const SCRIM = 'rgba(15, 17, 22, 0.4)'
+const SHADOW_DIALOG = '0 24px 60px rgba(15, 17, 22, 0.18)'
+const SCRIM = 'rgba(15, 17, 22, 0.4)'
+
+const gridLocale = ptBR.components.MuiDataGrid.defaultProps.localeText
 
 export const theme = createTheme({
   palette: {
@@ -19,7 +25,7 @@ export const theme = createTheme({
     error: { main: '#dc2626' },
     info: { main: '#2563eb' },
     background: { default: '#f4f5f7', paper: '#ffffff' },
-    text: { primary: '#0e1116', secondary: '#4b5563', disabled: '#8a8f98' },
+    text: { primary: INK, secondary: '#4b5563', disabled: '#8a8f98' },
     divider: BORDER,
   },
   shape: { borderRadius: 12 },
@@ -43,6 +49,10 @@ export const theme = createTheme({
         'button, input, select, textarea': { fontFamily: 'inherit' },
       },
     },
+    MuiSvgIcon: {
+      defaultProps: { fontSize: 'small' },
+      styleOverrides: { fontSizeSmall: { fontSize: 18 } },
+    },
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
@@ -56,7 +66,7 @@ export const theme = createTheme({
         },
         outlined: {
           borderColor: BORDER_STRONG,
-          color: '#0e1116',
+          color: INK,
           backgroundColor: '#ffffff',
           '&:hover': { backgroundColor: SURFACE_HOVER, borderColor: BORDER_STRONG },
         },
@@ -66,6 +76,32 @@ export const theme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: { borderRadius: 7, color: '#8a8f98', '&:hover': { backgroundColor: SUBTLE_HOVER } },
+      },
+    },
+    MuiToggleButtonGroup: {
+      styleOverrides: {
+        root: { backgroundColor: '#ffffff', borderRadius: 10 },
+        grouped: { border: `1px solid ${BORDER_STRONG}` },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          height: 38,
+          gap: 6,
+          padding: '0 14px',
+          borderRadius: 10,
+          fontSize: 13,
+          fontWeight: 600,
+          textTransform: 'none',
+          color: 'rgba(75, 85, 99, 1)',
+          '&:hover': { backgroundColor: SURFACE_HOVER },
+          '&.Mui-selected': {
+            backgroundColor: INK,
+            color: '#ffffff',
+            '&:hover': { backgroundColor: INK },
+          },
+        },
       },
     },
     MuiPaper: {
@@ -132,7 +168,7 @@ export const theme = createTheme({
           paddingTop: 9,
           paddingBottom: 9,
           color: '#4b5563',
-          '&:hover': { backgroundColor: '#f6f7f9', color: '#0e1116' },
+          '&:hover': { backgroundColor: '#f6f7f9', color: INK },
         },
       },
     },
@@ -148,6 +184,26 @@ export const theme = createTheme({
           fontWeight: 600,
           padding: '12px 16px',
         },
+      },
+    },
+    MuiDataGrid: {
+      defaultProps: {
+        localeText: gridLocale,
+        disableRowSelectionOnClick: true,
+        pagination: true,
+        pageSizeOptions: [10, 25, 50],
+        getRowHeight: () => 'auto',
+      },
+      styleOverrides: {
+        root: {
+          border: 0,
+          '--DataGrid-overlayHeight': '220px',
+          '--DataGrid-rowBorderColor': BORDER,
+        },
+        columnHeaders: { backgroundColor: HEADER_BG },
+        columnHeaderTitle: { fontSize: 11.5, fontWeight: 600, color: '#8a8f98' },
+        cell: { display: 'flex', alignItems: 'center', fontSize: 13.5 },
+        footerContainer: { borderTopColor: BORDER },
       },
     },
   },

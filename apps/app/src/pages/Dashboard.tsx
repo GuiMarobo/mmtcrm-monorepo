@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -6,12 +5,16 @@ import TableCell from '@mui/material/TableCell'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
-import { I } from '../icons'
+import { useEffect, useMemo, useState } from 'react'
 import { ApiError, clientsApi } from '../api'
-import { Stat, StatGrid, TableCard, TableError, TableToolbar } from '../components/ui'
 import { ClientStatusBadge } from '../components/clients/ClientBadges'
+import { PageHeader } from '../components/common/PageHeader'
+import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
+import { Stat, StatGrid } from '../components/common/StatGrid'
 import { formatDate } from '../utils/format'
 import type { Client } from '../types'
+
+const COLUMN_COUNT = 5
 
 export function Dashboard() {
   const [list, setList] = useState<Client[]>([])
@@ -51,72 +54,68 @@ export function Dashboard() {
   )
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-title">Dashboard</div>
-          <div className="page-sub">Visão geral da sua base de clientes e negociações.</div>
-        </div>
-      </div>
+    <Box>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Visão geral da sua base de clientes e negociações."
+      />
 
       <StatGrid>
         <Stat
           label="Total de Clientes"
           value={stats.total}
-          delta={<>{I.spark}<span>{stats.leads} leads em aberto</span></>}
+          hint={`${stats.leads} leads em aberto`}
         />
         <Stat
           label="Clientes Ativos"
           value={stats.ativos}
-          delta={<>{I.spark}<span>{stats.pct(stats.ativos)}% do total</span></>}
+          hint={`${stats.pct(stats.ativos)}% do total`}
         />
         <Stat
           label="Alta Intenção"
           value={stats.alta}
-          delta={<>{I.spark}<span>{stats.pct(stats.alta)}% do total</span></>}
+          hint={`${stats.pct(stats.alta)}% do total`}
         />
-        <Stat
-          label="Negociações"
-          value={stats.negociacoes}
-          delta={<>{I.spark}<span>no total da base</span></>}
-        />
+        <Stat label="Negociações" value={stats.negociacoes} hint="no total da base" />
       </StatGrid>
 
-      <TableCard>
-        <TableToolbar>
-          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-            Clientes recentes
-          </Typography>
-        </TableToolbar>
+      <SectionCard>
+        <SectionToolbar>
+          <Typography sx={{ fontSize: 14, fontWeight: 700 }}>Clientes recentes</Typography>
+        </SectionToolbar>
 
-        {loadError && <TableError>{loadError}</TableError>}
+        {loadError && <ErrorBanner message={loadError} />}
 
         <Box sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell>Nome</TableCell>
-                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
-                  E-mail
-                </TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>E-mail</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Negociações</TableCell>
-                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
-                  Cadastro
-                </TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Cadastro</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ color: 'text.disabled', py: 3 }}>
+                  <TableCell
+                    colSpan={COLUMN_COUNT}
+                    align="center"
+                    sx={{ color: 'text.disabled', py: 3 }}
+                  >
                     Carregando…
                   </TableCell>
                 </TableRow>
               )}
               {!loading && recent.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ color: 'text.disabled', py: 3 }}>
+                  <TableCell
+                    colSpan={COLUMN_COUNT}
+                    align="center"
+                    sx={{ color: 'text.disabled', py: 3 }}
+                  >
                     Nenhum cliente cadastrado ainda.
                   </TableCell>
                 </TableRow>
@@ -142,7 +141,7 @@ export function Dashboard() {
             </TableBody>
           </Table>
         </Box>
-      </TableCard>
-    </div>
+      </SectionCard>
+    </Box>
   )
 }

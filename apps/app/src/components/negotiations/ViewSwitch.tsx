@@ -1,4 +1,7 @@
-import { I } from '../../icons'
+import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBulletedOutlined'
+import ViewKanbanOutlinedIcon from '@mui/icons-material/ViewKanbanOutlined'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 
 export type NegotiationView = 'quadro' | 'lista'
 
@@ -9,23 +12,20 @@ interface ViewSwitchProps {
 
 export function ViewSwitch({ view, onChange }: ViewSwitchProps) {
   return (
-    <div className="view-switch" role="group" aria-label="Modo de visualização">
-      <button
-        className={view === 'quadro' ? 'active' : ''}
-        onClick={() => onChange('quadro')}
-        aria-pressed={view === 'quadro'}
-      >
-        {I.dashboard}
-        <span>Quadro</span>
-      </button>
-      <button
-        className={view === 'lista' ? 'active' : ''}
-        onClick={() => onChange('lista')}
-        aria-pressed={view === 'lista'}
-      >
-        {I.orders}
-        <span>Lista</span>
-      </button>
-    </div>
+    <ToggleButtonGroup
+      exclusive
+      value={view}
+      onChange={(_, next: NegotiationView | null) => next && onChange(next)}
+      aria-label="Modo de visualização"
+    >
+      <ToggleButton value="quadro" aria-label="Quadro">
+        <ViewKanbanOutlinedIcon />
+        Quadro
+      </ToggleButton>
+      <ToggleButton value="lista" aria-label="Lista">
+        <FormatListBulletedOutlinedIcon />
+        Lista
+      </ToggleButton>
+    </ToggleButtonGroup>
   )
 }

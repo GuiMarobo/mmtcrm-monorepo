@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -10,20 +9,17 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
-import { NegotiationColumn } from './NegotiationColumn'
+import Box from '@mui/material/Box'
+import { useMemo, useState } from 'react'
 import { NegotiationCard, NegotiationCardOverlay } from './NegotiationCard'
+import { NegotiationColumn } from './NegotiationColumn'
 import { canTransition } from './transitions'
 import type { Negotiation, NegotiationStatus } from '../../types'
 import { NEGOTIATION_STATUSES } from '../../types'
 
 interface NegotiationBoardProps {
   items: Negotiation[]
-  menuFor: number | null
-  onMenuToggle: (id: number | null) => void
-  onMove: (
-    negotiation: Negotiation,
-    target: NegotiationStatus,
-  ) => Promise<boolean>
+  onMove: (negotiation: Negotiation, target: NegotiationStatus) => Promise<boolean>
   onRefuse: () => void
   onEdit: (negotiation: Negotiation) => void
   onDelete: (negotiation: Negotiation) => void
@@ -31,8 +27,6 @@ interface NegotiationBoardProps {
 
 export function NegotiationBoard({
   items,
-  menuFor,
-  onMenuToggle,
   onMove,
   onRefuse,
   onEdit,
@@ -43,9 +37,7 @@ export function NegotiationBoard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 200, tolerance: 6 },
-    }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
     useSensor(KeyboardSensor),
   )
 
@@ -62,10 +54,7 @@ export function NegotiationBoard({
     return grouped
   }, [items, override])
 
-  const applyMove = async (
-    negotiation: Negotiation,
-    target: NegotiationStatus,
-  ) => {
+  const applyMove = async (negotiation: Negotiation, target: NegotiationStatus) => {
     const current = statusOf(negotiation)
     if (current === target) return
     if (!canTransition(current, target)) {
@@ -82,8 +71,7 @@ export function NegotiationBoard({
     })
   }
 
-  const handleDragStart = (event: DragStartEvent) =>
-    setActiveId(Number(event.active.id))
+  const handleDragStart = (event: DragStartEvent) => setActiveId(Number(event.active.id))
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null)
@@ -103,12 +91,18 @@ export function NegotiationBoard({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className="board">
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+          gap: 2,
+          alignItems: 'start',
+        }}
+      >
         {NEGOTIATION_STATUSES.map((status) => {
           const cards = columns[status]
           const accepting =
-            activeNegotiation !== null &&
-            canTransition(statusOf(activeNegotiation), status)
+            activeNegotiation !== null && canTransition(statusOf(activeNegotiation), status)
           return (
             <NegotiationColumn
               key={status}
@@ -122,12 +116,7 @@ export function NegotiationBoard({
                   key={n.id}
                   negotiation={n}
                   status={status}
-                  menuOpen={menuFor === n.id}
-                  onMenuToggle={onMenuToggle}
-                  onMove={(negotiation, target) => {
-                    onMenuToggle(null)
-                    void applyMove(negotiation, target)
-                  }}
+                  onMove={(negotiation, target) => void applyMove(negotiation, target)}
                   onEdit={onEdit}
                   onDelete={onDelete}
                 />
@@ -135,12 +124,10 @@ export function NegotiationBoard({
             </NegotiationColumn>
           )
         })}
-      </div>
+      </Box>
 
       <DragOverlay>
-        {activeNegotiation && (
-          <NegotiationCardOverlay negotiation={activeNegotiation} />
-        )}
+        {activeNegotiation && <NegotiationCardOverlay negotiation={activeNegotiation} />}
       </DragOverlay>
     </DndContext>
   )

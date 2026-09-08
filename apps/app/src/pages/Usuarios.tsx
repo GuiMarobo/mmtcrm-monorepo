@@ -1,24 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import {
   useGridApiRef,
   gridFilteredSortedRowEntriesSelector,
 } from '@mui/x-data-grid-premium'
-import { I } from '../icons'
+import { useEffect, useMemo, useState } from 'react'
 import { ApiError, usersApi } from '../api'
 import { UserFormModal } from '../components/users/UserFormModal'
 import { UsersDataGrid } from '../components/users/UsersDataGrid'
 import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
 import { useAuth } from '../contexts/AuthContext'
-import {
-  Button,
-  ConfirmDialog,
-  SearchInput,
-  Stat,
-  StatGrid,
-  TableCard,
-  TableError,
-  TableToolbar,
-} from '../components/ui'
+import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { PageHeader } from '../components/common/PageHeader'
+import { SearchField } from '../components/common/SearchField'
+import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
+import { Stat, StatGrid } from '../components/common/StatGrid'
 import { downloadCsv } from '../utils/csv'
 import type { CreateUserPayload, UpdateUserPayload, User } from '../types'
 
@@ -144,58 +142,50 @@ export function Usuarios({ toast }: UsuariosProps) {
   }
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-title">Usuários</div>
-          <div className="page-sub">Gerencie a equipe, perfis de acesso e disponibilidade.</div>
-        </div>
-        <div className="page-actions">
-          <Button icon={I.download} onClick={exportar}>
-            Exportar
-          </Button>
-          <Button variant="primary" icon={I.plus} onClick={() => setCreating(true)}>
-            Novo usuário
-          </Button>
-        </div>
-      </div>
+    <Box>
+      <PageHeader
+        title="Usuários"
+        subtitle="Gerencie a equipe, perfis de acesso e disponibilidade."
+        actions={
+          <>
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<FileDownloadOutlinedIcon />}
+              onClick={exportar}
+            >
+              Exportar
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddOutlinedIcon />}
+              onClick={() => setCreating(true)}
+            >
+              Novo usuário
+            </Button>
+          </>
+        }
+      />
 
       <StatGrid columns={2}>
-        <Stat
-          label="Total de Usuários"
-          value={stats.total}
-          delta={<>{I.spark}<span>equipe cadastrada</span></>}
-        />
+        <Stat label="Total de Usuários" value={stats.total} hint="equipe cadastrada" />
         <Stat
           label="Usuários Ativos"
           value={stats.ativos}
-          delta={<>{I.spark}<span>{stats.pctAtivos}% do total</span></>}
+          hint={`${stats.pctAtivos}% do total`}
         />
       </StatGrid>
 
-      <TableCard>
-        <TableToolbar>
-          <SearchInput
+      <SectionCard>
+        <SectionToolbar>
+          <SearchField
             value={query}
             onChange={setQuery}
             placeholder="Buscar por nome ou e-mail…"
           />
-        </TableToolbar>
+        </SectionToolbar>
 
-        {loadError && (
-          <TableError>
-            {loadError} -{' '}
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                void reload()
-              }}
-            >
-              tentar novamente
-            </a>
-          </TableError>
-        )}
+        {loadError && <ErrorBanner message={loadError} onRetry={() => void reload()} />}
 
         <UsersDataGrid
           apiRef={apiRef}
@@ -208,7 +198,7 @@ export function Usuarios({ toast }: UsuariosProps) {
           onDelete={setConfirmDelete}
           onErase={setConfirmErase}
         />
-      </TableCard>
+      </SectionCard>
 
       {(creating || editing) && (
         <UserFormModal
@@ -247,6 +237,6 @@ export function Usuarios({ toast }: UsuariosProps) {
           onCancel={() => setConfirmErase(null)}
         />
       )}
-    </div>
+    </Box>
   )
 }

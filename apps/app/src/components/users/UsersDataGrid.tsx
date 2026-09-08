@@ -1,11 +1,13 @@
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import PowerSettingsNewOutlinedIcon from '@mui/icons-material/PowerSettingsNewOutlined'
+import PrivacyTipOutlinedIcon from '@mui/icons-material/PrivacyTipOutlined'
 import Box from '@mui/material/Box'
 import { DataGridPremium, GridActionsCellItem } from '@mui/x-data-grid-premium'
 import type { GridApiPremium, GridColDef } from '@mui/x-data-grid-premium'
 import type { RefObject } from 'react'
-import { ptBR } from '@mui/x-data-grid/locales'
-import { I } from '../../icons'
 import { UserRoleBadge, UserStatusBadge } from './UserBadges'
-import { Badge } from '../ui'
+import { ToneChip } from '../common/ToneChip'
 import { formatDate, maskPhone } from '../../utils/format'
 import type { User } from '../../types'
 import { ROLE_OPTIONS, USER_STATUS_OPTIONS } from '../../types'
@@ -41,15 +43,11 @@ export function UsersDataGrid({
       minWidth: 200,
       renderCell: ({ row }) => (
         <Box sx={{ py: 1 }}>
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}
-          >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
             {row.name}
-            {row.anonymizedAt && <Badge tone="gray">Anonimizado</Badge>}
+            {row.anonymizedAt && <ToneChip tone="gray">Anonimizado</ToneChip>}
           </Box>
-          <Box sx={{ color: 'text.disabled', fontSize: 12 }}>
-            {maskPhone(row.phone) || '-'}
-          </Box>
+          <Box sx={{ color: 'text.disabled', fontSize: 12 }}>{maskPhone(row.phone) || '-'}</Box>
         </Box>
       ),
     },
@@ -90,7 +88,7 @@ export function UsersDataGrid({
           actions.push(
             <GridActionsCellItem
               key="edit"
-              icon={I.edit}
+              icon={<EditOutlinedIcon />}
               label="Editar"
               onClick={() => onEdit(row)}
               showInMenu
@@ -99,7 +97,7 @@ export function UsersDataGrid({
           actions.push(
             <GridActionsCellItem
               key="status"
-              icon={I.power}
+              icon={<PowerSettingsNewOutlinedIcon />}
               label={`${row.status === 'ATIVO' ? 'Desativar' : 'Ativar'} usuário`}
               onClick={() => onToggleStatus(row)}
               showInMenu
@@ -109,7 +107,7 @@ export function UsersDataGrid({
         actions.push(
           <GridActionsCellItem
             key="delete"
-            icon={I.trash}
+            icon={<DeleteOutlineIcon />}
             label="Excluir"
             onClick={() => onDelete(row)}
             showInMenu
@@ -119,7 +117,7 @@ export function UsersDataGrid({
           actions.push(
             <GridActionsCellItem
               key="erase"
-              icon={I.shield}
+              icon={<PrivacyTipOutlinedIcon />}
               label="Eliminar dados pessoais (LGPD)"
               onClick={() => onErase(row)}
               showInMenu
@@ -138,24 +136,13 @@ export function UsersDataGrid({
       columns={columns}
       loading={loading}
       getRowId={(row: User) => row.id}
-      getRowHeight={() => 'auto'}
-      disableRowSelectionOnClick
       filterModel={{
         items: [],
         quickFilterValues: quickFilter.trim().split(/\s+/).filter(Boolean),
       }}
-      pagination
       initialState={{
         pagination: { paginationModel: { pageSize: 10, page: 0 } },
         sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
-      }}
-      pageSizeOptions={[10, 25, 50]}
-      localeText={ptBR.components.MuiDataGrid.defaultProps.localeText}
-      sx={{
-        border: 0,
-        '--DataGrid-overlayHeight': '220px',
-        '& .MuiDataGrid-columnHeaders': { backgroundColor: '#fafbfc' },
-        '& .MuiDataGrid-cell': { display: 'flex', alignItems: 'center' },
       }}
     />
   )

@@ -1,9 +1,9 @@
+import Button from '@mui/material/Button'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
-import { Button } from './Button'
 
 interface ConfirmDialogProps {
   title: string
@@ -35,20 +35,13 @@ export function ConfirmDialog({
       slotProps={{ paper: { sx: { width: 440, maxWidth: '100%' } } }}
     >
       <DialogContent sx={{ p: '24px 24px 0' }}>
-        <Typography
-          sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em' }}
-        >
+        <Typography sx={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em' }}>
           {title}
         </Typography>
         {description && (
           <Typography
             component="div"
-            sx={{
-              mt: 1,
-              color: 'text.secondary',
-              fontSize: 13.5,
-              lineHeight: 1.55,
-            }}
+            sx={{ mt: 1, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.55 }}
           >
             {description}
           </Typography>
@@ -56,11 +49,12 @@ export function ConfirmDialog({
       </DialogContent>
 
       <DialogActions sx={{ p: '22px 24px 24px', gap: 1 }}>
-        <Button onClick={onCancel} disabled={loading}>
+        <Button variant="outlined" color="inherit" onClick={onCancel} disabled={loading}>
           {cancelLabel}
         </Button>
         <Button
-          variant={danger ? 'destructive' : 'primary'}
+          variant="contained"
+          color={danger ? 'error' : 'primary'}
           onClick={onConfirm}
           disabled={loading || confirmDisabled}
         >

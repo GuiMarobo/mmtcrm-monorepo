@@ -1,14 +1,10 @@
-import Snackbar from '@mui/material/Snackbar'
 import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 import type { ToastType } from '../../hooks/useToast'
 
 export function Toast({ text, type }: { text: string; type: ToastType }) {
   return (
-    <Snackbar
-      open
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      sx={{ bottom: { xs: 24, sm: 24 } }}
-    >
+    <Snackbar open anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
       <Alert
         severity={type === 'error' ? 'error' : 'success'}
         variant="outlined"

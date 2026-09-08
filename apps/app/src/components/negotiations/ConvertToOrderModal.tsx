@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { Button, Modal } from '../ui'
+import { useState } from 'react'
+import { FormDialog } from '../common/FormDialog'
 import { formatCurrency } from '../../utils/format'
 import type { Negotiation, PaymentMethod } from '../../types'
 import { PAYMENT_METHOD_OPTIONS } from '../../types'
@@ -23,7 +24,7 @@ export function ConvertToOrderModal({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('')
 
   return (
-    <Modal
+    <FormDialog
       title="Converter em pedido"
       subtitle={`${negotiation.client?.name ?? 'Cliente'} · ${formatCurrency(negotiation.totalValue)}`}
       onClose={loading ? () => undefined : onCancel}
@@ -31,11 +32,11 @@ export function ConvertToOrderModal({
       closeOnBackdrop={!loading}
       footer={
         <>
-          <Button onClick={onCancel} disabled={loading}>
+          <Button variant="outlined" color="inherit" onClick={onCancel} disabled={loading}>
             Cancelar
           </Button>
           <Button
-            variant="primary"
+            variant="contained"
             onClick={() => paymentMethod && onConfirm(paymentMethod)}
             disabled={loading || !paymentMethod}
           >
@@ -65,6 +66,6 @@ export function ConvertToOrderModal({
           </MenuItem>
         ))}
       </TextField>
-    </Modal>
+    </FormDialog>
   )
 }

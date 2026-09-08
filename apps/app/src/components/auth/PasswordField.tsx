@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import TextField from '@mui/material/TextField'
-import InputAdornment from '@mui/material/InputAdornment'
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import IconButton from '@mui/material/IconButton'
-import { I } from '../../icons'
+import InputAdornment from '@mui/material/InputAdornment'
+import TextField from '@mui/material/TextField'
+import { useState } from 'react'
 
 interface PasswordFieldProps {
   label: string
@@ -47,7 +48,7 @@ export function PasswordField({
                     edge="end"
                     size="small"
                   >
-                    {visible ? I.eyeOff : I.eye}
+                    {visible ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
                   </IconButton>
                 </InputAdornment>
               ),

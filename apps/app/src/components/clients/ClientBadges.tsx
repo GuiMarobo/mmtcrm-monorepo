@@ -1,5 +1,5 @@
-import { Badge } from '../ui'
-import type { BadgeTone } from '../ui'
+import { ToneChip } from '../common/ToneChip'
+import type { BadgeTone } from '../../theme/tones'
 import type { ClientStatus, LeadQualification } from '../../types'
 import { CLIENT_STATUS_LABELS, LEAD_QUALIFICATION_LABELS } from '../../types'
 
@@ -17,12 +17,12 @@ const QUALIFICATION_TONE: Record<LeadQualification, BadgeTone> = {
 
 export function ClientStatusBadge({ status }: { status: ClientStatus }) {
   return (
-    <Badge tone={STATUS_TONE[status]} dot>
+    <ToneChip tone={STATUS_TONE[status]} dot>
       {CLIENT_STATUS_LABELS[status]}
-    </Badge>
+    </ToneChip>
   )
 }
 
 export function ClientQualificationBadge({ value }: { value: LeadQualification }) {
-  return <Badge tone={QUALIFICATION_TONE[value]}>{LEAD_QUALIFICATION_LABELS[value]}</Badge>
+  return <ToneChip tone={QUALIFICATION_TONE[value]}>{LEAD_QUALIFICATION_LABELS[value]}</ToneChip>
 }

@@ -1,12 +1,13 @@
-import { useState } from 'react'
-import { I } from '../../icons'
-import { ApiError } from '../../api'
+import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
-import { Button, Modal } from '../ui'
-import { FormRow } from '../clients/ClientFormModal'
+import { useState } from 'react'
+import { ApiError } from '../../api'
+import { FormDialog } from '../common/FormDialog'
+import { FormRow } from '../common/FormRow'
 import { maskPhone, onlyDigits } from '../../utils/format'
 import { isValidEmail, isValidPhone } from '../../utils/validators'
 import type { CreateUserPayload, Role, UpdateUserPayload, User, UserStatus } from '../../types'
@@ -142,7 +143,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
   }
 
   return (
-    <Modal
+    <FormDialog
       title={isEdit ? 'Editar Usuário' : 'Novo Usuário'}
       subtitle="Defina credenciais, perfil de acesso e status."
       onClose={onClose}
@@ -150,10 +151,10 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
       closeOnBackdrop={false}
       footer={
         <>
-          <Button onClick={onClose} disabled={saving}>
+          <Button variant="outlined" color="inherit" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button variant="primary" icon={I.check} onClick={submit} disabled={saving}>
+          <Button variant="contained" startIcon={<CheckOutlinedIcon />} onClick={submit} disabled={saving}>
             {saving ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Criar usuário'}
           </Button>
         </>
@@ -259,6 +260,6 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
 
         {error && <Alert severity="error">{error}</Alert>}
       </Box>
-    </Modal>
+    </FormDialog>
   )
 }

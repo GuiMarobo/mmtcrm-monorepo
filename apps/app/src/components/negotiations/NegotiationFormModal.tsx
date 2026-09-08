@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { ApiError } from '../../api'
 import Alert from '@mui/material/Alert'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
-import { Button, Modal } from '../ui'
+import { useState } from 'react'
+import { ApiError } from '../../api'
+import { FormDialog } from '../common/FormDialog'
 import { formatCurrency } from '../../utils/format'
 import type {
   Client,
@@ -67,7 +68,7 @@ export function NegotiationFormModal({
   }
 
   return (
-    <Modal
+    <FormDialog
       title={isEdit ? 'Editar negociação' : 'Nova negociação'}
       subtitle={
         isEdit
@@ -77,10 +78,10 @@ export function NegotiationFormModal({
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose} disabled={saving}>
+          <Button variant="outlined" color="inherit" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={() => void submit()} disabled={saving}>
+          <Button variant="contained" onClick={() => void submit()} disabled={saving}>
             {saving ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Abrir negociação'}
           </Button>
         </>
@@ -140,6 +141,6 @@ export function NegotiationFormModal({
           fullWidth
         />
       </Box>
-    </Modal>
+    </FormDialog>
   )
 }

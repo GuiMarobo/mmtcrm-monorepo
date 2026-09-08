@@ -1,26 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
+import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import {
   useGridApiRef,
   gridFilteredSortedRowEntriesSelector,
 } from '@mui/x-data-grid-premium'
 import type { GridRowSelectionModel } from '@mui/x-data-grid-premium'
-import { I } from '../icons'
+import { useEffect, useMemo, useState } from 'react'
 import { ApiError, clientsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { ImportClientesModal } from '../components/clients/ImportClientesModal'
 import { ClientFormModal } from '../components/clients/ClientFormModal'
 import { ClientsDataGrid } from '../components/clients/ClientsDataGrid'
 import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
-import {
-  Button,
-  ConfirmDialog,
-  SearchInput,
-  Stat,
-  StatGrid,
-  TableCard,
-  TableError,
-  TableToolbar,
-} from '../components/ui'
+import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { PageHeader } from '../components/common/PageHeader'
+import { SearchField } from '../components/common/SearchField'
+import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
+import { Stat, StatGrid } from '../components/common/StatGrid'
 import { downloadClientesXlsx } from '../utils/xlsx'
 import { formatCurrency } from '../utils/format'
 import type { Client, CreateClientPayload } from '../types'
@@ -191,73 +190,73 @@ export function Clientes({ toast }: ClientesProps) {
   }
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <div className="page-title">Clientes &amp; Leads</div>
-          <div className="page-sub">
-            Gerencie a base de contatos e classifique leads por intenção.
-          </div>
-        </div>
-        <div className="page-actions">
-          <Button icon={I.upload} onClick={() => setImporting(true)}>
-            Importar
-          </Button>
-          <Button icon={I.download} onClick={() => void exportar()} disabled={exporting}>
-            {exporting ? 'Exportando…' : 'Exportar'}
-          </Button>
-          <Button variant="primary" icon={I.plus} onClick={() => setCreating(true)}>
-            Novo cliente
-          </Button>
-        </div>
-      </div>
+    <Box>
+      <PageHeader
+        title="Clientes & Leads"
+        subtitle="Gerencie a base de contatos e classifique leads por intenção."
+        actions={
+          <>
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<FileUploadOutlinedIcon />}
+              onClick={() => setImporting(true)}
+            >
+              Importar
+            </Button>
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<FileDownloadOutlinedIcon />}
+              onClick={() => void exportar()}
+              disabled={exporting}
+            >
+              {exporting ? 'Exportando…' : 'Exportar'}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddOutlinedIcon />}
+              onClick={() => setCreating(true)}
+            >
+              Novo cliente
+            </Button>
+          </>
+        }
+      />
 
       <StatGrid>
         <Stat
           label={`Faturamento${selectionSuffix}`}
           value={formatCurrency(faturamento)}
-          delta={<>{I.spark}<span>{selectionHint}</span></>}
+          hint={selectionHint}
         />
         <Stat
           label={`Quantidade de Pedidos${selectionSuffix}`}
           value={pedidos}
-          delta={<>{I.spark}<span>{selectionHint}</span></>}
+          hint={selectionHint}
         />
         <Stat
           label="Leads em Aberto"
           value={stats.leads}
-          delta={<>{I.spark}<span>{stats.pct(stats.leads)}% do total</span></>}
+          hint={`${stats.pct(stats.leads)}% do total`}
         />
         <Stat
           label="Clientes Ativos"
           value={stats.ativos}
-          delta={<>{I.spark}<span>{stats.pct(stats.ativos)}% do total</span></>}
+          hint={`${stats.pct(stats.ativos)}% do total`}
         />
       </StatGrid>
 
-      <TableCard>
-        <TableToolbar>
-          <SearchInput
+      <SectionCard>
+        <SectionToolbar>
+          <SearchField
             value={query}
             onChange={setQuery}
             placeholder="Buscar por nome, telefone ou e-mail…"
           />
-        </TableToolbar>
+        </SectionToolbar>
 
-        {loadError && (
-          <TableError>
-            {loadError} -{' '}
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                void reload()
-              }}
-            >
-              tentar novamente
-            </a>
-          </TableError>
-        )}
+        {loadError && <ErrorBanner message={loadError} onRetry={() => void reload()} />}
 
         <ClientsDataGrid
           apiRef={apiRef}
@@ -273,7 +272,7 @@ export function Clientes({ toast }: ClientesProps) {
           onDelete={setConfirmDelete}
           onErase={setConfirmErase}
         />
-      </TableCard>
+      </SectionCard>
 
       {(creating || editing) && (
         <ClientFormModal
@@ -321,6 +320,6 @@ export function Clientes({ toast }: ClientesProps) {
           onCancel={() => setConfirmErase(null)}
         />
       )}
-    </div>
+    </Box>
   )
 }

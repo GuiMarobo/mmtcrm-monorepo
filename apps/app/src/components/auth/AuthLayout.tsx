@@ -1,6 +1,15 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import type { FormEvent, ReactNode } from 'react'
+import { INK } from '../../theme'
+
+const ORB_BASE = {
+  position: 'absolute',
+  borderRadius: '999px',
+  filter: 'blur(20px)',
+  opacity: 0.55,
+  pointerEvents: 'none',
+} as const
 
 interface AuthLayoutProps {
   headline: string
@@ -28,10 +37,41 @@ export function AuthLayout({
         backgroundColor: 'background.default',
       }}
     >
-      <Box className="login-left" sx={{ display: { xs: 'none', md: 'flex' } }}>
-        <div className="login-orb" />
-        <div className="login-orb b" />
-        <Box className="login-layer">
+      <Box
+        sx={{
+          display: { xs: 'none', md: 'flex' },
+          flexDirection: 'column',
+          position: 'relative',
+          overflow: 'hidden',
+          p: 5,
+          backgroundColor: INK,
+          color: '#fff',
+        }}
+      >
+        <Box
+          sx={{
+            ...ORB_BASE,
+            right: -120,
+            top: 40,
+            width: 420,
+            height: 420,
+            background:
+              'radial-gradient(circle at 30% 30%, #3a82ff 0%, #1d4ed8 40%, transparent 70%)',
+          }}
+        />
+        <Box
+          sx={{
+            ...ORB_BASE,
+            right: 120,
+            top: 220,
+            width: 260,
+            height: 260,
+            background:
+              'radial-gradient(circle at 30% 30%, #ff8a4c 0%, #c2410c 50%, transparent 75%)',
+          }}
+        />
+
+        <Box sx={{ position: 'relative' }}>
           <Typography sx={{ fontWeight: 800, fontSize: 15, lineHeight: 1 }}>
             MMT Urbana
           </Typography>
@@ -39,7 +79,8 @@ export function AuthLayout({
             CRM Comercial
           </Typography>
         </Box>
-        <Box className="login-layer" sx={{ mt: 'auto', maxWidth: 460 }}>
+
+        <Box sx={{ position: 'relative', mt: 'auto', maxWidth: 460 }}>
           <Typography
             component="h2"
             sx={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.1 }}
@@ -54,15 +95,11 @@ export function AuthLayout({
         </Box>
       </Box>
 
-      <Box sx={{ display: 'grid', placeItems: 'center', p: { xs: '32px 20px', md: 5 } }}>
-        <Box
-          component="form"
-          onSubmit={onSubmit}
-          sx={{ width: '100%', maxWidth: 380 }}
-        >
+      <Box sx={{ display: 'grid', placeItems: 'center', p: { xs: '24px 16px', sm: '32px 20px', md: 5 } }}>
+        <Box component="form" onSubmit={onSubmit} sx={{ width: '100%', maxWidth: 380 }}>
           <Typography
             component="h1"
-            sx={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em' }}
+            sx={{ fontSize: { xs: 23, sm: 26 }, fontWeight: 700, letterSpacing: '-0.02em' }}
           >
             {title}
           </Typography>

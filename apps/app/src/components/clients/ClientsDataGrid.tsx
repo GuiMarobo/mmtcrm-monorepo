@@ -1,3 +1,8 @@
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined'
+import PrivacyTipOutlinedIcon from '@mui/icons-material/PrivacyTipOutlined'
+import StarBorderOutlinedIcon from '@mui/icons-material/StarBorderOutlined'
 import Box from '@mui/material/Box'
 import { DataGridPremium, GridActionsCellItem } from '@mui/x-data-grid-premium'
 import type {
@@ -6,10 +11,8 @@ import type {
   GridRowSelectionModel,
 } from '@mui/x-data-grid-premium'
 import type { RefObject } from 'react'
-import { ptBR } from '@mui/x-data-grid/locales'
-import { I } from '../../icons'
-import { ClientStatusBadge, ClientQualificationBadge } from './ClientBadges'
-import { Badge } from '../ui'
+import { ClientQualificationBadge, ClientStatusBadge } from './ClientBadges'
+import { ToneChip } from '../common/ToneChip'
 import { formatDate, maskCpf, maskPhone } from '../../utils/format'
 import type { Client, Role } from '../../types'
 import {
@@ -56,16 +59,12 @@ export function ClientsDataGrid({
       minWidth: 200,
       renderCell: ({ row }) => (
         <Box sx={{ py: 1 }}>
-          <Box
-            sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}
-          >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
             {row.name}
-            {row.anonymizedAt && <Badge tone="gray">Anonimizado</Badge>}
+            {row.anonymizedAt && <ToneChip tone="gray">Anonimizado</ToneChip>}
           </Box>
           {row.cpf && (
-            <Box sx={{ color: 'text.disabled', fontSize: 12 }}>
-              CPF {maskCpf(row.cpf)}
-            </Box>
+            <Box sx={{ color: 'text.disabled', fontSize: 12 }}>CPF {maskCpf(row.cpf)}</Box>
           )}
         </Box>
       ),
@@ -84,8 +83,7 @@ export function ClientsDataGrid({
       minWidth: 150,
       type: 'singleSelect',
       valueOptions: LEAD_ORIGIN_OPTIONS,
-      valueFormatter: (value: Client['origin']) =>
-        value ? LEAD_ORIGIN_LABELS[value] : '-',
+      valueFormatter: (value: Client['origin']) => (value ? LEAD_ORIGIN_LABELS[value] : '-'),
     },
     {
       field: 'status',
@@ -103,9 +101,7 @@ export function ClientsDataGrid({
       minWidth: 140,
       type: 'singleSelect',
       valueOptions: LEAD_QUALIFICATION_OPTIONS,
-      renderCell: ({ row }) => (
-        <ClientQualificationBadge value={row.qualification} />
-      ),
+      renderCell: ({ row }) => <ClientQualificationBadge value={row.qualification} />,
     },
     {
       field: 'lastContactAt',
@@ -125,7 +121,7 @@ export function ClientsDataGrid({
           actions.push(
             <GridActionsCellItem
               key="edit"
-              icon={I.edit}
+              icon={<EditOutlinedIcon />}
               label="Editar"
               onClick={() => onEdit(row)}
               showInMenu
@@ -136,7 +132,7 @@ export function ClientsDataGrid({
           actions.push(
             <GridActionsCellItem
               key="qualify"
-              icon={I.star}
+              icon={<StarBorderOutlinedIcon />}
               label="Qualificar lead"
               onClick={() => onQualify(row)}
               showInMenu
@@ -147,7 +143,7 @@ export function ClientsDataGrid({
           actions.push(
             <GridActionsCellItem
               key="contact"
-              icon={I.phone}
+              icon={<PhoneOutlinedIcon />}
               label="Registrar contato"
               onClick={() => onRegisterContact(row)}
               showInMenu
@@ -157,7 +153,7 @@ export function ClientsDataGrid({
         actions.push(
           <GridActionsCellItem
             key="delete"
-            icon={I.trash}
+            icon={<DeleteOutlineIcon />}
             label="Excluir"
             onClick={() => onDelete(row)}
             showInMenu
@@ -167,7 +163,7 @@ export function ClientsDataGrid({
           actions.push(
             <GridActionsCellItem
               key="erase"
-              icon={I.shield}
+              icon={<PrivacyTipOutlinedIcon />}
               label="Eliminar dados pessoais (LGPD)"
               onClick={() => onErase(row)}
               showInMenu
@@ -186,24 +182,16 @@ export function ClientsDataGrid({
       columns={columns}
       loading={loading}
       getRowId={(row: Client) => row.id}
-      getRowHeight={() => 'auto'}
       checkboxSelection
-      disableRowSelectionOnClick
       rowSelectionModel={selection}
       onRowSelectionModelChange={onSelectionChange}
-      filterModel={{ items: [], quickFilterValues: quickFilter.trim().split(/\s+/).filter(Boolean) }}
-      pagination
+      filterModel={{
+        items: [],
+        quickFilterValues: quickFilter.trim().split(/\s+/).filter(Boolean),
+      }}
       initialState={{
         pagination: { paginationModel: { pageSize: 10, page: 0 } },
         sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
-      }}
-      pageSizeOptions={[10, 25, 50]}
-      localeText={ptBR.components.MuiDataGrid.defaultProps.localeText}
-      sx={{
-        border: 0,
-        '--DataGrid-overlayHeight': '220px',
-        '& .MuiDataGrid-columnHeaders': { backgroundColor: '#fafbfc' },
-        '& .MuiDataGrid-cell': { display: 'flex', alignItems: 'center' },
       }}
     />
   )
