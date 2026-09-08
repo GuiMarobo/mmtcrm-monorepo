@@ -5,6 +5,8 @@ import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import type { ReactNode } from 'react'
 import { I } from '../../icons'
 
@@ -22,16 +24,20 @@ export function Modal({
   title,
   subtitle,
   onClose,
-  width = 560,
+  width = 600,
   children,
   footer,
   closeOnBackdrop = true,
 }: ModalProps) {
+  const theme = useTheme()
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
+
   return (
     <Dialog
       open
+      fullScreen={fullScreen}
       onClose={closeOnBackdrop ? onClose : undefined}
-      slotProps={{ paper: { sx: { width, maxWidth: '100%' } } }}
+      slotProps={{ paper: { sx: { width: fullScreen ? '100%' : width, maxWidth: '100%' } } }}
     >
       <DialogTitle
         component="div"
@@ -39,7 +45,7 @@ export function Modal({
           display: 'flex',
           alignItems: 'center',
           gap: 1.5,
-          p: '18px 22px',
+          p: '20px 28px',
           borderBottom: 1,
           borderColor: 'divider',
         }}
@@ -57,11 +63,13 @@ export function Modal({
         </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ p: '20px 22px' }}>{children}</DialogContent>
+      <DialogContent sx={{ p: '24px 28px', '&.MuiDialogContent-root': { pt: '24px' } }}>
+        {children}
+      </DialogContent>
 
       {footer && (
         <DialogActions
-          sx={{ p: '14px 22px', borderTop: 1, borderColor: 'divider', gap: 1 }}
+          sx={{ p: '16px 28px', borderTop: 1, borderColor: 'divider', gap: 1 }}
         >
           {footer}
         </DialogActions>

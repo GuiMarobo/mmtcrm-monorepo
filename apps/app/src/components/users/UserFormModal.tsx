@@ -146,7 +146,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
       title={isEdit ? 'Editar Usuário' : 'Novo Usuário'}
       subtitle="Defina credenciais, perfil de acesso e status."
       onClose={onClose}
-      width={640}
+      width={680}
       closeOnBackdrop={false}
       footer={
         <>
@@ -159,7 +159,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
         </>
       }
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
         <TextField
           label="Nome Completo"
           required
@@ -168,7 +168,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
           onBlur={() => handleBlur('name')}
           placeholder="Ex.: João da Silva"
           error={!!displayError('name')}
-          helperText={displayError('name')}
+          helperText={displayError('name') ?? ' '}
           fullWidth
         />
 
@@ -182,7 +182,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             onBlur={() => handleBlur('email')}
             placeholder="nome@mmturbana.com"
             error={!!displayError('email')}
-            helperText={displayError('email')}
+            helperText={displayError('email') ?? ' '}
             fullWidth
           />
           <TextField
@@ -192,7 +192,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             onBlur={() => handleBlur('phone')}
             placeholder="(00) 00000-0000"
             error={!!displayError('phone')}
-            helperText={displayError('phone')}
+            helperText={displayError('phone') ?? ' '}
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             fullWidth
           />
@@ -209,7 +209,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             placeholder="Mín. 8 caracteres"
             autoComplete="new-password"
             error={!!displayError('password')}
-            helperText={displayError('password')}
+            helperText={displayError('password') ?? ' '}
             fullWidth
           />
           <TextField
@@ -221,7 +221,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             placeholder="Repita a senha"
             autoComplete="new-password"
             error={!!displayError('confirm')}
-            helperText={displayError('confirm')}
+            helperText={displayError('confirm') ?? ' '}
             fullWidth
           />
         </FormRow>
@@ -232,6 +232,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             label="Perfil"
             value={form.role}
             onChange={(e) => set('role', e.target.value as Role)}
+            helperText=" "
             fullWidth
           >
             {ROLE_OPTIONS.map((o) => (
@@ -245,6 +246,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             label="Status"
             value={form.status}
             onChange={(e) => set('status', e.target.value as UserStatus)}
+            helperText=" "
             fullWidth
           >
             {USER_STATUS_OPTIONS.map((o) => (

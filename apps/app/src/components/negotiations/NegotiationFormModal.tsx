@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { ApiError } from '../../api'
 import Alert from '@mui/material/Alert'
+import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
-import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
 import { Button, Modal } from '../ui'
 import { formatCurrency } from '../../utils/format'
 import type {
@@ -87,45 +86,47 @@ export function NegotiationFormModal({
         </>
       }
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
         {error && <Alert severity="error">{error}</Alert>}
 
-        <TextField
-          select
-          label="Cliente"
-          required
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
+        <Autocomplete
+          options={clients}
+          getOptionLabel={(c) => c.name}
+          value={clients.find((c) => c.id === clientId) ?? null}
+          onChange={(_, option) => setClientId(option?.id ?? '')}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          noOptionsText="Nenhum cliente encontrado"
           fullWidth
-        >
-          <MenuItem value="">Selecione um cliente…</MenuItem>
-          {clients.map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.name}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <Box>
-          <TextField
-            label="Valor total"
-            type="number"
-            required
-            value={totalValue}
-            onChange={(e) => setTotalValue(e.target.value)}
-            placeholder="0,00"
-            autoFocus={!isEdit}
-            error={valueInvalid}
-            helperText={valueInvalid ? 'Valor inválido' : undefined}
-            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
-            fullWidth
-          />
-          {!valueInvalid && totalValue.trim() !== '' && (
-            <Typography sx={{ mt: 0.5, color: 'text.disabled', fontSize: 12.5 }}>
-              {formatCurrency(parsed)}
-            </Typography>
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Cliente"
+              required
+              placeholder="Busque pelo nome…"
+              helperText=" "
+            />
           )}
-        </Box>
+        />
+
+        <TextField
+          label="Valor total"
+          type="number"
+          required
+          value={totalValue}
+          onChange={(e) => setTotalValue(e.target.value)}
+          placeholder="0,00"
+          autoFocus={!isEdit}
+          error={valueInvalid}
+          helperText={
+            valueInvalid
+              ? 'Valor inválido'
+              : totalValue.trim() !== ''
+                ? formatCurrency(parsed)
+                : ' '
+          }
+          slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+          fullWidth
+        />
 
         <TextField
           label="Observações"
@@ -135,6 +136,7 @@ export function NegotiationFormModal({
           multiline
           minRows={3}
           slotProps={{ htmlInput: { maxLength: 1000 } }}
+          helperText=" "
           fullWidth
         />
       </Box>

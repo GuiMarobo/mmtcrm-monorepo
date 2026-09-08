@@ -85,7 +85,17 @@ export const theme = createTheme({
       },
     },
     MuiTextField: { defaultProps: { size: 'small' } },
-    MuiSelect: { defaultProps: { size: 'small' } },
+    MuiSelect: {
+      defaultProps: {
+        size: 'small',
+        MenuProps: {
+          anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+          transformOrigin: { vertical: 'top', horizontal: 'left' },
+          marginThreshold: 12,
+          slotProps: { paper: { sx: { mt: 0.5, maxHeight: 320 } } },
+        },
+      },
+    },
     MuiCheckbox: { defaultProps: { size: 'small' } },
     MuiOutlinedInput: {
       styleOverrides: {
@@ -96,7 +106,11 @@ export const theme = createTheme({
     },
     MuiInputLabel: { styleOverrides: { root: { fontSize: 13.5 } } },
     MuiFormLabel: { styleOverrides: { root: { fontSize: 12, fontWeight: 600 } } },
-    MuiFormHelperText: { styleOverrides: { root: { fontSize: 12, marginLeft: 0 } } },
+    MuiFormHelperText: {
+      styleOverrides: {
+        root: { fontSize: 12, marginLeft: 0, marginTop: 4, minHeight: 14, lineHeight: 1.4 },
+      },
+    },
     MuiBackdrop: { styleOverrides: { root: { backgroundColor: SCRIM } } },
     MuiDialog: {
       styleOverrides: { paper: { borderRadius: 14, boxShadow: SHADOW_DIALOG } },

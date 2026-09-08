@@ -89,7 +89,9 @@ export function FormRow({ children }: { children: React.ReactNode }) {
       sx={{
         display: 'grid',
         gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-        gap: 1.75,
+        columnGap: 2,
+        rowGap: { xs: 1.25, sm: 0 },
+        alignItems: 'start',
       }}
     >
       {children}
@@ -140,7 +142,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
       title={isEdit ? 'Editar Cliente' : 'Novo Cliente / Lead'}
       subtitle="Preencha os dados de contato e classificação."
       onClose={onClose}
-      width={640}
+      width={680}
       closeOnBackdrop={false}
       footer={
         <>
@@ -153,7 +155,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
         </>
       }
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
         <TextField
           label="Nome Completo"
           required
@@ -162,7 +164,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
           onBlur={() => handleBlur('name')}
           placeholder="Ex.: João da Silva"
           error={!!displayError('name')}
-          helperText={displayError('name')}
+          helperText={displayError('name') ?? ' '}
           fullWidth
         />
 
@@ -175,7 +177,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             onBlur={() => handleBlur('email')}
             placeholder="cliente@email.com"
             error={!!displayError('email')}
-            helperText={displayError('email')}
+            helperText={displayError('email') ?? ' '}
             fullWidth
           />
           <TextField
@@ -186,7 +188,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             onBlur={() => handleBlur('phone')}
             placeholder="(00) 00000-0000"
             error={!!displayError('phone')}
-            helperText={displayError('phone')}
+            helperText={displayError('phone') ?? ' '}
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             fullWidth
           />
@@ -200,7 +202,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             onBlur={() => handleBlur('cpf')}
             placeholder="000.000.000-00"
             error={!!displayError('cpf')}
-            helperText={displayError('cpf')}
+            helperText={displayError('cpf') ?? ' '}
             slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             fullWidth
           />
@@ -210,6 +212,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             required
             value={form.origin ?? 'WHATSAPP'}
             onChange={(e) => set('origin', e.target.value as LeadOrigin)}
+            helperText=" "
             fullWidth
           >
             {LEAD_ORIGIN_OPTIONS.map((o) => (
@@ -225,6 +228,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
           value={form.address ?? ''}
           onChange={(e) => set('address', e.target.value)}
           placeholder="Rua, nº - Bairro, Cidade/UF"
+          helperText=" "
           fullWidth
         />
 
@@ -235,6 +239,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             required
             value={form.status ?? 'LEAD'}
             onChange={(e) => set('status', e.target.value as ClientStatus)}
+            helperText=" "
             fullWidth
           >
             {CLIENT_STATUS_OPTIONS.map((o) => (
@@ -249,6 +254,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             required
             value={form.qualification ?? 'NAO_QUALIFICADO'}
             onChange={(e) => set('qualification', e.target.value as LeadQualification)}
+            helperText=" "
             fullWidth
           >
             {LEAD_QUALIFICATION_OPTIONS.map((o) => (
