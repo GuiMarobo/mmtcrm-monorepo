@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mmtcrm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: mmturbana
+    ports:
+      - "5432:5432"
+    volumes:
+      - mmtcrm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mmturbana"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.dev
+    container_name: mmtcrm-api
+    restart: unless-stopped
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:root@postgres:5432/mmturbana?schema=public
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/api:/app
+      - api_node_modules:/app/node_modules
+      - api_prisma_generated:/app/generated
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npx prisma generate && npm run start:dev"
+
+  app:
+    build:
+      context: ./apps/app
+      dockerfile: Dockerfile.dev
+    container_name: mmtcrm-app
+    restart: unless-stopped
+    env_file:
+      - ./apps/app/.env
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/app:/app
+      - app_node_modules:/app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  mmtcrm_postgres_data:
+  api_node_modules:
+  api_prisma_generated:
+  app_node_modules:
