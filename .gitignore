@@ -3,6 +3,7 @@
 # Nao versionar: o andaime de agente nao vai junto no repositorio do codigo.
 /context
 /docs
+/.scratch
 CLAUDE.md
 .claude/skills
 DOCUMENTACAO.md
