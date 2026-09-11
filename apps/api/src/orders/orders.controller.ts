@@ -1,4 +1,4 @@
-import { Controller, Param, ParseIntPipe, Patch } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RoleEnum } from 'src/users/dto/create-user.dto';
@@ -9,6 +9,24 @@ import { OrdersService } from './orders.service';
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Listar os pedidos não excluídos, na ordem da fila de cobrança',
+    description:
+      'Todos os pedidos, de qualquer vendedor (RN14). Ordem padrão: "Aguardando ' +
+      'Pagamento" primeiro, do mais antigo para o mais novo por "situação desde".',
+  })
+  findAll() {
+    return this.ordersService.findAll();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Consultar um pedido e a negociação de origem' })
+  @ApiResponse({ status: 404, description: 'Pedido não encontrado' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.ordersService.findOne(id);
+  }
 
   @Patch(':id/approve')
   @ApiOperation({

@@ -20,7 +20,7 @@ const orderRow = (overrides: Record<string, unknown> = {}) => ({
   negotiation: {
     id: 3,
     notes: null,
-    client: { id: 'c1', name: 'Fulana', status: 'ATIVO', anonymizedAt: null },
+    client: { id: 'c1', name: 'Fulana', status: 'ATIVO' },
     vendedor: { id: 2, name: 'Vendedora' },
   },
   ...overrides,
@@ -128,5 +128,103 @@ describe('OrdersService.markAsPaid', () => {
     });
     expect(prisma.client.findFirst).not.toHaveBeenCalled();
     expect(prisma.client.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrdersService leitura', () => {
+  let service: OrdersService;
+  let prisma: MockPrisma;
+
+  beforeEach(async () => {
+    prisma = createMockPrisma();
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        OrdersService,
+        { provide: PrismaService, useValue: asPrismaService(prisma) },
+      ],
+    }).compile();
+    service = moduleRef.get(OrdersService);
+  });
+
+  describe('findAll', () => {
+    it('só lista Pedidos não excluídos (RN5) e não filtra por Vendedor (RN14)', async () => {
+      prisma.order.findMany.mockResolvedValue([orderRow()]);
+
+      await service.findAll();
+
+      const arg = callArg<{ where: Record<string, unknown> }>(
+        prisma.order.findMany,
+      );
+      expect(arg.where).toEqual({ deletedAt: null });
+    });
+
+    it('ordena pela fila de cobrança: EM_NEGOCIACAO primeiro, mais antigo primeiro (RN14/D13)', async () => {
+      prisma.order.findMany.mockResolvedValue([
+        orderRow({
+          id: 1,
+          status: 'COMPRA_APROVADA',
+          statusChangedAt: new Date('2026-01-01T00:00:00Z'),
+        }),
+        orderRow({
+          id: 2,
+          status: 'EM_NEGOCIACAO',
+          statusChangedAt: new Date('2026-03-01T00:00:00Z'),
+        }),
+        orderRow({
+          id: 3,
+          status: 'EM_NEGOCIACAO',
+          statusChangedAt: new Date('2026-02-01T00:00:00Z'),
+        }),
+        orderRow({
+          id: 4,
+          status: 'DESISTENCIA',
+          statusChangedAt: new Date('2026-01-15T00:00:00Z'),
+        }),
+      ]);
+
+      const result = await service.findAll();
+
+      expect(result.map((o) => o.id)).toEqual([3, 2, 1, 4]);
+    });
+
+    it('converte o Decimal do valor para number', async () => {
+      prisma.order.findMany.mockResolvedValue([orderRow()]);
+
+      const [first] = await service.findAll();
+
+      expect(first.totalValue).toBe(1500);
+      expect(first.client).toEqual({
+        id: 'c1',
+        name: 'Fulana',
+        status: 'ATIVO',
+      });
+    });
+  });
+
+  describe('findOne', () => {
+    it('devolve o Pedido com Cliente e Negociação de origem', async () => {
+      prisma.order.findFirst.mockResolvedValue(orderRow());
+
+      const result = await service.findOne(7);
+
+      expect(result).toMatchObject({
+        id: 7,
+        code: 'PED-7',
+        negotiationId: 3,
+        client: { id: 'c1', name: 'Fulana' },
+        vendedor: { id: 2, name: 'Vendedora' },
+      });
+    });
+
+    it('404 quando inexistente ou excluído', async () => {
+      prisma.order.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne(99)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.findOne(99)).rejects.toThrow(
+        'Pedido não encontrado',
+      );
+    });
   });
 });

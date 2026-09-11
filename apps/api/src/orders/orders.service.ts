@@ -28,6 +28,14 @@ const orderSelect = {
 
 type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
 
+// Fila de cobrança (RN14/D13): "Aguardando Pagamento" no topo, depois o restante.
+// Dentro de cada grupo, o mais antigo primeiro por statusChangedAt.
+const QUEUE_PRIORITY: Record<string, number> = {
+  EM_NEGOCIACAO: 0,
+  COMPRA_APROVADA: 1,
+  DESISTENCIA: 2,
+};
+
 @Injectable()
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -51,6 +59,29 @@ export class OrdersService {
     });
     if (!order) throw new NotFoundException('Pedido não encontrado');
     return order;
+  }
+
+  // RN5/RN14: todos os Pedidos não excluídos, de qualquer Vendedor, na ordem da
+  // fila de cobrança. A ordenação é feita aqui (não no banco) porque a
+  // prioridade por situação não é a ordem natural do enum.
+  async findAll() {
+    const orders = await this.prisma.order.findMany({
+      where: { ...NOT_DELETED },
+      select: orderSelect,
+    });
+
+    return orders
+      .sort((a, b) => {
+        const byQueue =
+          (QUEUE_PRIORITY[a.status] ?? 9) - (QUEUE_PRIORITY[b.status] ?? 9);
+        if (byQueue !== 0) return byQueue;
+        return a.statusChangedAt.getTime() - b.statusChangedAt.getTime();
+      })
+      .map((order) => this.toResponse(order));
+  }
+
+  async findOne(id: number) {
+    return this.toResponse(await this.ensureExists(id));
   }
 
   // RN2: registra o pagamento confirmado. Só a partir de EM_NEGOCIACAO; a
