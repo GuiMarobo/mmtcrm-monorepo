@@ -102,7 +102,7 @@ export const ORDER_STATUSES = [
 export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  EM_NEGOCIACAO: 'Em Negociação',
+  EM_NEGOCIACAO: 'Aguardando Pagamento',
   COMPRA_APROVADA: 'Compra Aprovada',
   DESISTENCIA: 'Desistência',
 }
