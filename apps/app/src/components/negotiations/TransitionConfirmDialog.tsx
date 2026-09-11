@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '../common/ConfirmDialog'
+import { formatCurrency } from '../../utils/format'
 import type { Negotiation, NegotiationStatus } from '../../types'
 
 interface TransitionConfirmDialogProps {
@@ -18,6 +19,7 @@ export function TransitionConfirmDialog({
 }: TransitionConfirmDialogProps) {
   const isCancel = target === 'PERDIDA'
   const clientName = negotiation.client?.name ?? 'este cliente'
+  const orderPaid = negotiation.order?.status === 'COMPRA_APROVADA'
 
   return (
     <ConfirmDialog
@@ -37,6 +39,14 @@ export function TransitionConfirmDialog({
               <>
                 {' '}
                 O pedido <b>{negotiation.order?.code}</b> passará a Desistência.
+                {orderPaid && (
+                  <>
+                    {' '}
+                    Como o pagamento já foi confirmado,{' '}
+                    <b>{formatCurrency(negotiation.totalValue)}</b> sairão do
+                    faturamento do cliente.
+                  </>
+                )}
               </>
             )}
           </>

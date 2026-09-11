@@ -15,7 +15,6 @@ const orderSelect = {
   paymentMethod: true,
   totalValue: true,
   statusChangedAt: true,
-  createdAt: true,
   negotiation: {
     select: {
       id: true,
@@ -35,6 +34,7 @@ const QUEUE_PRIORITY: Record<string, number> = {
   COMPRA_APROVADA: 1,
   DESISTENCIA: 2,
 };
+const QUEUE_LAST = Number.MAX_SAFE_INTEGER;
 
 @Injectable()
 export class OrdersService {
@@ -73,7 +73,8 @@ export class OrdersService {
     return orders
       .sort((a, b) => {
         const byQueue =
-          (QUEUE_PRIORITY[a.status] ?? 9) - (QUEUE_PRIORITY[b.status] ?? 9);
+          (QUEUE_PRIORITY[a.status] ?? QUEUE_LAST) -
+          (QUEUE_PRIORITY[b.status] ?? QUEUE_LAST);
         if (byQueue !== 0) return byQueue;
         return a.statusChangedAt.getTime() - b.statusChangedAt.getTime();
       })

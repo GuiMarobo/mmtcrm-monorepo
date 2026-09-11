@@ -16,7 +16,6 @@ const orderRow = (overrides: Record<string, unknown> = {}) => ({
   paymentMethod: 'PIX',
   totalValue: { toString: () => '1500.00' },
   statusChangedAt: new Date('2026-01-01T00:00:00Z'),
-  createdAt: new Date('2026-01-01T00:00:00Z'),
   negotiation: {
     id: 3,
     notes: null,

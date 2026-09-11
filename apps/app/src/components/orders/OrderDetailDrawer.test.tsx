@@ -11,7 +11,6 @@ const order = (overrides: Partial<Order> = {}): Order => ({
   paymentMethod: 'PIX',
   totalValue: 2500,
   statusChangedAt: '2026-02-01T00:00:00Z',
-  createdAt: '2026-01-01T00:00:00Z',
   negotiationId: 3,
   notes: null,
   client: { id: 'c1', name: 'Fulana de Tal', status: 'ATIVO' },

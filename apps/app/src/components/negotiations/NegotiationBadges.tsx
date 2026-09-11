@@ -3,8 +3,6 @@ import type { BadgeTone } from '../../theme/tones'
 import type { NegotiationStatus } from '../../types'
 import { NEGOTIATION_STATUS_LABELS } from '../../types'
 
-export { OrderStatusBadge } from '../common/OrderStatusBadge'
-
 const STATUS_TONE: Record<NegotiationStatus, BadgeTone> = {
   ABERTA: 'blue',
   GANHA: 'green',

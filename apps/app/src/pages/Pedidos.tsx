@@ -7,7 +7,6 @@ import { OrderDetailDrawer } from '../components/orders/OrderDetailDrawer'
 import { ApproveOrderDialog } from '../components/orders/ApproveOrderDialog'
 import { summarizeAwaitingPayment } from '../components/orders/ordersSummary'
 import { PageHeader } from '../components/common/PageHeader'
-import { SearchField } from '../components/common/SearchField'
 import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
 import type { Order, Route } from '../types'
 
@@ -20,7 +19,6 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
   const [list, setList] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<Order | null>(null)
   const [pendingApprove, setPendingApprove] = useState<Order | null>(null)
   const [approving, setApproving] = useState(false)
@@ -80,18 +78,8 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
       ) : (
         <SectionCard>
           <SectionToolbar>
-            <SearchField
-              value={query}
-              onChange={setQuery}
-              placeholder="Buscar por código, cliente ou vendedor…"
-            />
             <Typography
-              sx={{
-                ml: { sm: 'auto' },
-                fontSize: 13,
-                fontWeight: 600,
-                color: 'text.secondary',
-              }}
+              sx={{ fontSize: 13, fontWeight: 600, color: 'text.secondary' }}
             >
               {summary.label}
             </Typography>
@@ -112,7 +100,6 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
             <OrdersDataGrid
               rows={list}
               loading={loading}
-              quickFilter={query}
               onOpen={setSelected}
             />
           )}

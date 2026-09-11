@@ -17,12 +17,16 @@ export class OrdersController {
       'Todos os pedidos, de qualquer vendedor (RN14). Ordem padrão: "Aguardando ' +
       'Pagamento" primeiro, do mais antigo para o mais novo por "situação desde".',
   })
+  @ApiResponse({ status: 200, description: 'Lista de pedidos' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
   findAll() {
     return this.ordersService.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Consultar um pedido e a negociação de origem' })
+  @ApiResponse({ status: 200, description: 'Pedido encontrado' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
   @ApiResponse({ status: 404, description: 'Pedido não encontrado' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.findOne(id);

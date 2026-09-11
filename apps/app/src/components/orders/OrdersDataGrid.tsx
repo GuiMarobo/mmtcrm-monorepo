@@ -12,16 +12,10 @@ import { ORDER_STATUS_OPTIONS, PAYMENT_METHOD_LABELS } from '../../types'
 interface OrdersDataGridProps {
   rows: Order[]
   loading: boolean
-  quickFilter: string
   onOpen: (order: Order) => void
 }
 
-export function OrdersDataGrid({
-  rows,
-  loading,
-  quickFilter,
-  onOpen,
-}: OrdersDataGridProps) {
+export function OrdersDataGrid({ rows, loading, onOpen }: OrdersDataGridProps) {
   const theme = useTheme()
   const compact = useMediaQuery(theme.breakpoints.down('md'))
   const narrow = useMediaQuery(theme.breakpoints.down('sm'))
@@ -108,10 +102,6 @@ export function OrdersDataGrid({
           vendedor: !narrow,
           paymentMethod: !compact,
           statusChangedAt: !compact,
-        }}
-        filterModel={{
-          items: [],
-          quickFilterValues: quickFilter.trim().split(/\s+/).filter(Boolean),
         }}
         initialState={{
           pagination: { paginationModel: { pageSize: 10, page: 0 } },

@@ -18,7 +18,6 @@ export interface Order {
   paymentMethod: PaymentMethod | null
   totalValue: number
   statusChangedAt: string
-  createdAt: string
   negotiationId: number
   notes: string | null
   client: OrderClient | null
