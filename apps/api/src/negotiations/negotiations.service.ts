@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { RoleEnum } from '../users/dto/create-user.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { NegotiationStatus } from '../../generated/prisma/enums';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
@@ -262,12 +264,24 @@ export class NegotiationsService {
     return this.findOne(id);
   }
 
-  async reopen(id: number) {
+  async reopen(id: number, actorRole: RoleEnum) {
     const negotiation = await this.ensureExists(id);
     await this.ensureClientEditable(negotiation.clientId);
     this.assertTransition(negotiation.status, 'ABERTA');
 
     const wasWon = negotiation.status === 'GANHA';
+
+    // RN11/D10: reabrir tira do faturamento uma venda já paga. Com o Pedido em
+    // COMPRA_APROVADA isso é exclusivo do ADMIN — o VENDEDOR só reabre enquanto
+    // o Pedido está EM_NEGOCIACAO. A máquina de estados não muda: só quem dispara.
+    if (
+      negotiation.order?.status === 'COMPRA_APROVADA' &&
+      actorRole !== RoleEnum.ADMIN
+    ) {
+      throw new ForbiddenException(
+        'Venda com pagamento confirmado só pode ser reaberta por um administrador',
+      );
+    }
 
     await this.prisma.$transaction(async (tx) => {
       if (wasWon) {

@@ -139,8 +139,15 @@ export class NegotiationsController {
       'DESISTENCIA, preservando o registro da operação.',
   })
   @ApiResponse({ status: 404, description: 'Negociação não encontrada' })
+  @ApiResponse({
+    status: 403,
+    description: 'Pedido pago só é reaberto por um administrador (RN11)',
+  })
   @ApiResponse({ status: 409, description: 'Negociação já está aberta' })
-  reopen(@Param('id', ParseIntPipe) id: number) {
-    return this.negotiationsService.reopen(id);
+  reopen(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: { role: RoleEnum } },
+  ) {
+    return this.negotiationsService.reopen(id, req.user.role);
   }
 }

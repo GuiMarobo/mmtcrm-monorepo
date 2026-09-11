@@ -1,7 +1,9 @@
+import { ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NegotiationsService } from './negotiations.service';
 import { PaymentMethodEnum } from './dto/create-negotiation.dto';
+import { RoleEnum } from '../users/dto/create-user.dto';
 import {
   asPrismaService,
   callArg,
@@ -90,6 +92,15 @@ describe('NegotiationsService', () => {
   });
 
   describe('reopen', () => {
+    const order = (status: string) => ({
+      id: 9,
+      code: 'PED-3',
+      status,
+      paymentMethod: 'PIX',
+      totalValue: { toString: () => '1500.00' },
+      deletedAt: null,
+    });
+
     beforeEach(() => {
       prisma.client.findFirst.mockResolvedValue({
         id: 'c1',
@@ -102,11 +113,11 @@ describe('NegotiationsService', () => {
 
     it('vindo de GANHA, marca o Pedido como DESISTENCIA e grava statusChangedAt (RN3/RN13)', async () => {
       prisma.negotiation.findFirst.mockResolvedValue(
-        negotiationRow({ status: 'GANHA' }),
+        negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
       );
 
       const before = Date.now();
-      await service.reopen(3);
+      await service.reopen(3, RoleEnum.VENDEDOR);
       const after = Date.now();
 
       const arg = callArg<{
@@ -124,9 +135,47 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'PERDIDA' }),
       );
 
-      await service.reopen(3);
+      await service.reopen(3, RoleEnum.VENDEDOR);
 
       expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('VENDEDOR não reabre Negociação de Pedido COMPRA_APROVADA → 403 (RN11)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
+      );
+
+      await expect(service.reopen(3, RoleEnum.VENDEDOR)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      await expect(service.reopen(3, RoleEnum.VENDEDOR)).rejects.toThrow(
+        'Venda com pagamento confirmado só pode ser reaberta por um administrador',
+      );
+      expect(prisma.negotiation.update).not.toHaveBeenCalled();
+    });
+
+    it('ADMIN reabre Negociação de Pedido COMPRA_APROVADA (RN11)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
+      );
+
+      await service.reopen(3, RoleEnum.ADMIN);
+
+      expect(prisma.negotiation.update).toHaveBeenCalled();
+      const arg = callArg<{ data: { status: string } }>(
+        prisma.order.updateMany,
+      );
+      expect(arg.data.status).toBe('DESISTENCIA');
+    });
+
+    it('Pedido EM_NEGOCIACAO: VENDEDOR reabre normalmente (sem regressão, RN11)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
+      );
+
+      await service.reopen(3, RoleEnum.VENDEDOR);
+
+      expect(prisma.negotiation.update).toHaveBeenCalled();
     });
   });
 });
