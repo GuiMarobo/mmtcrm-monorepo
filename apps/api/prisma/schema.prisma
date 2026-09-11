@@ -138,6 +138,11 @@ model Order {
   notes         String?
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
+  // Marca quando o Pedido entrou na situação atual (RN13). Gravado em convert,
+  // approve e reopen. Não usar createdAt (reconversão reaproveita a linha) nem
+  // updatedAt. Backfill inicial = updatedAt (um Pedido nunca é editado, só muda
+  // de situação — spec 005 §8).
+  statusChangedAt DateTime  @default(now()) @map("status_changed_at")
   deletedAt     DateTime?   @map("deleted_at")
 
   negotiation Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
