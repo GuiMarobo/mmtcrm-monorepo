@@ -178,4 +178,77 @@ describe('NegotiationsService', () => {
       expect(prisma.negotiation.update).toHaveBeenCalled();
     });
   });
+
+  // RN12 / ADR 0012: a anonimização LGPD não congela o ciclo comercial. As
+  // transições e a edição de uma Negociação existente seguem liberadas — só o
+  // cadastro pessoal e abrir/transferir Negociação para o titular continuam
+  // bloqueados. `ensureClientEditable` faz exatamente uma query de client.
+  describe('LGPD não bloqueia o ciclo comercial (RN12)', () => {
+    beforeEach(() => {
+      prisma.negotiation.update.mockResolvedValue({});
+      prisma.order.upsert.mockResolvedValue({});
+      prisma.order.updateMany.mockResolvedValue({});
+      prisma.client.update.mockResolvedValue({});
+    });
+
+    it('convert não checa o Cliente (nem anonimização)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await service.convert(3, PaymentMethodEnum.PIX);
+
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('cancel não checa o Cliente', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await service.cancel(3);
+
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('reopen não checa o Cliente', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ status: 'GANHA', order: null }),
+      );
+
+      await service.reopen(3, RoleEnum.VENDEDOR);
+
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('editar a Negociação sem trocar o Cliente não o checa', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await service.updatePartial(3, { totalValue: 2000 });
+
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('trocar o clientId na edição volta a checar o Cliente destino', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.client.findFirst.mockResolvedValue({
+        id: 'c2',
+        status: 'LEAD',
+        anonymizedAt: null,
+      });
+
+      await service.updatePartial(3, { clientId: 'c2' });
+
+      expect(prisma.client.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('create continua checando o Cliente', async () => {
+      prisma.client.findFirst.mockResolvedValue({
+        id: 'c1',
+        status: 'LEAD',
+        anonymizedAt: null,
+      });
+      prisma.negotiation.create.mockResolvedValue(negotiationRow());
+
+      await service.create({ clientId: 'c1', totalValue: 100 }, 2);
+
+      expect(prisma.client.findFirst).toHaveBeenCalledTimes(1);
+    });
+  });
 });

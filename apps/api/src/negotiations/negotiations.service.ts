@@ -93,8 +93,11 @@ export class NegotiationsService {
     return negotiation;
   }
 
-  // Cliente anonimizado (LGPD) e imutavel: o historico comercial fica visivel,
-  // mas nao aceita escrita. UC3 secao 3.6.
+  // Cliente anonimizado (LGPD): o cadastro pessoal e imutavel e nenhuma
+  // Negociacao nova pode ser aberta ou transferida para ele. As transicoes e a
+  // edicao de uma Negociacao existente NAO passam por aqui — a anonimizacao nao
+  // congela o ciclo comercial (RN12 / ADR 0012). So `create` e a troca de
+  // clientId chamam este guarda.
   private async ensureClientEditable(clientId: string) {
     const client = await this.prisma.client.findFirst({
       where: { ...NOT_DELETED, id: clientId },
@@ -150,7 +153,9 @@ export class NegotiationsService {
   async replace(id: number, dto: ReplaceNegotiationDto) {
     const current = await this.ensureExists(id);
     this.ensureOpen(current);
-    await this.ensureClientEditable(dto.clientId);
+    if (dto.clientId !== current.clientId) {
+      await this.ensureClientEditable(dto.clientId);
+    }
 
     const negotiation = await this.prisma.negotiation.update({
       where: { id },
@@ -172,7 +177,9 @@ export class NegotiationsService {
 
     const current = await this.ensureExists(id);
     this.ensureOpen(current);
-    await this.ensureClientEditable(dto.clientId ?? current.clientId);
+    if (dto.clientId && dto.clientId !== current.clientId) {
+      await this.ensureClientEditable(dto.clientId);
+    }
 
     const negotiation = await this.prisma.negotiation.update({
       where: { id },
@@ -201,7 +208,6 @@ export class NegotiationsService {
 
   async cancel(id: number) {
     const negotiation = await this.ensureExists(id);
-    await this.ensureClientEditable(negotiation.clientId);
     this.assertTransition(negotiation.status, 'PERDIDA');
 
     const updated = await this.prisma.negotiation.update({
@@ -215,7 +221,9 @@ export class NegotiationsService {
 
   async convert(id: number, paymentMethod: PaymentMethodEnum) {
     const negotiation = await this.ensureExists(id);
-    const client = await this.ensureClientEditable(negotiation.clientId);
+    // RN12: converter não passa por `ensureClientEditable` — a anonimização não
+    // congela o ciclo. O Cliente vem no próprio select da Negociação.
+    const client = negotiation.client;
     this.assertTransition(negotiation.status, 'GANHA');
 
     const closedAt = new Date();
@@ -266,7 +274,6 @@ export class NegotiationsService {
 
   async reopen(id: number, actorRole: RoleEnum) {
     const negotiation = await this.ensureExists(id);
-    await this.ensureClientEditable(negotiation.clientId);
     this.assertTransition(negotiation.status, 'ABERTA');
 
     const wasWon = negotiation.status === 'GANHA';

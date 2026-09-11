@@ -61,6 +61,24 @@ export class ErasureService {
             anonymizedAt: performedAt,
           },
         });
+
+        // RN12 / ADR 0012: a eliminação também apaga as observações comerciais do
+        // titular — de todas as Negociações e Pedidos, inclusive os excluídos
+        // logicamente (por isso sem filtro NOT_DELETED), na mesma transação.
+        const negotiations = await tx.negotiation.findMany({
+          where: { clientId: id },
+          select: { id: true },
+        });
+        await tx.negotiation.updateMany({
+          where: { clientId: id },
+          data: { notes: null },
+        });
+        if (negotiations.length > 0) {
+          await tx.order.updateMany({
+            where: { negotiationId: { in: negotiations.map((n) => n.id) } },
+            data: { notes: null },
+          });
+        }
       }
 
       await this.log(tx, {
