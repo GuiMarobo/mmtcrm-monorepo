@@ -217,23 +217,30 @@ export class NegotiationsService {
     this.assertTransition(negotiation.status, 'GANHA');
 
     const closedAt = new Date();
+    // D2/RN1: o Pedido nasce EM_NEGOCIACAO ("Aguardando Pagamento"). O faturamento
+    // do Cliente só sobe quando alguém aprova a compra (RN6) — converter deixa de
+    // faturar na hora. statusChangedAt marca a entrada na situação (RN13).
+    const statusChangedAt = new Date();
 
     await this.prisma.$transaction(async (tx) => {
       // upsert, e nao create: reabrir preserva o pedido como DESISTENCIA, entao
-      // reconverter reaproveita a mesma linha em vez de colidir com o @unique.
+      // reconverter reaproveita a mesma linha em vez de colidir com o @unique
+      // (RN4), devolvendo-a para EM_NEGOCIACAO.
       await tx.order.upsert({
         where: { negotiationId: id },
         create: {
           negotiationId: id,
           code: `PED-${id}`,
-          status: 'COMPRA_APROVADA',
+          status: 'EM_NEGOCIACAO',
           paymentMethod,
           totalValue: negotiation.totalValue,
+          statusChangedAt,
         },
         update: {
-          status: 'COMPRA_APROVADA',
+          status: 'EM_NEGOCIACAO',
           paymentMethod,
           totalValue: negotiation.totalValue,
+          statusChangedAt,
           deletedAt: null,
         },
       });
@@ -264,9 +271,11 @@ export class NegotiationsService {
 
     await this.prisma.$transaction(async (tx) => {
       if (wasWon) {
+        // RN3: reabrir desfaz o Pedido a partir de EM_NEGOCIACAO ou de
+        // COMPRA_APROVADA. Sem filtro de status: os dois viram DESISTENCIA.
         await tx.order.updateMany({
           where: { ...NOT_DELETED, negotiationId: id },
-          data: { status: 'DESISTENCIA' },
+          data: { status: 'DESISTENCIA', statusChangedAt: new Date() },
         });
       }
 

@@ -6,12 +6,19 @@ import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { ClientsModule } from '../clients/clients.module';
 import { NegotiationsModule } from '../negotiations/negotiations.module';
+import { OrdersModule } from '../orders/orders.module';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { MustChangePasswordGuard } from 'src/auth/guards/must-change-password.guard';
 
 @Module({
-  imports: [UsersModule, AuthModule, ClientsModule, NegotiationsModule],
+  imports: [
+    UsersModule,
+    AuthModule,
+    ClientsModule,
+    NegotiationsModule,
+    OrdersModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,

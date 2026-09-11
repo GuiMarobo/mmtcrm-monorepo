@@ -132,8 +132,11 @@ export class ClientsImportService {
                       order: {
                         create: {
                           code: `IMP-${r.rowNumber}`,
+                          // RN8: dado histórico já consumado nasce COMPRA_APROVADA,
+                          // não é venda a aprovar.
                           status: 'COMPRA_APROVADA',
                           totalValue: r.dto.ltv!,
+                          statusChangedAt: new Date(),
                           notes: 'Importado via CSV',
                         },
                       },
