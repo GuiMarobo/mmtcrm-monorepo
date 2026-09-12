@@ -15,7 +15,8 @@ import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
-import type { Route } from '../types'
+import type { Role, Route } from '../types'
+import { canAccess } from '../types'
 
 export const SIDEBAR_WIDTH = 248
 
@@ -30,36 +31,38 @@ interface NavGroup {
   items: NavEntry[]
 }
 
-function buildGroups(canManageUsers: boolean): NavGroup[] {
-  const groups: NavGroup[] = [
-    {
-      label: 'Principal',
-      items: [{ id: 'dashboard', label: 'Dashboard', icon: <DashboardOutlinedIcon /> }],
-    },
-    {
-      label: 'Vendas',
-      items: [
-        { id: 'negociacoes', label: 'Negociações', icon: <HandshakeOutlinedIcon /> },
-        { id: 'clientes', label: 'Clientes & Leads', icon: <PeopleAltOutlinedIcon /> },
-        { id: 'orcamentos', label: 'Orçamentos', icon: <DescriptionOutlinedIcon /> },
-        { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBagOutlinedIcon /> },
-      ],
-    },
-    {
-      label: 'Cadastros',
-      items: [
-        { id: 'produtos', label: 'Produtos', icon: <Inventory2OutlinedIcon /> },
-        { id: 'usados', label: 'Dispositivos Usados', icon: <PhoneIphoneOutlinedIcon /> },
-      ],
-    },
-  ]
-  if (canManageUsers) {
-    groups.push({
-      label: 'Sistema',
-      items: [{ id: 'usuarios', label: 'Usuários', icon: <ManageAccountsOutlinedIcon /> }],
-    })
-  }
-  return groups
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Principal',
+    items: [{ id: 'dashboard', label: 'Dashboard', icon: <DashboardOutlinedIcon /> }],
+  },
+  {
+    label: 'Vendas',
+    items: [
+      { id: 'negociacoes', label: 'Negociações', icon: <HandshakeOutlinedIcon /> },
+      { id: 'clientes', label: 'Clientes & Leads', icon: <PeopleAltOutlinedIcon /> },
+      { id: 'orcamentos', label: 'Orçamentos', icon: <DescriptionOutlinedIcon /> },
+      { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBagOutlinedIcon /> },
+    ],
+  },
+  {
+    label: 'Cadastros',
+    items: [
+      { id: 'produtos', label: 'Produtos', icon: <Inventory2OutlinedIcon /> },
+      { id: 'usados', label: 'Dispositivos Usados', icon: <PhoneIphoneOutlinedIcon /> },
+    ],
+  },
+  {
+    label: 'Sistema',
+    items: [{ id: 'usuarios', label: 'Usuários', icon: <ManageAccountsOutlinedIcon /> }],
+  },
+]
+
+function buildGroups(role: Role): NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccess(item.id, role)),
+  })).filter((group) => group.items.length > 0)
 }
 
 const ITEM_SX = {
@@ -84,7 +87,7 @@ interface SidebarProps {
   setRoute: (route: Route) => void
   open: boolean
   onClose: () => void
-  canManageUsers: boolean
+  role: Role
   onLogout: () => void
 }
 
@@ -93,10 +96,10 @@ export function Sidebar({
   setRoute,
   open,
   onClose,
-  canManageUsers,
+  role,
   onLogout,
 }: SidebarProps) {
-  const groups = buildGroups(canManageUsers)
+  const groups = buildGroups(role)
 
   const content = (
     <Box
