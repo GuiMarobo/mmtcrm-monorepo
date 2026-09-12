@@ -1,4 +1,8 @@
-import type { ProductCategory, ProductStatus } from './enums'
+import type {
+  ProductCategory,
+  ProductStatus,
+  StockMovementType,
+} from './enums'
 
 export interface Product {
   id: string
@@ -11,6 +15,19 @@ export interface Product {
   status: ProductStatus
   createdAt: string
   updatedAt: string
+}
+
+export interface StockMovement {
+  id: string
+  type: StockMovementType
+  quantity: number
+  note: string | null
+  createdAt: string
+  user: { id: number; name: string } | null
+}
+
+export interface ProductDetail extends Product {
+  stockMovements: StockMovement[]
 }
 
 export interface CreateProductPayload {

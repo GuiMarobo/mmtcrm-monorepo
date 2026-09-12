@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ProductsDataGrid } from './ProductsDataGrid'
 import type { Product } from '../../types'
 
@@ -17,9 +18,11 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   ...overrides,
 })
 
+const noop = () => undefined
+
 describe('ProductsDataGrid', () => {
   it('mostra as colunas do catálogo com os rótulos em pt-BR', () => {
-    render(<ProductsDataGrid rows={[product()]} loading={false} />)
+    render(<ProductsDataGrid rows={[product()]} loading={false} onOpen={noop} />)
 
     expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
     expect(screen.getByText('IP15P-256')).toBeInTheDocument()
@@ -33,10 +36,23 @@ describe('ProductsDataGrid', () => {
       <ProductsDataGrid
         rows={[product({ status: 'INATIVO' })]}
         loading={false}
+        onOpen={noop}
       />,
     )
 
     expect(screen.getByText('Inativo')).toBeInTheDocument()
     expect(screen.queryByText('INATIVO')).not.toBeInTheDocument()
+  })
+
+  it('clicar numa linha abre o detalhe do Produto daquela linha', async () => {
+    const onOpen = vi.fn()
+    render(
+      <ProductsDataGrid rows={[product()]} loading={false} onOpen={onOpen} />,
+    )
+
+    await userEvent.click(screen.getByText('iPhone 15 Pro'))
+
+    expect(onOpen).toHaveBeenCalledTimes(1)
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }))
   })
 })

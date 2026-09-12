@@ -11,9 +11,14 @@ import { PRODUCT_CATEGORY_OPTIONS, PRODUCT_STATUS_OPTIONS } from '../../types'
 interface ProductsDataGridProps {
   rows: Product[]
   loading: boolean
+  onOpen: (product: Product) => void
 }
 
-export function ProductsDataGrid({ rows, loading }: ProductsDataGridProps) {
+export function ProductsDataGrid({
+  rows,
+  loading,
+  onOpen,
+}: ProductsDataGridProps) {
   const theme = useTheme()
   const compact = useMediaQuery(theme.breakpoints.down('md'))
   const narrow = useMediaQuery(theme.breakpoints.down('sm'))
@@ -73,6 +78,7 @@ export function ProductsDataGrid({ rows, loading }: ProductsDataGridProps) {
         loading={loading}
         density={narrow ? 'compact' : 'standard'}
         getRowId={(row: Product) => row.id}
+        onRowClick={({ row }) => onOpen(row)}
         columnVisibilityModel={{
           sku: !narrow,
           category: !compact,
@@ -80,6 +86,7 @@ export function ProductsDataGrid({ rows, loading }: ProductsDataGridProps) {
         initialState={{
           pagination: { paginationModel: { pageSize: 10, page: 0 } },
         }}
+        sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
       />
     </Box>
   )

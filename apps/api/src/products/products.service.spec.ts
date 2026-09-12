@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,6 +22,16 @@ const productRow = (overrides: Record<string, unknown> = {}) => ({
   status: 'ATIVO',
   createdAt: new Date('2026-09-11T00:00:00Z'),
   updatedAt: new Date('2026-09-11T00:00:00Z'),
+  ...overrides,
+});
+
+const movementRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 'm1',
+  type: 'ENTRADA',
+  quantity: 10,
+  note: 'Carga inicial de estoque',
+  createdAt: new Date('2026-09-11T00:00:00Z'),
+  user: { id: 42, name: 'Admin' },
   ...overrides,
 });
 
@@ -186,6 +196,93 @@ describe('ProductsService', () => {
       const result = await service.findAll();
 
       expect(result.map((p) => p.price)).toEqual([7999, 199.9]);
+    });
+  });
+
+  describe('findOne — detalhe com histórico de estoque (UC6 §2.3)', () => {
+    it('devolve o Produto com os movimentos de estoque associados', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow({ stock: 10 }),
+        stockMovements: [movementRow()],
+      });
+
+      const result = await service.findOne('p1');
+
+      expect(result.id).toBe('p1');
+      expect(result.stockMovements).toHaveLength(1);
+      expect(result.stockMovements[0]).toMatchObject({
+        id: 'm1',
+        type: 'ENTRADA',
+        quantity: 10,
+        note: 'Carga inicial de estoque',
+        user: { id: 42, name: 'Admin' },
+      });
+    });
+
+    it('pede os movimentos do mais recente para o mais antigo', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow(),
+        stockMovements: [],
+      });
+
+      await service.findOne('p1');
+
+      const arg = callArg<{
+        select: {
+          stockMovements: { orderBy: { createdAt: string } };
+        };
+      }>(prisma.product.findFirst);
+      expect(arg.select.stockMovements.orderBy).toEqual({ createdAt: 'desc' });
+    });
+
+    it('filtra NOT_DELETED no Produto e nos movimentos (RP9)', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow(),
+        stockMovements: [],
+      });
+
+      await service.findOne('p1');
+
+      const arg = callArg<{
+        where: { id: string; deletedAt: null };
+        select: { stockMovements: { where: { deletedAt: null } } };
+      }>(prisma.product.findFirst);
+      expect(arg.where.id).toBe('p1');
+      expect(arg.where.deletedAt).toBeNull();
+      expect(arg.select.stockMovements.where.deletedAt).toBeNull();
+    });
+
+    it('converte o Decimal do preço para number', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow(),
+        stockMovements: [],
+      });
+
+      const result = await service.findOne('p1');
+
+      expect(result.price).toBe(7999);
+    });
+
+    it('404 quando o Produto não existe ou foi excluído logicamente (RP8)', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('fantasma')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.findOne('fantasma')).rejects.toThrow(
+        'Produto não encontrado',
+      );
+    });
+
+    it('preserva o movimento cujo autor foi excluído (user nulo)', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow(),
+        stockMovements: [movementRow({ user: null })],
+      });
+
+      const result = await service.findOne('p1');
+
+      expect(result.stockMovements[0].user).toBeNull();
     });
   });
 });

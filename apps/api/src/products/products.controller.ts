@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RoleEnum } from 'src/users/dto/create-user.dto';
@@ -41,5 +49,23 @@ export class ProductsController {
   @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
   findAll() {
     return this.productsService.findAll();
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Detalhar um produto com o histórico de movimentações de estoque',
+    description:
+      'Devolve o produto e a lista de movimentos de estoque associada, do mais ' +
+      'recente para o mais antigo, cada um com data, tipo, quantidade, autor e ' +
+      'observação (UC6 §2.3).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Produto com o histórico de estoque',
+  })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.productsService.findOne(id);
   }
 }
