@@ -23,6 +23,9 @@ const Negociacoes = lazy(() =>
 const Pedidos = lazy(() =>
   import('./pages/Pedidos').then((m) => ({ default: m.Pedidos })),
 )
+const Produtos = lazy(() =>
+  import('./pages/Produtos').then((m) => ({ default: m.Produtos })),
+)
 const Usuarios = lazy(() =>
   import('./pages/Usuarios').then((m) => ({ default: m.Usuarios })),
 )
@@ -67,7 +70,7 @@ function AppRoot() {
     negociacoes: <Negociacoes toast={show} />,
     orcamentos: <Placeholder title="Orçamentos" hint="Simulador de orçamento e propostas." />,
     pedidos: <Pedidos toast={show} onNavigate={navigate} />,
-    produtos: <Placeholder title="Produtos" hint="Catálogo de dispositivos Apple." />,
+    produtos: <Produtos toast={show} />,
     usados: <Placeholder title="Dispositivos Usados" hint="Avaliação e laudo de trade-in." />,
   }
 

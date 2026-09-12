@@ -153,3 +153,57 @@ export const ERASURE_ACTION_LABELS: Record<ErasureAction, string> = {
 
 export const ERASURE_ACTION_OPTIONS: { value: ErasureAction; label: string }[] =
   ERASURE_ACTIONS.map((v) => ({ value: v, label: ERASURE_ACTION_LABELS[v] }))
+
+export const PRODUCT_CATEGORIES = [
+  'IPHONE',
+  'IPAD',
+  'MAC',
+  'APPLE_WATCH',
+  'AUDIO',
+  'ACESSORIOS',
+] as const
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number]
+
+export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
+  IPHONE: 'iPhone',
+  IPAD: 'iPad',
+  MAC: 'Mac',
+  APPLE_WATCH: 'Apple Watch',
+  AUDIO: 'Áudio',
+  ACESSORIOS: 'Acessórios',
+}
+
+export const PRODUCT_CATEGORY_OPTIONS: {
+  value: ProductCategory
+  label: string
+}[] = PRODUCT_CATEGORIES.map((v) => ({
+  value: v,
+  label: PRODUCT_CATEGORY_LABELS[v],
+}))
+
+export const PRODUCT_STATUSES = ['ATIVO', 'INATIVO'] as const
+export type ProductStatus = (typeof PRODUCT_STATUSES)[number]
+
+export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
+  ATIVO: 'Ativo',
+  INATIVO: 'Inativo',
+}
+
+export const PRODUCT_STATUS_OPTIONS: { value: ProductStatus; label: string }[] =
+  PRODUCT_STATUSES.map((v) => ({ value: v, label: PRODUCT_STATUS_LABELS[v] }))
+
+export const STOCK_MOVEMENT_TYPES = ['ENTRADA', 'SAIDA'] as const
+export type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number]
+
+export const STOCK_MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {
+  ENTRADA: 'Entrada',
+  SAIDA: 'Saída',
+}
+
+export const STOCK_MOVEMENT_TYPE_OPTIONS: {
+  value: StockMovementType
+  label: string
+}[] = STOCK_MOVEMENT_TYPES.map((v) => ({
+  value: v,
+  label: STOCK_MOVEMENT_TYPE_LABELS[v],
+}))

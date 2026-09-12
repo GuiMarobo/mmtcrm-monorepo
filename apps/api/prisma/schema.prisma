@@ -56,6 +56,7 @@ model User {
 
   negotiations Negotiation[]
   erasuresPerformed DataErasureLog[]
+  stockMovements    StockMovement[]
 
   @@index([email])
   @@index([deletedAt])
@@ -175,4 +176,67 @@ model DataErasureLog {
 
   @@index([subject, subjectId])
   @@map("data_erasure_logs")
+}
+
+// Catálogo de Produtos (UC6 / spec 009). Os valores de ProductCategory são os
+// seis do UC6 §2.1, item 4.
+enum ProductCategory {
+  IPHONE
+  IPAD
+  MAC
+  APPLE_WATCH
+  AUDIO
+  ACESSORIOS
+}
+
+enum ProductStatus {
+  ATIVO
+  INATIVO
+}
+
+enum StockMovementType {
+  ENTRADA
+  SAIDA
+}
+
+model Product {
+  id          String          @id @default(uuid())
+  name        String
+  sku         String          // unico por indice parcial (WHERE deleted_at IS NULL), gravado normalizado
+  description String?
+  category    ProductCategory
+  price       Decimal         @default(0) @db.Decimal(12, 2)
+  // Saldo denormalizado: só muda junto de um StockMovement, na mesma transação
+  // (ADR 0013). Nenhum update de produto escreve nesta coluna.
+  stock       Int             @default(0)
+  status      ProductStatus   @default(ATIVO)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  deletedAt   DateTime?       @map("deleted_at")
+
+  stockMovements StockMovement[]
+
+  @@index([sku])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+// Registro de um fato ocorrido: nunca editado, nunca apagado fisicamente.
+model StockMovement {
+  id        String            @id @default(uuid())
+  productId String            @map("product_id")
+  type      StockMovementType
+  quantity  Int
+  note      String?
+  userId    Int?              @map("user_id")
+  createdAt DateTime          @default(now()) @map("created_at")
+  deletedAt DateTime?         @map("deleted_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // SetNull preserva o histórico quando o autor é excluído, como Negotiation.vendedorId.
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([deletedAt])
+  @@map("stock_movements")
 }
