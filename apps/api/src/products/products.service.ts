@@ -69,7 +69,7 @@ const INVALID_QUANTITY =
   'A quantidade deve ser um número inteiro maior que zero';
 
 const INVALID_PRICE =
-  'O preço de venda deve ser um valor maior ou igual a zero';
+  'O preço de venda deve ser um valor entre 0 e 9.999.999.999,99';
 
 const insufficientStock = (stock: number) =>
   `Saldo insuficiente: há ${stock} unidade(s) disponível(is)`;
@@ -89,6 +89,20 @@ export class ProductsService {
     return { ...product, price: Number(product.price) };
   }
 
+  // RP2: o sku já normalizado não pode estar em outro Produto não excluído.
+  // `exceptId` tira o próprio Produto da comparação ao editar.
+  private async ensureSkuAvailable(sku: string, exceptId?: string) {
+    const existing = await this.prisma.product.findFirst({
+      where: {
+        ...NOT_DELETED,
+        sku,
+        ...(exceptId !== undefined && { id: { not: exceptId } }),
+      },
+      select: { id: true },
+    });
+    if (existing) throw new ConflictException(SKU_TAKEN);
+  }
+
   private toDetailResponse(product: ProductDetailRow) {
     const { stockMovements, ...rest } = product;
     return { ...this.toResponse(rest), stockMovements };
@@ -100,12 +114,7 @@ export class ProductsService {
   // explica (ADR 0013).
   async create(dto: CreateProductDto, userId: number) {
     const sku = normalizeSku(dto.sku);
-
-    const existing = await this.prisma.product.findFirst({
-      where: { ...NOT_DELETED, sku },
-      select: { id: true },
-    });
-    if (existing) throw new ConflictException(SKU_TAKEN);
+    await this.ensureSkuAvailable(sku);
 
     const initialStock = dto.initialStock ?? 0;
 
@@ -231,23 +240,19 @@ export class ProductsService {
   // — nunca um spread do DTO — para que preço e saldo fiquem fora mesmo que o
   // chamador não passe pelo whitelist do ValidationPipe. RP2: trocar o código
   // de referência reaplica a unicidade normalizada, sem contar o próprio
-  // Produto.
+  // Produto. O @IsOptional do PartialType deixa passar `null`: nos campos
+  // obrigatórios ele conta como ausente (PATCH não apaga campo obrigatório);
+  // só a descrição, que é opcional, pode ser limpa com null.
   async update(id: string, dto: UpdateProductDto) {
-    const sku = dto.sku === undefined ? undefined : normalizeSku(dto.sku);
+    const sku = dto.sku == null ? undefined : normalizeSku(dto.sku);
 
-    if (sku !== undefined) {
-      const existing = await this.prisma.product.findFirst({
-        where: { ...NOT_DELETED, sku, id: { not: id } },
-        select: { id: true },
-      });
-      if (existing) throw new ConflictException(SKU_TAKEN);
-    }
+    if (sku !== undefined) await this.ensureSkuAvailable(sku, id);
 
     const data = {
-      ...(dto.name !== undefined && { name: dto.name }),
+      ...(dto.name != null && { name: dto.name }),
       ...(sku !== undefined && { sku }),
       ...(dto.description !== undefined && { description: dto.description }),
-      ...(dto.category !== undefined && { category: dto.category }),
+      ...(dto.category != null && { category: dto.category }),
     } satisfies Prisma.ProductUpdateManyMutationInput;
 
     try {

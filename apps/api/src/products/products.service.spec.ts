@@ -526,6 +526,24 @@ describe('ProductsService', () => {
       expect(arg.data).toEqual({ name: 'iPhone 15' });
     });
 
+    it('null em campo obrigatório conta como ausente; na descrição, limpa o campo', async () => {
+      prisma.product.findFirst.mockResolvedValue(detailAfter());
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.update('p1', {
+        name: null,
+        sku: null,
+        category: null,
+        description: null,
+      } as unknown as UpdateProductDto);
+
+      expect(prisma.product.findFirst).toHaveBeenCalledTimes(1);
+      const arg = callArg<{ data: Record<string, unknown> }>(
+        prisma.product.updateMany,
+      );
+      expect(arg.data).toEqual({ description: null });
+    });
+
     it('404 quando o Produto não existe ou foi excluído', async () => {
       prisma.product.findFirst.mockResolvedValue(null);
       prisma.product.updateMany.mockResolvedValue({ count: 0 });
