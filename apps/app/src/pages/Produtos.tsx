@@ -8,9 +8,15 @@ import { useAuth } from '../contexts/AuthContext'
 import { ProductDetailDrawer } from '../components/products/ProductDetailDrawer'
 import { ProductFormModal } from '../components/products/ProductFormModal'
 import { ProductsDataGrid } from '../components/products/ProductsDataGrid'
+import { StockMovementModal } from '../components/products/StockMovementModal'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
-import type { CreateProductPayload, Product, ProductDetail } from '../types'
+import type {
+  CreateProductPayload,
+  CreateStockMovementPayload,
+  Product,
+  ProductDetail,
+} from '../types'
 
 interface ProdutosProps {
   toast: (msg: string, type?: 'success' | 'error') => void
@@ -26,6 +32,7 @@ export function Produtos({ toast }: ProdutosProps) {
   const [detail, setDetail] = useState<ProductDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [moving, setMoving] = useState(false)
   const openedId = useRef<string | null>(null)
 
   const isAdmin = user?.role === 'ADMIN'
@@ -72,6 +79,7 @@ export function Produtos({ toast }: ProdutosProps) {
 
   const closeDetail = () => {
     openedId.current = null
+    setMoving(false)
     setSelected(null)
     setDetail(null)
     setDetailError(null)
@@ -82,6 +90,19 @@ export function Produtos({ toast }: ProdutosProps) {
     setList((prev) => [created, ...prev])
     setCreating(false)
     toast(`Produto "${created.name}" cadastrado`)
+  }
+
+  const moveStock = async (payload: CreateStockMovementPayload) => {
+    if (!detail) return
+    const updated = await productsApi.moveStock(detail.id, payload)
+    const { stockMovements: _, ...row } = updated
+    setList((prev) => prev.map((p) => (p.id === row.id ? row : p)))
+    if (openedId.current === updated.id) {
+      setSelected(row)
+      setDetail(updated)
+    }
+    setMoving(false)
+    toast(`Movimentação registrada. Saldo atual: ${updated.stock}`)
   }
 
   return (
@@ -136,7 +157,17 @@ export function Produtos({ toast }: ProdutosProps) {
           movementsLoading={detailLoading}
           movementsError={detailError}
           isAdmin={isAdmin}
+          onMoveStock={detail ? () => setMoving(true) : undefined}
           onClose={closeDetail}
+        />
+      )}
+
+      {moving && detail && (
+        <StockMovementModal
+          product={detail}
+          onClose={() => setMoving(false)}
+          onSave={moveStock}
+          onError={(message) => toast(message, 'error')}
         />
       )}
 

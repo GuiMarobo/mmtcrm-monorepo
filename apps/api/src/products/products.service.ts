@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -6,6 +7,10 @@ import {
 import { Prisma } from '../../generated/prisma/client';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
+import {
+  CreateStockMovementDto,
+  StockMovementTypeEnum,
+} from './dto/create-stock-movement.dto';
 
 const productSelect = {
   id: true,
@@ -56,6 +61,12 @@ const INITIAL_LOAD_NOTE = 'Carga inicial de estoque';
 const SKU_TAKEN = 'Já existe um produto com este código de referência';
 
 const NOT_FOUND = 'Produto não encontrado';
+
+const INVALID_QUANTITY =
+  'A quantidade deve ser um número inteiro maior que zero';
+
+const insufficientStock = (stock: number) =>
+  `Saldo insuficiente: há ${stock} unidade(s) disponível(is)`;
 
 // P2002 = violação de índice único. Só o índice parcial de sku
 // (products_sku_unique_active) pode disparar isso aqui, e ele é a rede que pega
@@ -142,8 +153,8 @@ export class ProductsService {
 
   // UC6 §2.3: detalhe do Produto com o histórico de movimentações. RP8: um
   // Produto excluído logicamente é 404, como se nunca tivesse existido.
-  // O histórico só é carregado aqui: as escritas dos tickets 04-06 conferem a
-  // existência pelo productSelect enxuto, sem arrastar a lista de movimentos.
+  // O histórico só é carregado aqui: as escritas conferem a existência por um
+  // select enxuto, sem arrastar a lista de movimentos.
   async findOne(id: string) {
     const product = await this.prisma.product.findFirst({
       where: { ...NOT_DELETED, id },
@@ -152,5 +163,56 @@ export class ProductsService {
     if (!product) throw new NotFoundException(NOT_FOUND);
 
     return this.toDetailResponse(product);
+  }
+  // RP5 / ADR 0013: o único caminho de escrita do saldo. O movimento e o saldo
+  // mudam na mesma transação. A Saída só decrementa onde stock >= quantidade,
+  // numa única escrita condicional — duas saídas simultâneas não conseguem
+  // passar ambas por uma checagem lida antes. Nenhuma linha afetada significa
+  // Produto inexistente/excluído (404) ou saldo insuficiente (409); o throw
+  // desfaz a transação, então nada é gravado.
+  async moveStock(id: string, dto: CreateStockMovementDto, userId: number) {
+    // O DTO já barra isto na borda HTTP; repetido aqui porque o service é o
+    // guardião da invariante "saldo nunca negativo", seja quem for o chamador.
+    if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
+      throw new BadRequestException(INVALID_QUANTITY);
+    }
+
+    const isOut = dto.type === StockMovementTypeEnum.SAIDA;
+
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.product.updateMany({
+        where: {
+          ...NOT_DELETED,
+          id,
+          ...(isOut && { stock: { gte: dto.quantity } }),
+        },
+        data: {
+          stock: isOut
+            ? { decrement: dto.quantity }
+            : { increment: dto.quantity },
+        },
+      });
+
+      if (count === 0) {
+        const product = await tx.product.findFirst({
+          where: { ...NOT_DELETED, id },
+          select: { stock: true },
+        });
+        if (!product) throw new NotFoundException(NOT_FOUND);
+        throw new ConflictException(insufficientStock(product.stock));
+      }
+
+      await tx.stockMovement.create({
+        data: {
+          productId: id,
+          type: dto.type,
+          quantity: dto.quantity,
+          note: dto.note,
+          userId,
+        },
+      });
+    });
+
+    return this.findOne(id);
   }
 }

@@ -1,9 +1,14 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from './products.service';
 import { ProductCategoryEnum } from './dto/create-product.dto';
+import { StockMovementTypeEnum } from './dto/create-stock-movement.dto';
 import {
   asPrismaService,
   callArg,
@@ -284,5 +289,128 @@ describe('ProductsService', () => {
 
       expect(result.stockMovements[0].user).toBeNull();
     });
+  });
+  describe('moveStock — movimentar estoque (RP5)', () => {
+    const detailAfter = (stock: number) => ({
+      ...productRow({ stock }),
+      stockMovements: [movementRow()],
+    });
+
+    it('Entrada soma a quantidade ao saldo e grava o movimento na mesma transação', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.stockMovement.create.mockResolvedValue({ id: 'm2' });
+      prisma.product.findFirst.mockResolvedValue(detailAfter(15));
+
+      const result = await service.moveStock(
+        'p1',
+        { type: StockMovementTypeEnum.ENTRADA, quantity: 5, note: 'Reposição' },
+        42,
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const update = callArg<{
+        where: { id: string; deletedAt: null };
+        data: { stock: { increment: number } };
+      }>(prisma.product.updateMany);
+      expect(update.where.id).toBe('p1');
+      expect(update.where.deletedAt).toBeNull();
+      expect(update.data.stock).toEqual({ increment: 5 });
+
+      const movement = callArg<{
+        data: Record<string, unknown>;
+      }>(prisma.stockMovement.create);
+      expect(movement.data).toMatchObject({
+        productId: 'p1',
+        type: 'ENTRADA',
+        quantity: 5,
+        note: 'Reposição',
+        userId: 42,
+      });
+
+      expect(result.stock).toBe(15);
+      expect(result.stockMovements).toHaveLength(1);
+    });
+
+    it('Saída subtrai do saldo só se houver saldo suficiente, na mesma escrita', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.stockMovement.create.mockResolvedValue({ id: 'm2' });
+      prisma.product.findFirst.mockResolvedValue(detailAfter(7));
+
+      const result = await service.moveStock(
+        'p1',
+        { type: StockMovementTypeEnum.SAIDA, quantity: 3 },
+        42,
+      );
+
+      const update = callArg<{
+        where: { id: string; stock: { gte: number } };
+        data: { stock: { decrement: number } };
+      }>(prisma.product.updateMany);
+      expect(update.where.stock).toEqual({ gte: 3 });
+      expect(update.data.stock).toEqual({ decrement: 3 });
+
+      const movement = callArg<{ data: Record<string, unknown> }>(
+        prisma.stockMovement.create,
+      );
+      expect(movement.data).toMatchObject({ type: 'SAIDA', quantity: 3 });
+      expect(result.stock).toBe(7);
+    });
+
+    it('recusa Saída maior que o saldo com 409 e não grava o movimento', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+      prisma.product.findFirst.mockResolvedValue({ id: 'p1', stock: 2 });
+
+      await expect(
+        service.moveStock(
+          'p1',
+          { type: StockMovementTypeEnum.SAIDA, quantity: 3 },
+          42,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('a mensagem do 409 informa o saldo disponível', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+      prisma.product.findFirst.mockResolvedValue({ id: 'p1', stock: 2 });
+
+      await expect(
+        service.moveStock(
+          'p1',
+          { type: StockMovementTypeEnum.SAIDA, quantity: 3 },
+          42,
+        ),
+      ).rejects.toThrow('Saldo insuficiente: há 2 unidade(s) disponível(is)');
+    });
+
+    it('404 quando o Produto não existe ou foi excluído, sem gravar movimento', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.moveStock(
+          'fantasma',
+          { type: StockMovementTypeEnum.ENTRADA, quantity: 1 },
+          42,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+    });
+
+    it.each([0, -4, 2.5])(
+      'recusa quantidade %p com 400, sem tocar no banco',
+      async (quantity) => {
+        await expect(
+          service.moveStock(
+            'p1',
+            { type: StockMovementTypeEnum.ENTRADA, quantity },
+            42,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+      },
+    );
   });
 });

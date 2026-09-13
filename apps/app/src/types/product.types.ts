@@ -38,3 +38,9 @@ export interface CreateProductPayload {
   price: number
   initialStock?: number
 }
+
+export interface CreateStockMovementPayload {
+  type: StockMovementType
+  quantity: number
+  note?: string
+}

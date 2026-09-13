@@ -1,5 +1,10 @@
 import { http } from './http'
-import type { CreateProductPayload, Product, ProductDetail } from '../types'
+import type {
+  CreateProductPayload,
+  CreateStockMovementPayload,
+  Product,
+  ProductDetail,
+} from '../types'
 
 export const productsApi = {
   list(): Promise<Product[]> {
@@ -12,5 +17,12 @@ export const productsApi = {
 
   create(payload: CreateProductPayload): Promise<Product> {
     return http.post<Product>('/products', payload)
+  },
+
+  moveStock(
+    id: string,
+    payload: CreateStockMovementPayload,
+  ): Promise<ProductDetail> {
+    return http.post<ProductDetail>(`/products/${id}/stock-movements`, payload)
   },
 }

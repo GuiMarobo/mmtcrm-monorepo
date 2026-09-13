@@ -11,6 +11,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RoleEnum } from 'src/users/dto/create-user.dto';
 import { CreateProductDto } from './dto/create-product.dto';
+import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
 import { ProductsService } from './products.service';
 
 // RP10: consultar o catálogo é do ADMIN e do VENDEDOR; manter o catálogo é só do
@@ -67,5 +68,31 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Produto não encontrado' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.productsService.findOne(id);
+  }
+  @Post(':id/stock-movements')
+  @Roles(RoleEnum.ADMIN)
+  @ApiOperation({
+    summary: 'Registrar uma entrada ou saída de estoque',
+    description:
+      'Único caminho que altera o saldo: grava o movimento e atualiza o saldo na ' +
+      'mesma transação (ADR 0013). A quantidade é um inteiro positivo; o tipo ' +
+      '(ENTRADA/SAIDA) informa a direção. Uma saída maior que o saldo é recusada ' +
+      'e nada é gravado. Devolve o produto atualizado com o histórico.',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'Movimento registrado; produto com saldo e histórico atualizados',
+  })
+  @ApiResponse({ status: 400, description: 'Tipo ou quantidade inválidos' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  @ApiResponse({ status: 409, description: 'Saldo insuficiente para a saída' })
+  moveStock(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateStockMovementDto,
+    @Req() req: { user: { id: number } },
+  ) {
+    return this.productsService.moveStock(id, dto, req.user.id);
   }
 }
