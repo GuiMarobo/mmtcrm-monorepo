@@ -186,6 +186,30 @@ describe('ProductDetailDrawer', () => {
     expect(onEdit).toHaveBeenCalledTimes(1)
   })
 
+  it('com handlers, Descontinuar e Excluir do menu ⋮ chamam as ações (ticket 06)', async () => {
+    const onDiscontinue = vi.fn()
+    const onDelete = vi.fn()
+    setup({ onDiscontinue, onDelete })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Descontinuar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Excluir' }))
+
+    expect(onDiscontinue).toHaveBeenCalledTimes(1)
+    expect(onDelete).toHaveBeenCalledTimes(1)
+  })
+
+  it('com handler, Reativar do menu ⋮ chama a ação num Produto Inativo (RP7)', async () => {
+    const onReactivate = vi.fn()
+    setup({ product: product({ status: 'INATIVO' }), onReactivate })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Reativar' }))
+
+    expect(onReactivate).toHaveBeenCalledTimes(1)
+  })
+
   it('informa a falha de carregamento do histórico sem esconder os dados', () => {
     setup({ movements: [], movementsError: 'Falha ao carregar o histórico.' })
 

@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -142,5 +144,52 @@ export class ProductsController {
     @Body() dto: UpdateProductPriceDto,
   ) {
     return this.productsService.updatePrice(id, dto);
+  }
+
+  @Patch(':id/discontinue')
+  @Roles(RoleEnum.ADMIN)
+  @ApiOperation({
+    summary: 'Descontinuar um produto',
+    description:
+      'Muda a situação de Ativo para Inativo. O produto continua visível para ' +
+      'consulta histórica. Devolve o produto com o histórico.',
+  })
+  @ApiResponse({ status: 200, description: 'Produto descontinuado' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  @ApiResponse({ status: 409, description: 'Produto já está Inativo' })
+  discontinue(@Param('id', ParseUUIDPipe) id: string) {
+    return this.productsService.discontinue(id);
+  }
+
+  @Patch(':id/reactivate')
+  @Roles(RoleEnum.ADMIN)
+  @ApiOperation({
+    summary: 'Reativar um produto descontinuado',
+    description:
+      'Devolve a situação de Inativo para Ativo. Devolve o produto com o histórico.',
+  })
+  @ApiResponse({ status: 200, description: 'Produto reativado' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  @ApiResponse({ status: 409, description: 'Produto já está Ativo' })
+  reactivate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.productsService.reactivate(id);
+  }
+
+  @Delete(':id')
+  @Roles(RoleEnum.ADMIN)
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Excluir um produto (exclusão lógica)',
+    description:
+      'Marca a data de exclusão; a linha e o histórico de estoque são ' +
+      'preservados, mas o produto some de todas as consultas (ADR 0008).',
+  })
+  @ApiResponse({ status: 204, description: 'Produto excluído' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.productsService.remove(id);
   }
 }

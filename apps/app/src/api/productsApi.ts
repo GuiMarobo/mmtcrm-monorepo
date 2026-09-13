@@ -38,4 +38,16 @@ export const productsApi = {
   ): Promise<ProductDetail> {
     return http.post<ProductDetail>(`/products/${id}/stock-movements`, payload)
   },
+
+  discontinue(id: string): Promise<ProductDetail> {
+    return http.patch<ProductDetail>(`/products/${id}/discontinue`)
+  },
+
+  reactivate(id: string): Promise<ProductDetail> {
+    return http.patch<ProductDetail>(`/products/${id}/reactivate`)
+  },
+
+  remove(id: string): Promise<void> {
+    return http.delete<void>(`/products/${id}`)
+  },
 }

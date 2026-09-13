@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
+import { Prisma, ProductStatus } from '../../generated/prisma/client';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, MAX_PRICE } from './dto/create-product.dto';
 import {
@@ -70,6 +70,10 @@ const INVALID_QUANTITY =
 
 const INVALID_PRICE =
   'O preço de venda deve ser um valor entre 0 e 9.999.999.999,99';
+
+const ALREADY_INACTIVE = 'Este produto já está descontinuado';
+
+const ALREADY_ACTIVE = 'Este produto já está ativo';
 
 const insufficientStock = (stock: number) =>
   `Saldo insuficiente: há ${stock} unidade(s) disponível(is)`;
@@ -285,5 +289,52 @@ export class ProductsService {
     if (count === 0) throw new NotFoundException(NOT_FOUND);
 
     return this.findOne(id);
+  }
+
+  // RP6: descontinuar tira o Produto de circulação sem apagá-lo.
+  discontinue(id: string) {
+    return this.changeStatus(id, 'ATIVO', 'INATIVO', ALREADY_INACTIVE);
+  }
+
+  // RP7: reativar só parte de Inativo — é a volta da descontinuação.
+  reactivate(id: string) {
+    return this.changeStatus(id, 'INATIVO', 'ATIVO', ALREADY_ACTIVE);
+  }
+
+  // A transição é uma escrita condicional à situação de origem. Nenhuma linha
+  // afetada significa Produto inexistente/excluído (404) ou já na situação de
+  // destino (409).
+  private async changeStatus(
+    id: string,
+    from: ProductStatus,
+    to: ProductStatus,
+    alreadyMessage: string,
+  ) {
+    const { count } = await this.prisma.product.updateMany({
+      where: { ...NOT_DELETED, id, status: from },
+      data: { status: to },
+    });
+
+    if (count === 0) {
+      const product = await this.prisma.product.findFirst({
+        where: { ...NOT_DELETED, id },
+        select: { id: true },
+      });
+      if (!product) throw new NotFoundException(NOT_FOUND);
+      throw new ConflictException(alreadyMessage);
+    }
+
+    return this.findOne(id);
+  }
+
+  // RP8 / ADR 0008: excluir só marca deletedAt — a linha e os movimentos de
+  // estoque ficam, e o NOT_DELETED de toda consulta passa a escondê-los. O
+  // índice parcial de sku libera o código de referência para um novo cadastro.
+  async remove(id: string) {
+    const { count } = await this.prisma.product.updateMany({
+      where: { ...NOT_DELETED, id },
+      data: { deletedAt: new Date() },
+    });
+    if (count === 0) throw new NotFoundException(NOT_FOUND);
   }
 }

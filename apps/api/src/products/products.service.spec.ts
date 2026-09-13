@@ -604,4 +604,99 @@ describe('ProductsService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe.each([
+    {
+      action: 'discontinue' as const,
+      rule: 'RP6',
+      from: 'ATIVO',
+      to: 'INATIVO',
+    },
+    {
+      action: 'reactivate' as const,
+      rule: 'RP7',
+      from: 'INATIVO',
+      to: 'ATIVO',
+    },
+  ])('$action — troca de situação ($rule)', ({ action, from, to }) => {
+    it(`muda a situação de ${from} para ${to} e devolve o detalhe`, async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow({ status: to }),
+        stockMovements: [],
+      });
+
+      const result = await service[action]('p1');
+
+      const arg = callArg<{
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }>(prisma.product.updateMany);
+      expect(arg.where).toEqual({ deletedAt: null, id: 'p1', status: from });
+      expect(arg.data).toEqual({ status: to });
+      expect(result.status).toBe(to);
+    });
+
+    it(`recusa com 409 um Produto que já está ${to}`, async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+      prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
+
+      await expect(service[action]('p1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('404 quando o Produto não existe ou foi excluído', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service[action]('fantasma')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      const arg = callArg<{ where: Record<string, unknown> }>(
+        prisma.product.findFirst,
+      );
+      expect(arg.where).toMatchObject({ deletedAt: null, id: 'fantasma' });
+    });
+  });
+
+  describe('remove — exclusão lógica (RP8)', () => {
+    it('marca deletedAt no Produto não excluído e nunca apaga a linha', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.remove('p1');
+
+      const arg = callArg<{
+        where: Record<string, unknown>;
+        data: { deletedAt: unknown };
+      }>(prisma.product.updateMany);
+      expect(arg.where).toEqual({ deletedAt: null, id: 'p1' });
+      expect(arg.data.deletedAt).toBeInstanceOf(Date);
+      expect(prisma.product.delete).not.toHaveBeenCalled();
+      expect(prisma.stockMovement.delete).not.toHaveBeenCalled();
+    });
+
+    it('404 quando o Produto não existe ou já foi excluído', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.remove('fantasma')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('depois de excluído, o detalhe é 404: o NOT_DELETED passa a filtrá-lo', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      await service.remove('p1');
+
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne('p1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      const arg = callArg<{ where: Record<string, unknown> }>(
+        prisma.product.findFirst,
+      );
+      expect(arg.where).toMatchObject({ deletedAt: null, id: 'p1' });
+    });
+  });
 });
