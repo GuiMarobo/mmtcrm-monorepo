@@ -5,9 +5,13 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
+
+// Teto da coluna Decimal(12, 2): acima disto a escrita estouraria em 500.
+export const MAX_PRICE = 9_999_999_999.99;
 
 // Espelha ProductCategory do Prisma: o @IsEnum precisa de um enum de runtime, e
 // a categoria é o único campo de enum que chega pelo corpo da requisição. O
@@ -45,6 +49,7 @@ export class CreateProductDto {
 
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(MAX_PRICE)
   price!: number;
 
   // Quantidade de carga inicial. Maior que zero vira o primeiro movimento do

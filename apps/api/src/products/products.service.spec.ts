@@ -7,7 +7,8 @@ import { Test } from '@nestjs/testing';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from './products.service';
-import { ProductCategoryEnum } from './dto/create-product.dto';
+import { MAX_PRICE, ProductCategoryEnum } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { StockMovementTypeEnum } from './dto/create-stock-movement.dto';
 import {
   asPrismaService,
@@ -290,6 +291,7 @@ describe('ProductsService', () => {
       expect(result.stockMovements[0].user).toBeNull();
     });
   });
+
   describe('moveStock — movimentar estoque (RP5)', () => {
     const detailAfter = (stock: number) => ({
       ...productRow({ stock }),
@@ -412,5 +414,176 @@ describe('ProductsService', () => {
         expect(prisma.stockMovement.create).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe('update — editar dados do Produto (RP3)', () => {
+    const detailAfter = (overrides: Record<string, unknown> = {}) => ({
+      ...productRow(overrides),
+      stockMovements: [],
+    });
+
+    it('grava nome, sku normalizado, descrição e categoria', async () => {
+      prisma.product.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(
+          detailAfter({ name: 'iPhone 15', sku: 'IP15-128' }),
+        );
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.update('p1', {
+        name: 'iPhone 15',
+        sku: ' ip15-128 ',
+        description: 'Azul',
+        category: ProductCategoryEnum.IPHONE,
+      });
+
+      const arg = callArg<{
+        where: { id: string; deletedAt: null };
+        data: Record<string, unknown>;
+      }>(prisma.product.updateMany);
+      expect(arg.where.id).toBe('p1');
+      expect(arg.where.deletedAt).toBeNull();
+      expect(arg.data).toEqual({
+        name: 'iPhone 15',
+        sku: 'IP15-128',
+        description: 'Azul',
+        category: 'IPHONE',
+      });
+      expect(result.sku).toBe('IP15-128');
+    });
+
+    it('ignora price e stock que venham no corpo: editar não toca preço nem saldo', async () => {
+      prisma.product.findFirst.mockResolvedValue(detailAfter());
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.update('p1', {
+        name: 'iPhone 15',
+        price: 1,
+        stock: 999,
+        initialStock: 5,
+        status: 'INATIVO',
+      } as unknown as UpdateProductDto);
+
+      const arg = callArg<{ data: Record<string, unknown> }>(
+        prisma.product.updateMany,
+      );
+      expect(arg.data).not.toHaveProperty('price');
+      expect(arg.data).not.toHaveProperty('stock');
+      expect(arg.data).not.toHaveProperty('initialStock');
+      expect(arg.data).not.toHaveProperty('status');
+      expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('reaplica a unicidade normalizada do sku, desconsiderando o próprio Produto (RP2)', async () => {
+      prisma.product.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(detailAfter());
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.update('p1', { sku: ' ip15p-256 ' });
+
+      const arg = callArg<{
+        where: { sku: string; id: { not: string }; deletedAt: null };
+      }>(prisma.product.findFirst);
+      expect(arg.where.sku).toBe('IP15P-256');
+      expect(arg.where.id).toEqual({ not: 'p1' });
+      expect(arg.where.deletedAt).toBeNull();
+    });
+
+    it('recusa sku de outro Produto com 409 e não grava nada', async () => {
+      prisma.product.findFirst.mockResolvedValue({ id: 'outro' });
+
+      await expect(service.update('p1', { sku: 'IP15P-256' })).rejects.toThrow(
+        'Já existe um produto com este código de referência',
+      );
+      expect(prisma.product.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('traduz a colisão do índice único (P2002) para o mesmo 409 amigável', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+      prisma.product.updateMany.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(
+        service.update('p1', { sku: 'IP15P-256' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('sem sku no corpo, não consulta duplicidade', async () => {
+      prisma.product.findFirst.mockResolvedValue(detailAfter());
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.update('p1', { name: 'iPhone 15' });
+
+      expect(prisma.product.findFirst).toHaveBeenCalledTimes(1);
+      const arg = callArg<{ data: Record<string, unknown> }>(
+        prisma.product.updateMany,
+      );
+      expect(arg.data).toEqual({ name: 'iPhone 15' });
+    });
+
+    it('404 quando o Produto não existe ou foi excluído', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.update('fantasma', { name: 'X' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('updatePrice — atualizar preço de venda (RP4)', () => {
+    it('grava só o novo preço e devolve o detail com o preço em number', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow({ price: { toString: () => '8499.90' } }),
+        stockMovements: [],
+      });
+
+      const result = await service.updatePrice('p1', { price: 8499.9 });
+
+      const arg = callArg<{
+        where: { id: string; deletedAt: null };
+        data: Record<string, unknown>;
+      }>(prisma.product.updateMany);
+      expect(arg.where.id).toBe('p1');
+      expect(arg.where.deletedAt).toBeNull();
+      expect(arg.data).toEqual({ price: 8499.9 });
+      expect(result.price).toBe(8499.9);
+    });
+
+    it('aceita preço zero', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow({ price: { toString: () => '0' } }),
+        stockMovements: [],
+      });
+
+      await expect(
+        service.updatePrice('p1', { price: 0 }),
+      ).resolves.toMatchObject({ price: 0 });
+    });
+
+    it.each([-0.01, -100, Number.NaN, MAX_PRICE + 1])(
+      'recusa preço %p com 400, sem tocar no banco',
+      async (price) => {
+        await expect(
+          service.updatePrice('p1', { price }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+      },
+    );
+
+    it('404 quando o Produto não existe ou foi excluído', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.updatePrice('fantasma', { price: 10 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 });

@@ -8,7 +8,13 @@ import { useState } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
 import { FormRow } from '../common/FormRow'
-import type { CreateProductPayload, ProductCategory } from '../../types'
+import { priceError } from '../../utils/validators'
+import type {
+  CreateProductPayload,
+  Product,
+  ProductCategory,
+  UpdateProductPayload,
+} from '../../types'
 import { PRODUCT_CATEGORY_OPTIONS } from '../../types'
 
 interface ProductForm {
@@ -29,9 +35,21 @@ const EMPTY_FORM: ProductForm = {
   initialStock: '0',
 }
 
+function toForm(product: Product): ProductForm {
+  return {
+    ...EMPTY_FORM,
+    name: product.name,
+    sku: product.sku,
+    description: product.description ?? '',
+    category: product.category,
+  }
+}
+
 type FieldKey = 'name' | 'sku' | 'price' | 'initialStock'
 
-const ALL_FIELDS: FieldKey[] = ['name', 'sku', 'price', 'initialStock']
+const CREATE_FIELDS: FieldKey[] = ['name', 'sku', 'price', 'initialStock']
+
+const EDIT_FIELDS: FieldKey[] = ['name', 'sku']
 
 function computeError(key: FieldKey, form: ProductForm): string | undefined {
   switch (key) {
@@ -41,12 +59,8 @@ function computeError(key: FieldKey, form: ProductForm): string | undefined {
       return form.sku.trim()
         ? undefined
         : 'Informe o código de referência do produto.'
-    case 'price': {
-      if (!form.price.trim()) return 'Informe o preço de venda.'
-      const price = Number(form.price)
-      if (Number.isNaN(price)) return 'Preço inválido.'
-      return price < 0 ? 'O preço não pode ser negativo.' : undefined
-    }
+    case 'price':
+      return priceError(form.price)
     case 'initialStock': {
       if (!form.initialStock.trim()) return 'Informe a quantidade inicial.'
       const stock = Number(form.initialStock)
@@ -56,24 +70,35 @@ function computeError(key: FieldKey, form: ProductForm): string | undefined {
   }
 }
 
-function toPayload(form: ProductForm): CreateProductPayload {
+function toUpdatePayload(form: ProductForm): UpdateProductPayload {
   return {
     name: form.name.trim(),
     sku: form.sku.trim(),
     description: form.description.trim() ? form.description.trim() : null,
     category: form.category,
+  }
+}
+
+function toCreatePayload(form: ProductForm): CreateProductPayload {
+  return {
+    ...toUpdatePayload(form),
     price: Number(form.price),
     initialStock: Number(form.initialStock),
   }
 }
 
-interface ProductFormModalProps {
-  onClose: () => void
-  onSave: (payload: CreateProductPayload) => Promise<void>
-}
+type ProductFormModalProps = { onClose: () => void } & (
+  | { product?: undefined; onSave: (payload: CreateProductPayload) => Promise<void> }
+  | { product: Product; onSave: (payload: UpdateProductPayload) => Promise<void> }
+)
 
-export function ProductFormModal({ onClose, onSave }: ProductFormModalProps) {
-  const [form, setForm] = useState<ProductForm>(EMPTY_FORM)
+export function ProductFormModal(props: ProductFormModalProps) {
+  const { onClose } = props
+  const editing = !!props.product
+  const fields = editing ? EDIT_FIELDS : CREATE_FIELDS
+  const [form, setForm] = useState<ProductForm>(() =>
+    props.product ? toForm(props.product) : EMPTY_FORM,
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
@@ -90,12 +115,13 @@ export function ProductFormModal({ onClose, onSave }: ProductFormModalProps) {
   }
 
   const submit = async () => {
-    setTouched({ name: true, sku: true, price: true, initialStock: true })
-    if (!ALL_FIELDS.every((key) => !computeError(key, form))) return
+    setTouched(Object.fromEntries(fields.map((key) => [key, true])))
+    if (fields.some((key) => computeError(key, form))) return
     setError(null)
     setSaving(true)
     try {
-      await onSave(toPayload(form))
+      if (props.product) await props.onSave(toUpdatePayload(form))
+      else await props.onSave(toCreatePayload(form))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao salvar produto.')
     } finally {
@@ -105,8 +131,12 @@ export function ProductFormModal({ onClose, onSave }: ProductFormModalProps) {
 
   return (
     <FormDialog
-      title="Novo Produto"
-      subtitle="O produto nasce ativo no catálogo. A quantidade inicial abre o histórico de estoque."
+      title={editing ? 'Editar Produto' : 'Novo Produto'}
+      subtitle={
+        editing
+          ? 'Preço e estoque têm ações próprias no detalhe do produto.'
+          : 'O produto nasce ativo no catálogo. A quantidade inicial abre o histórico de estoque.'
+      }
       onClose={onClose}
       width={680}
       closeOnBackdrop={false}
@@ -121,7 +151,7 @@ export function ProductFormModal({ onClose, onSave }: ProductFormModalProps) {
             onClick={() => void submit()}
             disabled={saving}
           >
-            {saving ? 'Salvando…' : 'Cadastrar produto'}
+            {saving ? 'Salvando…' : editing ? 'Salvar alterações' : 'Cadastrar produto'}
           </Button>
         </>
       }
@@ -168,33 +198,35 @@ export function ProductFormModal({ onClose, onSave }: ProductFormModalProps) {
           </TextField>
         </FormRow>
 
-        <FormRow>
-          <TextField
-            label="Preço de Venda"
-            required
-            type="number"
-            value={form.price}
-            onChange={(e) => set('price', e.target.value)}
-            onBlur={() => handleBlur('price')}
-            placeholder="0,00"
-            error={!!displayError('price')}
-            helperText={displayError('price') ?? ' '}
-            slotProps={{ htmlInput: { inputMode: 'decimal', min: 0, step: '0.01' } }}
-            fullWidth
-          />
-          <TextField
-            label="Quantidade Inicial em Estoque"
-            required
-            type="number"
-            value={form.initialStock}
-            onChange={(e) => set('initialStock', e.target.value)}
-            onBlur={() => handleBlur('initialStock')}
-            error={!!displayError('initialStock')}
-            helperText={displayError('initialStock') ?? ' '}
-            slotProps={{ htmlInput: { inputMode: 'numeric', min: 0, step: 1 } }}
-            fullWidth
-          />
-        </FormRow>
+        {!editing && (
+          <FormRow>
+            <TextField
+              label="Preço de Venda"
+              required
+              type="number"
+              value={form.price}
+              onChange={(e) => set('price', e.target.value)}
+              onBlur={() => handleBlur('price')}
+              placeholder="0,00"
+              error={!!displayError('price')}
+              helperText={displayError('price') ?? ' '}
+              slotProps={{ htmlInput: { inputMode: 'decimal', min: 0, step: '0.01' } }}
+              fullWidth
+            />
+            <TextField
+              label="Quantidade Inicial em Estoque"
+              required
+              type="number"
+              value={form.initialStock}
+              onChange={(e) => set('initialStock', e.target.value)}
+              onBlur={() => handleBlur('initialStock')}
+              error={!!displayError('initialStock')}
+              helperText={displayError('initialStock') ?? ' '}
+              slotProps={{ htmlInput: { inputMode: 'numeric', min: 0, step: 1 } }}
+              fullWidth
+            />
+          </FormRow>
+        )}
 
         <TextField
           label="Descrição"

@@ -39,6 +39,15 @@ export interface CreateProductPayload {
   initialStock?: number
 }
 
+export type UpdateProductPayload = Pick<
+  CreateProductPayload,
+  'name' | 'sku' | 'description' | 'category'
+>
+
+export interface UpdateProductPricePayload {
+  price: number
+}
+
 export interface CreateStockMovementPayload {
   type: StockMovementType
   quantity: number

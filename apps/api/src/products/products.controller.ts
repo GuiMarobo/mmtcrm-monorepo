@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Req,
 } from '@nestjs/common';
@@ -12,6 +13,8 @@ import { Roles } from 'src/auth/decorators/roles.decorator';
 import { RoleEnum } from 'src/users/dto/create-user.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { UpdateProductPriceDto } from './dto/update-product-price.dto';
 import { ProductsService } from './products.service';
 
 // RP10: consultar o catálogo é do ADMIN e do VENDEDOR; manter o catálogo é só do
@@ -95,5 +98,49 @@ export class ProductsController {
     @Req() req: { user: { id: number } },
   ) {
     return this.productsService.moveStock(id, dto, req.user.id);
+  }
+
+  @Patch(':id')
+  @Roles(RoleEnum.ADMIN)
+  @ApiOperation({
+    summary: 'Editar os dados cadastrais de um produto',
+    description:
+      'Aceita nome, código de referência, descrição e categoria. Nunca altera ' +
+      'preço nem saldo, mesmo que venham no corpo — o preço tem rota própria e ' +
+      'o saldo só muda por movimento de estoque. Trocar o código de referência ' +
+      'reaplica a unicidade normalizada. Devolve o produto com o histórico.',
+  })
+  @ApiResponse({ status: 200, description: 'Produto atualizado' })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  @ApiResponse({
+    status: 409,
+    description: 'Código de referência já cadastrado',
+  })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProductDto,
+  ) {
+    return this.productsService.update(id, dto);
+  }
+
+  @Patch(':id/price')
+  @Roles(RoleEnum.ADMIN)
+  @ApiOperation({
+    summary: 'Atualizar o preço de venda de um produto',
+    description:
+      'Grava só o novo preço, que não pode ser negativo. Não retroage sobre ' +
+      'negociações e pedidos já registrados. Devolve o produto com o histórico.',
+  })
+  @ApiResponse({ status: 200, description: 'Preço atualizado' })
+  @ApiResponse({ status: 400, description: 'Preço inválido' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Produto não encontrado' })
+  updatePrice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProductPriceDto,
+  ) {
+    return this.productsService.updatePrice(id, dto);
   }
 }

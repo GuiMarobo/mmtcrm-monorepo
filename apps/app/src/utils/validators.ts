@@ -24,6 +24,13 @@ export function isValidCpf(value: string): boolean {
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10])
 }
 
+export function priceError(value: string): string | undefined {
+  if (!value.trim()) return 'Informe o preço de venda.'
+  const price = Number(value)
+  if (Number.isNaN(price)) return 'Preço inválido.'
+  return price < 0 ? 'O preço não pode ser negativo.' : undefined
+}
+
 export function isPositiveInteger(value: string): boolean {
   if (!value.trim()) return false
   const n = Number(value)

@@ -173,6 +173,19 @@ describe('ProductDetailDrawer', () => {
     expect(onMoveStock).toHaveBeenCalledTimes(1)
   })
 
+  it('com handlers, Atualizar Preço e o Editar do menu ⋮ chamam as ações (ticket 05)', async () => {
+    const onUpdatePrice = vi.fn()
+    const onEdit = vi.fn()
+    setup({ onUpdatePrice, onEdit })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Atualizar Preço' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Editar' }))
+
+    expect(onUpdatePrice).toHaveBeenCalledTimes(1)
+    expect(onEdit).toHaveBeenCalledTimes(1)
+  })
+
   it('informa a falha de carregamento do histórico sem esconder os dados', () => {
     setup({ movements: [], movementsError: 'Falha ao carregar o histórico.' })
 

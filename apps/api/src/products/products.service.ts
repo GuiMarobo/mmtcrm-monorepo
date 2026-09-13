@@ -6,12 +6,14 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
-import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductDto, MAX_PRICE } from './dto/create-product.dto';
 import {
   CreateStockMovementDto,
   MAX_STOCK_QUANTITY,
   StockMovementTypeEnum,
 } from './dto/create-stock-movement.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { UpdateProductPriceDto } from './dto/update-product-price.dto';
 
 const productSelect = {
   id: true,
@@ -65,6 +67,9 @@ const NOT_FOUND = 'Produto não encontrado';
 
 const INVALID_QUANTITY =
   'A quantidade deve ser um número inteiro maior que zero';
+
+const INVALID_PRICE =
+  'O preço de venda deve ser um valor maior ou igual a zero';
 
 const insufficientStock = (stock: number) =>
   `Saldo insuficiente: há ${stock} unidade(s) disponível(is)`;
@@ -218,6 +223,61 @@ export class ProductsService {
         },
       });
     });
+
+    return this.findOne(id);
+  }
+
+  // RP3: editar mexe só nos dados cadastrais. O `data` é montado campo a campo
+  // — nunca um spread do DTO — para que preço e saldo fiquem fora mesmo que o
+  // chamador não passe pelo whitelist do ValidationPipe. RP2: trocar o código
+  // de referência reaplica a unicidade normalizada, sem contar o próprio
+  // Produto.
+  async update(id: string, dto: UpdateProductDto) {
+    const sku = dto.sku === undefined ? undefined : normalizeSku(dto.sku);
+
+    if (sku !== undefined) {
+      const existing = await this.prisma.product.findFirst({
+        where: { ...NOT_DELETED, sku, id: { not: id } },
+        select: { id: true },
+      });
+      if (existing) throw new ConflictException(SKU_TAKEN);
+    }
+
+    const data = {
+      ...(dto.name !== undefined && { name: dto.name }),
+      ...(sku !== undefined && { sku }),
+      ...(dto.description !== undefined && { description: dto.description }),
+      ...(dto.category !== undefined && { category: dto.category }),
+    } satisfies Prisma.ProductUpdateManyMutationInput;
+
+    try {
+      const { count } = await this.prisma.product.updateMany({
+        where: { ...NOT_DELETED, id },
+        data,
+      });
+      if (count === 0) throw new NotFoundException(NOT_FOUND);
+    } catch (err) {
+      if (isSkuConflict(err)) throw new ConflictException(SKU_TAKEN);
+      throw err;
+    }
+
+    return this.findOne(id);
+  }
+
+  // RP4: grava o novo preço e nada mais. Negociações e pedidos já registrados
+  // não leem daqui o preço praticado, então não há o que retroagir.
+  async updatePrice(id: string, dto: UpdateProductPriceDto) {
+    // Mesma defesa em profundidade de moveStock: o DTO já recusa, mas o
+    // service é quem garante que nenhum preço negativo chega à coluna.
+    if (!Number.isFinite(dto.price) || dto.price < 0 || dto.price > MAX_PRICE) {
+      throw new BadRequestException(INVALID_PRICE);
+    }
+
+    const { count } = await this.prisma.product.updateMany({
+      where: { ...NOT_DELETED, id },
+      data: { price: dto.price },
+    });
+    if (count === 0) throw new NotFoundException(NOT_FOUND);
 
     return this.findOne(id);
   }

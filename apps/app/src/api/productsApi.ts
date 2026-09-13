@@ -4,6 +4,8 @@ import type {
   CreateStockMovementPayload,
   Product,
   ProductDetail,
+  UpdateProductPayload,
+  UpdateProductPricePayload,
 } from '../types'
 
 export const productsApi = {
@@ -17,6 +19,17 @@ export const productsApi = {
 
   create(payload: CreateProductPayload): Promise<Product> {
     return http.post<Product>('/products', payload)
+  },
+
+  update(id: string, payload: UpdateProductPayload): Promise<ProductDetail> {
+    return http.patch<ProductDetail>(`/products/${id}`, payload)
+  },
+
+  updatePrice(
+    id: string,
+    payload: UpdateProductPricePayload,
+  ): Promise<ProductDetail> {
+    return http.patch<ProductDetail>(`/products/${id}/price`, payload)
   },
 
   moveStock(
