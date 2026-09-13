@@ -9,6 +9,7 @@ import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import {
   CreateStockMovementDto,
+  MAX_STOCK_QUANTITY,
   StockMovementTypeEnum,
 } from './dto/create-stock-movement.dto';
 
@@ -164,6 +165,7 @@ export class ProductsService {
 
     return this.toDetailResponse(product);
   }
+
   // RP5 / ADR 0013: o único caminho de escrita do saldo. O movimento e o saldo
   // mudam na mesma transação. A Saída só decrementa onde stock >= quantidade,
   // numa única escrita condicional — duas saídas simultâneas não conseguem
@@ -173,7 +175,11 @@ export class ProductsService {
   async moveStock(id: string, dto: CreateStockMovementDto, userId: number) {
     // O DTO já barra isto na borda HTTP; repetido aqui porque o service é o
     // guardião da invariante "saldo nunca negativo", seja quem for o chamador.
-    if (!Number.isInteger(dto.quantity) || dto.quantity <= 0) {
+    if (
+      !Number.isInteger(dto.quantity) ||
+      dto.quantity <= 0 ||
+      dto.quantity > MAX_STOCK_QUANTITY
+    ) {
       throw new BadRequestException(INVALID_QUANTITY);
     }
 

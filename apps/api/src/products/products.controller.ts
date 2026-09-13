@@ -69,6 +69,7 @@ export class ProductsController {
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.productsService.findOne(id);
   }
+
   @Post(':id/stock-movements')
   @Roles(RoleEnum.ADMIN)
   @ApiOperation({

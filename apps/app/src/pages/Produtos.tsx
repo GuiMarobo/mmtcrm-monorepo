@@ -32,7 +32,7 @@ export function Produtos({ toast }: ProdutosProps) {
   const [detail, setDetail] = useState<ProductDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
-  const [moving, setMoving] = useState(false)
+  const [movingStock, setMovingStock] = useState(false)
   const openedId = useRef<string | null>(null)
 
   const isAdmin = user?.role === 'ADMIN'
@@ -79,7 +79,7 @@ export function Produtos({ toast }: ProdutosProps) {
 
   const closeDetail = () => {
     openedId.current = null
-    setMoving(false)
+    setMovingStock(false)
     setSelected(null)
     setDetail(null)
     setDetailError(null)
@@ -101,7 +101,7 @@ export function Produtos({ toast }: ProdutosProps) {
       setSelected(row)
       setDetail(updated)
     }
-    setMoving(false)
+    setMovingStock(false)
     toast(`Movimentação registrada. Saldo atual: ${updated.stock}`)
   }
 
@@ -157,15 +157,15 @@ export function Produtos({ toast }: ProdutosProps) {
           movementsLoading={detailLoading}
           movementsError={detailError}
           isAdmin={isAdmin}
-          onMoveStock={detail ? () => setMoving(true) : undefined}
+          onMoveStock={detail ? () => setMovingStock(true) : undefined}
           onClose={closeDetail}
         />
       )}
 
-      {moving && detail && (
+      {movingStock && detail && (
         <StockMovementModal
           product={detail}
-          onClose={() => setMoving(false)}
+          onClose={() => setMovingStock(false)}
           onSave={moveStock}
           onError={(message) => toast(message, 'error')}
         />

@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
+import { isPositiveInteger } from '../../utils/validators'
 import type {
   CreateStockMovementPayload,
   Product,
@@ -18,11 +19,7 @@ import { STOCK_MOVEMENT_TYPE_OPTIONS } from '../../types'
 const INVALID_QUANTITY = 'A quantidade deve ser um número inteiro maior que zero.'
 
 function quantityError(value: string): string | undefined {
-  const quantity = Number(value)
-  if (!value.trim() || !Number.isInteger(quantity) || quantity <= 0) {
-    return INVALID_QUANTITY
-  }
-  return undefined
+  return isPositiveInteger(value) ? undefined : INVALID_QUANTITY
 }
 
 interface StockMovementModalProps {

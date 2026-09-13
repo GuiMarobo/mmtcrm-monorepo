@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -15,6 +16,9 @@ export enum StockMovementTypeEnum {
   SAIDA = 'SAIDA',
 }
 
+// Teto da coluna Int do Postgres: acima disto a escrita estouraria em 500.
+export const MAX_STOCK_QUANTITY = 2_147_483_647;
+
 export class CreateStockMovementDto {
   @IsEnum(StockMovementTypeEnum)
   @IsNotEmpty()
@@ -23,6 +27,7 @@ export class CreateStockMovementDto {
   // RP5: sempre inteiro positivo — o tipo diz a direção, não o sinal (ADR 0013).
   @IsInt()
   @Min(1)
+  @Max(MAX_STOCK_QUANTITY)
   quantity!: number;
 
   @IsString()

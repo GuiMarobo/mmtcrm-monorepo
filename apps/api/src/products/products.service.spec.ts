@@ -397,7 +397,7 @@ describe('ProductsService', () => {
       expect(prisma.stockMovement.create).not.toHaveBeenCalled();
     });
 
-    it.each([0, -4, 2.5])(
+    it.each([0, -4, 2.5, 2_147_483_648])(
       'recusa quantidade %p com 400, sem tocar no banco',
       async (quantity) => {
         await expect(

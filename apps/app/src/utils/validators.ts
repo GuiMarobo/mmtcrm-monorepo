@@ -23,3 +23,9 @@ export function isValidCpf(value: string): boolean {
 
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10])
 }
+
+export function isPositiveInteger(value: string): boolean {
+  if (!value.trim()) return false
+  const n = Number(value)
+  return Number.isInteger(n) && n > 0
+}
