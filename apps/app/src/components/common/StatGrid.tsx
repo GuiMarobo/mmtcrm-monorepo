@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 
 interface StatGridProps {
   children: ReactNode
-  columns?: 2 | 4
+  columns?: 2 | 3 | 4
 }
 
 export function StatGrid({ children, columns = 4 }: StatGridProps) {

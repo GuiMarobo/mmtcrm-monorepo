@@ -1,10 +1,10 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
+import { ProductCatalog } from '../components/products/ProductCatalog'
 import {
   ProductConfirmDialog,
   type ProductConfirmAction,
@@ -12,7 +12,6 @@ import {
 import { ProductDetailDrawer } from '../components/products/ProductDetailDrawer'
 import { ProductFormModal } from '../components/products/ProductFormModal'
 import { ProductPriceModal } from '../components/products/ProductPriceModal'
-import { ProductsDataGrid } from '../components/products/ProductsDataGrid'
 import { StockMovementModal } from '../components/products/StockMovementModal'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
@@ -201,26 +200,11 @@ export function Produtos({ toast }: ProdutosProps) {
           <ErrorBanner message={loadError} onRetry={() => void reload()} />
         </SectionCard>
       ) : (
-        <SectionCard>
-          {!loading && list.length === 0 ? (
-            <Typography
-              sx={{
-                p: 6,
-                textAlign: 'center',
-                color: 'text.disabled',
-                fontSize: 13,
-              }}
-            >
-              Nenhum produto ainda
-            </Typography>
-          ) : (
-            <ProductsDataGrid
-              rows={list}
-              loading={loading}
-              onOpen={(product) => void openDetail(product)}
-            />
-          )}
-        </SectionCard>
+        <ProductCatalog
+          list={list}
+          loading={loading}
+          onOpen={(product) => void openDetail(product)}
+        />
       )}
 
       {selected && (

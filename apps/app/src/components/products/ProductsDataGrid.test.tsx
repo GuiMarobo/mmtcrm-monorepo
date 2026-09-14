@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProductsDataGrid } from './ProductsDataGrid'
@@ -54,5 +54,36 @@ describe('ProductsDataGrid', () => {
 
     expect(onOpen).toHaveBeenCalledTimes(1)
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }))
+  })
+
+  describe('no telefone', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('mantém a mesma grade, só sem as colunas menos essenciais e em densidade compacta', () => {
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addListener: noop,
+        removeListener: noop,
+        addEventListener: noop,
+        removeEventListener: noop,
+        dispatchEvent: () => false,
+      }))
+
+      const { container } = render(
+        <ProductsDataGrid rows={[product()]} loading={false} onOpen={noop} />,
+      )
+
+      expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
+      expect(screen.getByText('R$ 7.999,90')).toBeInTheDocument()
+      expect(screen.getByText('Ativo')).toBeInTheDocument()
+      expect(screen.queryByText('IP15P-256')).not.toBeInTheDocument()
+      expect(screen.queryByText('Código de Referência')).not.toBeInTheDocument()
+      expect(screen.queryByText('Categoria')).not.toBeInTheDocument()
+      expect(container.querySelector('.MuiDataGrid-root--densityCompact')).not.toBeNull()
+    })
   })
 })
