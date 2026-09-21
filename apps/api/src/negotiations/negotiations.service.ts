@@ -219,7 +219,10 @@ export class NegotiationsService {
     return this.toResponse(updated);
   }
 
-  async convert(id: number, paymentMethod: PaymentMethodEnum) {
+  // userId: autor da baixa de venda gravada na transação de conversão (ticket
+  // 11 da spec 010). Ainda não usado aqui — este ticket só faz o dado chegar.
+  async convert(id: number, paymentMethod: PaymentMethodEnum, userId: number) {
+    void userId;
     const negotiation = await this.ensureExists(id);
     // RN12: converter não passa por `ensureClientEditable` — a anonimização não
     // congela o ciclo. O Cliente vem no próprio select da Negociação.
@@ -272,7 +275,11 @@ export class NegotiationsService {
     return this.findOne(id);
   }
 
-  async reopen(id: number, actorRole: RoleEnum) {
+  // userId: autor da devolução de venda gravada na transação de reabertura
+  // (ticket 14 da spec 010). Ainda não usado aqui — este ticket só faz o dado
+  // chegar.
+  async reopen(id: number, actorRole: RoleEnum, userId: number) {
+    void userId;
     const negotiation = await this.ensureExists(id);
     this.assertTransition(negotiation.status, 'ABERTA');
 

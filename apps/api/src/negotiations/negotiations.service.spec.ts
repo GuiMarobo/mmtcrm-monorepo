@@ -58,7 +58,7 @@ describe('NegotiationsService', () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
       const before = Date.now();
-      await service.convert(3, PaymentMethodEnum.PIX);
+      await service.convert(3, PaymentMethodEnum.PIX, 42);
       const after = Date.now();
 
       const arg = callArg<{
@@ -82,7 +82,7 @@ describe('NegotiationsService', () => {
     it('ativa o Cliente na conversão mesmo com o Pedido ainda EM_NEGOCIACAO (RN7)', async () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
-      await service.convert(3, PaymentMethodEnum.PIX);
+      await service.convert(3, PaymentMethodEnum.PIX, 42);
 
       expect(prisma.client.update).toHaveBeenCalledWith({
         where: { id: 'c1' },
@@ -117,7 +117,7 @@ describe('NegotiationsService', () => {
       );
 
       const before = Date.now();
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
       const after = Date.now();
 
       const arg = callArg<{
@@ -135,7 +135,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'PERDIDA' }),
       );
 
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
 
       expect(prisma.order.updateMany).not.toHaveBeenCalled();
     });
@@ -145,10 +145,10 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
       );
 
-      await expect(service.reopen(3, RoleEnum.VENDEDOR)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-      await expect(service.reopen(3, RoleEnum.VENDEDOR)).rejects.toThrow(
+      await expect(
+        service.reopen(3, RoleEnum.VENDEDOR, 42),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.reopen(3, RoleEnum.VENDEDOR, 42)).rejects.toThrow(
         'Venda com pagamento confirmado só pode ser reaberta por um administrador',
       );
       expect(prisma.negotiation.update).not.toHaveBeenCalled();
@@ -159,7 +159,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
       );
 
-      await service.reopen(3, RoleEnum.ADMIN);
+      await service.reopen(3, RoleEnum.ADMIN, 42);
 
       expect(prisma.negotiation.update).toHaveBeenCalled();
       const arg = callArg<{ data: { status: string } }>(
@@ -173,7 +173,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
       );
 
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
 
       expect(prisma.negotiation.update).toHaveBeenCalled();
     });
@@ -194,7 +194,7 @@ describe('NegotiationsService', () => {
     it('convert não checa o Cliente (nem anonimização)', async () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
-      await service.convert(3, PaymentMethodEnum.PIX);
+      await service.convert(3, PaymentMethodEnum.PIX, 42);
 
       expect(prisma.client.findFirst).not.toHaveBeenCalled();
     });
@@ -212,7 +212,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: null }),
       );
 
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
 
       expect(prisma.client.findFirst).not.toHaveBeenCalled();
     });

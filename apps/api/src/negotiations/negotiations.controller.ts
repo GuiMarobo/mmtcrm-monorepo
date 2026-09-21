@@ -127,8 +127,9 @@ export class NegotiationsController {
   convert(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ConvertNegotiationDto,
+    @Req() req: { user: { id: number } },
   ) {
-    return this.negotiationsService.convert(id, dto.paymentMethod);
+    return this.negotiationsService.convert(id, dto.paymentMethod, req.user.id);
   }
 
   @Patch(':id/reopen')
@@ -146,8 +147,8 @@ export class NegotiationsController {
   @ApiResponse({ status: 409, description: 'Negociação já está aberta' })
   reopen(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: { user: { role: RoleEnum } },
+    @Req() req: { user: { id: number; role: RoleEnum } },
   ) {
-    return this.negotiationsService.reopen(id, req.user.role);
+    return this.negotiationsService.reopen(id, req.user.role, req.user.id);
   }
 }
