@@ -2,6 +2,7 @@ import { http } from './http'
 import type {
   CreateNegotiationPayload,
   Negotiation,
+  NegotiationDetail,
   PaymentMethod,
   UpdateNegotiationPayload,
 } from '../types'
@@ -11,8 +12,8 @@ export const negotiationsApi = {
     return http.get<Negotiation[]>('/negotiations')
   },
 
-  findOne(id: number): Promise<Negotiation> {
-    return http.get<Negotiation>(`/negotiations/${id}`)
+  findOne(id: number): Promise<NegotiationDetail> {
+    return http.get<NegotiationDetail>(`/negotiations/${id}`)
   },
 
   create(payload: CreateNegotiationPayload): Promise<Negotiation> {

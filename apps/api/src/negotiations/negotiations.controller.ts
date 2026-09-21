@@ -27,12 +27,17 @@ export class NegotiationsController {
 
   @Post()
   @ApiOperation({
-    summary: 'Abrir uma negociação para um cliente',
+    summary: 'Abrir uma negociação para um cliente, com os itens (spec 010)',
     description:
       'A negociação nasce ABERTA. O vendedor responsável é sempre o usuário ' +
-      'autenticado — mandar vendedorId no corpo não tem efeito.',
+      'autenticado — mandar vendedorId no corpo não tem efeito. O total é ' +
+      'sempre a soma dos itens: sem itens, nasce R$ 0,00.',
   })
   @ApiResponse({ status: 201, description: 'Negociação aberta' })
+  @ApiResponse({
+    status: 400,
+    description: 'Item de Produto inativo/excluído ou repetido na lista',
+  })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   @ApiResponse({ status: 409, description: 'Cliente anonimizado (LGPD)' })
   create(

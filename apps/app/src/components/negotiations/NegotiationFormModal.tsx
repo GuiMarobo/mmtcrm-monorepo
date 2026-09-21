@@ -3,31 +3,41 @@ import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
+import { NegotiationItemsEditor } from './NegotiationItemsEditor'
 import { formatCurrency } from '../../utils/format'
 import type {
   Client,
+  CreateNegotiationItemPayload,
   CreateNegotiationPayload,
   Negotiation,
+  Product,
+  UpdateNegotiationPayload,
 } from '../../types'
 
 interface NegotiationFormModalProps {
   negotiation: Negotiation | null
   clients: Client[]
+  products: Product[]
   onClose: () => void
-  onSave: (payload: CreateNegotiationPayload) => Promise<void>
+  onCreate: (payload: CreateNegotiationPayload) => Promise<void>
+  onUpdate: (payload: UpdateNegotiationPayload) => Promise<void>
 }
 
 export function NegotiationFormModal({
   negotiation,
   clients,
+  products,
   onClose,
-  onSave,
+  onCreate,
+  onUpdate,
 }: NegotiationFormModalProps) {
   const isEdit = !!negotiation
   const [clientId, setClientId] = useState(negotiation?.clientId ?? '')
+  const [items, setItems] = useState<CreateNegotiationItemPayload[]>([])
   const [totalValue, setTotalValue] = useState(
     negotiation ? String(negotiation.totalValue) : '',
   )
@@ -35,8 +45,11 @@ export function NegotiationFormModal({
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const parsed = Number(totalValue.replace(',', '.'))
-  const valueInvalid = totalValue.trim() !== '' && (Number.isNaN(parsed) || parsed < 0)
+  const availableProducts = products.filter((p) => p.status === 'ATIVO')
+
+  const parsedTotal = Number(totalValue.replace(',', '.'))
+  const totalInvalid =
+    isEdit && totalValue.trim() !== '' && (Number.isNaN(parsedTotal) || parsedTotal < 0)
 
   const submit = async () => {
     setError(null)
@@ -44,18 +57,27 @@ export function NegotiationFormModal({
       setError('Selecione o cliente da negociação.')
       return
     }
-    if (totalValue.trim() === '' || Number.isNaN(parsed) || parsed < 0) {
-      setError('Informe um valor total válido, igual ou maior que zero.')
-      return
-    }
 
     setSaving(true)
     try {
-      await onSave({
-        clientId,
-        totalValue: Math.round(parsed * 100) / 100,
-        notes: notes.trim() || null,
-      })
+      if (isEdit) {
+        if (totalValue.trim() === '' || Number.isNaN(parsedTotal) || parsedTotal < 0) {
+          setError('Informe um valor total válido, igual ou maior que zero.')
+          setSaving(false)
+          return
+        }
+        await onUpdate({
+          clientId,
+          totalValue: Math.round(parsedTotal * 100) / 100,
+          notes: notes.trim() || null,
+        })
+      } else {
+        await onCreate({
+          clientId,
+          items,
+          notes: notes.trim() || null,
+        })
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -75,6 +97,7 @@ export function NegotiationFormModal({
           ? 'Altere os dados da tratativa em aberto.'
           : 'A negociação nasce em aberto, com você como vendedor responsável.'
       }
+      width={isEdit ? 600 : 680}
       onClose={onClose}
       footer={
         <>
@@ -109,25 +132,37 @@ export function NegotiationFormModal({
           )}
         />
 
-        <TextField
-          label="Valor total"
-          type="number"
-          required
-          value={totalValue}
-          onChange={(e) => setTotalValue(e.target.value)}
-          placeholder="0,00"
-          autoFocus={!isEdit}
-          error={valueInvalid}
-          helperText={
-            valueInvalid
-              ? 'Valor inválido'
-              : totalValue.trim() !== ''
-                ? formatCurrency(parsed)
-                : ' '
-          }
-          slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
-          fullWidth
-        />
+        {isEdit ? (
+          <TextField
+            label="Valor total"
+            type="number"
+            required
+            value={totalValue}
+            onChange={(e) => setTotalValue(e.target.value)}
+            placeholder="0,00"
+            error={totalInvalid}
+            helperText={
+              totalInvalid
+                ? 'Valor inválido'
+                : totalValue.trim() !== ''
+                  ? formatCurrency(parsedTotal)
+                  : ' '
+            }
+            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+            fullWidth
+          />
+        ) : (
+          <Box>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 600, mb: 0.75 }}>
+              Itens da negociação
+            </Typography>
+            <NegotiationItemsEditor
+              products={availableProducts}
+              items={items}
+              onChange={setItems}
+            />
+          </Box>
+        )}
 
         <TextField
           label="Observações"

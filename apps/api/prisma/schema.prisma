@@ -123,6 +123,7 @@ model Negotiation {
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   vendedor User?  @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
   order    Order?
+  items    NegotiationItem[]
 
   @@index([clientId])
   @@index([deletedAt])
@@ -215,11 +216,37 @@ model Product {
   updatedAt   DateTime        @updatedAt @map("updated_at")
   deletedAt   DateTime?       @map("deleted_at")
 
-  stockMovements StockMovement[]
+  stockMovements   StockMovement[]
+  negotiationItems NegotiationItem[]
 
   @@index([sku])
   @@index([deletedAt])
   @@map("products")
+}
+
+// Um Produto dentro de uma Negociação (spec 010). Guarda a quantidade e o
+// preço praticado, copiado do Produto na inclusão e nunca atualizado depois
+// (RI4) — mudar o preço no catálogo não retroage nos itens já gravados. Um
+// Produto aparece no máximo uma vez por Negociação entre os não excluídos:
+// índice único parcial, adicionado à mão na migration (RI3), no mesmo padrão
+// de products_sku_unique_active (ADR 0008).
+model NegotiationItem {
+  id            Int       @id @default(autoincrement())
+  negotiationId Int       @map("negotiation_id")
+  productId     String    @map("product_id")
+  quantity      Int
+  unitPrice     Decimal   @map("unit_price") @db.Decimal(12, 2)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  negotiation Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([negotiationId])
+  @@index([productId])
+  @@index([deletedAt])
+  @@map("negotiation_items")
 }
 
 // Registro de um fato ocorrido: nunca editado, nunca apagado fisicamente.

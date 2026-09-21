@@ -3,6 +3,7 @@ import type {
   NegotiationStatus,
   OrderStatus,
   PaymentMethod,
+  ProductStatus,
 } from './enums'
 
 export interface NegotiationOrder {
@@ -39,10 +40,39 @@ export interface Negotiation {
   order: NegotiationOrder | null
 }
 
+export interface NegotiationItemProduct {
+  id: string
+  name: string
+  sku: string
+  status: ProductStatus
+  deleted: boolean
+}
+
+export interface NegotiationItem {
+  id: number
+  product: NegotiationItemProduct
+  quantity: number
+  unitPrice: number
+  subtotal: number
+}
+
+export interface NegotiationDetail extends Negotiation {
+  items: NegotiationItem[]
+}
+
+export interface CreateNegotiationItemPayload {
+  productId: string
+  quantity: number
+}
+
 export interface CreateNegotiationPayload {
   clientId: string
-  totalValue: number
+  items: CreateNegotiationItemPayload[]
   notes?: string | null
 }
 
-export type UpdateNegotiationPayload = Partial<CreateNegotiationPayload>
+export interface UpdateNegotiationPayload {
+  clientId?: string
+  totalValue?: number
+  notes?: string | null
+}

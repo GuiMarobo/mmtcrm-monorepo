@@ -3,7 +3,7 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
-import { ApiError, clientsApi, negotiationsApi } from '../api'
+import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
 import { NegotiationBoard } from '../components/negotiations/NegotiationBoard'
@@ -25,6 +25,8 @@ import type {
   Negotiation,
   NegotiationStatus,
   PaymentMethod,
+  Product,
+  UpdateNegotiationPayload,
 } from '../types'
 
 interface NegociacoesProps {
@@ -39,6 +41,7 @@ interface PendingTransition {
 export function Negociacoes({ toast }: NegociacoesProps) {
   const [list, setList] = useState<Negotiation[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [view, setView] = useState<NegotiationView>('quadro')
@@ -59,12 +62,14 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     setLoading(true)
     setLoadError(null)
     try {
-      const [negotiations, clientList] = await Promise.all([
+      const [negotiations, clientList, productList] = await Promise.all([
         negotiationsApi.list(),
         clientsApi.list(),
+        productsApi.list(),
       ])
       setList(negotiations)
       setClients(clientList)
+      setProducts(productList)
     } catch (err) {
       setLoadError(
         err instanceof ApiError ? err.message : 'Falha ao carregar negociações.',
@@ -81,18 +86,19 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const replaceInList = (updated: Negotiation) =>
     setList((prev) => prev.map((n) => (n.id === updated.id ? updated : n)))
 
-  const save = async (payload: CreateNegotiationPayload) => {
-    if (editing) {
-      const updated = await negotiationsApi.update(editing.id, payload)
-      replaceInList(updated)
-      toast('Negociação atualizada')
-    } else {
-      const created = await negotiationsApi.create(payload)
-      setList((prev) => [created, ...prev])
-      toast('Negociação aberta')
-    }
-    setEditing(null)
+  const createNegotiation = async (payload: CreateNegotiationPayload) => {
+    const created = await negotiationsApi.create(payload)
+    setList((prev) => [created, ...prev])
+    toast('Negociação aberta')
     setCreating(false)
+  }
+
+  const updateNegotiation = async (payload: UpdateNegotiationPayload) => {
+    if (!editing) return
+    const updated = await negotiationsApi.update(editing.id, payload)
+    replaceInList(updated)
+    toast('Negociação atualizada')
+    setEditing(null)
   }
 
   const requestTransition = (
@@ -233,11 +239,13 @@ export function Negociacoes({ toast }: NegociacoesProps) {
         <NegotiationFormModal
           negotiation={editing}
           clients={clients}
+          products={products}
           onClose={() => {
             setCreating(false)
             setEditing(null)
           }}
-          onSave={save}
+          onCreate={createNegotiation}
+          onUpdate={updateNegotiation}
         />
       )}
 
