@@ -416,6 +416,52 @@ describe('ProductsService', () => {
     );
   });
 
+  describe('recordStockMovement — caminho compartilhado (prefactor spec 010)', () => {
+    it('grava o movimento e atualiza o saldo recebendo um tx externo, com orderId', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.stockMovement.create.mockResolvedValue({ id: 'm3' });
+
+      await service.recordStockMovement(asPrismaService(prisma), {
+        productId: 'p1',
+        type: StockMovementTypeEnum.SAIDA,
+        quantity: 2,
+        orderId: 7,
+      });
+
+      const update = callArg<{
+        where: { id: string; stock: { gte: number } };
+        data: { stock: { decrement: number } };
+      }>(prisma.product.updateMany);
+      expect(update.where.stock).toEqual({ gte: 2 });
+      expect(update.data.stock).toEqual({ decrement: 2 });
+
+      const movement = callArg<{ data: Record<string, unknown> }>(
+        prisma.stockMovement.create,
+      );
+      expect(movement.data).toMatchObject({
+        productId: 'p1',
+        type: 'SAIDA',
+        quantity: 2,
+        orderId: 7,
+      });
+    });
+
+    it('recusa saldo insuficiente sem gravar o movimento, mesmo com tx externo', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+      prisma.product.findFirst.mockResolvedValue({ id: 'p1', stock: 1 });
+
+      await expect(
+        service.recordStockMovement(asPrismaService(prisma), {
+          productId: 'p1',
+          type: StockMovementTypeEnum.SAIDA,
+          quantity: 5,
+          orderId: 7,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('update — editar dados do Produto (RP3)', () => {
     const detailAfter = (overrides: Record<string, unknown> = {}) => ({
       ...productRow(overrides),

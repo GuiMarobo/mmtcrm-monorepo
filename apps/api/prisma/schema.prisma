@@ -147,6 +147,7 @@ model Order {
   deletedAt     DateTime?   @map("deleted_at")
 
   negotiation Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  stockMovements StockMovement[]
 
   @@index([deletedAt])
   @@map("orders")
@@ -229,14 +230,20 @@ model StockMovement {
   quantity  Int
   note      String?
   userId    Int?              @map("user_id")
+  // Vínculo com o Pedido que originou a baixa/devolução de venda (specs 010/11
+  // e 010/14). Nulo no movimento manual. SetNull: o histórico de estoque não
+  // pode sumir se o Pedido for excluído (ADR 0013 continua valendo).
+  orderId   Int?              @map("order_id")
   createdAt DateTime          @default(now()) @map("created_at")
   deletedAt DateTime?         @map("deleted_at")
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   // SetNull preserva o histórico quando o autor é excluído, como Negotiation.vendedorId.
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([productId])
   @@index([deletedAt])
+  @@index([orderId])
   @@map("stock_movements")
 }
