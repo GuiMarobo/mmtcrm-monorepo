@@ -7,7 +7,7 @@ import Divider from '@mui/material/Divider'
 import Drawer from '@mui/material/Drawer'
 import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
-import type { ReactNode } from 'react'
+import { DetailField, DetailSection } from '../common/DetailSection'
 import { OrderStatusBadge } from '../common/OrderStatusBadge'
 import { CLIENT_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../../types'
 import { formatCurrency, formatDate } from '../../utils/format'
@@ -19,44 +19,6 @@ interface OrderDetailDrawerProps {
   onApprove: () => void
   onGoToNegotiations: () => void
   onClose: () => void
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Box sx={{ px: 3, py: 2.5 }}>
-      <Typography
-        sx={{
-          fontSize: 11.5,
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          color: 'text.disabled',
-          mb: 1.5,
-        }}
-      >
-        {title}
-      </Typography>
-      <Box sx={{ display: 'grid', gap: 1.25 }}>{children}</Box>
-    </Box>
-  )
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        gap: 2,
-        alignItems: 'baseline',
-      }}
-    >
-      <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>{label}</Typography>
-      <Typography sx={{ fontSize: 13.5, fontWeight: 600, textAlign: 'right' }}>
-        {children}
-      </Typography>
-    </Box>
-  )
 }
 
 export function OrderDetailDrawer({
@@ -100,28 +62,28 @@ export function OrderDetailDrawer({
       </Box>
 
       <Box sx={{ flex: 1, overflow: 'auto' }}>
-        <Section title="Pedido">
-          <Field label="Valor">{formatCurrency(order.totalValue)}</Field>
-          <Field label="Forma de pagamento">
+        <DetailSection title="Pedido">
+          <DetailField label="Valor">{formatCurrency(order.totalValue)}</DetailField>
+          <DetailField label="Forma de pagamento">
             {order.paymentMethod ? PAYMENT_METHOD_LABELS[order.paymentMethod] : '-'}
-          </Field>
-          <Field label="Situação desde">{formatDate(order.statusChangedAt)}</Field>
-        </Section>
+          </DetailField>
+          <DetailField label="Situação desde">{formatDate(order.statusChangedAt)}</DetailField>
+        </DetailSection>
         <Divider />
 
-        <Section title="Cliente">
-          <Field label="Nome">{order.client?.name ?? '-'}</Field>
-          <Field label="Situação">
+        <DetailSection title="Cliente">
+          <DetailField label="Nome">{order.client?.name ?? '-'}</DetailField>
+          <DetailField label="Situação">
             {order.client ? CLIENT_STATUS_LABELS[order.client.status] : '-'}
-          </Field>
-        </Section>
+          </DetailField>
+        </DetailSection>
         <Divider />
 
-        <Section title="Negociação de origem">
-          <Field label="Número">#{order.negotiationId}</Field>
-          <Field label="Vendedor">{order.vendedor?.name ?? '-'}</Field>
-          {order.notes && <Field label="Observações">{order.notes}</Field>}
-        </Section>
+        <DetailSection title="Negociação de origem">
+          <DetailField label="Número">#{order.negotiationId}</DetailField>
+          <DetailField label="Vendedor">{order.vendedor?.name ?? '-'}</DetailField>
+          {order.notes && <DetailField label="Observações">{order.notes}</DetailField>}
+        </DetailSection>
 
         {awaitingPayment && (
           <Box sx={{ px: 3, pb: 3 }}>

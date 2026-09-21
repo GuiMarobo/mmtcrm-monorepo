@@ -11,6 +11,7 @@ import { ChangePassword } from './pages/ChangePassword'
 import { Dashboard } from './pages/Dashboard'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { useToast } from './hooks/useToast'
+import { canAccess } from './types'
 import type { Route } from './types'
 
 const Clientes = lazy(() =>
@@ -21,6 +22,9 @@ const Negociacoes = lazy(() =>
 )
 const Pedidos = lazy(() =>
   import('./pages/Pedidos').then((m) => ({ default: m.Pedidos })),
+)
+const Produtos = lazy(() =>
+  import('./pages/Produtos').then((m) => ({ default: m.Produtos })),
 )
 const Usuarios = lazy(() =>
   import('./pages/Usuarios').then((m) => ({ default: m.Usuarios })),
@@ -52,8 +56,7 @@ function AppRoot() {
   if (!user) return <Login />
   if (user.mustChangePassword) return <ChangePassword />
 
-  const canManageUsers = user.role === 'ADMIN'
-  const safeRoute: Route = route === 'usuarios' && !canManageUsers ? 'dashboard' : route
+  const safeRoute: Route = canAccess(route, user.role) ? route : 'dashboard'
 
   const navigate = (next: Route) => {
     setRoute(next)
@@ -63,15 +66,11 @@ function AppRoot() {
   const pages: Record<Route, ReactNode> = {
     dashboard: <Dashboard />,
     clientes: <Clientes toast={show} />,
-    usuarios: canManageUsers ? (
-      <Usuarios toast={show} />
-    ) : (
-      <Placeholder title="Acesso negado" hint="Apenas administradores podem gerenciar usuários." />
-    ),
+    usuarios: <Usuarios toast={show} />,
     negociacoes: <Negociacoes toast={show} />,
     orcamentos: <Placeholder title="Orçamentos" hint="Simulador de orçamento e propostas." />,
     pedidos: <Pedidos toast={show} onNavigate={navigate} />,
-    produtos: <Placeholder title="Produtos" hint="Catálogo de dispositivos Apple." />,
+    produtos: <Produtos toast={show} />,
     usados: <Placeholder title="Dispositivos Usados" hint="Avaliação e laudo de trade-in." />,
   }
 
@@ -82,7 +81,7 @@ function AppRoot() {
         setRoute={navigate}
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        canManageUsers={canManageUsers}
+        role={user.role}
         onLogout={() => {
           logout()
           navigate('dashboard')

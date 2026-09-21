@@ -18,6 +18,8 @@ const model = (): Model => ({
 
 export interface MockPrisma {
   order: Model;
+  product: Model;
+  stockMovement: Model;
   negotiation: Model;
   client: Model;
   user: Model;
@@ -31,6 +33,8 @@ export interface MockPrisma {
 export function createMockPrisma(): MockPrisma {
   const prisma = {
     order: model(),
+    product: model(),
+    stockMovement: model(),
     negotiation: model(),
     client: model(),
     user: model(),
