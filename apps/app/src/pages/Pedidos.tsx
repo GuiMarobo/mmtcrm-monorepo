@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, ordersApi } from '../api'
 import { OrdersDataGrid } from '../components/orders/OrdersDataGrid'
 import { OrderDetailDrawer } from '../components/orders/OrderDetailDrawer'
@@ -8,7 +8,7 @@ import { ApproveOrderDialog } from '../components/orders/ApproveOrderDialog'
 import { summarizeAwaitingPayment } from '../components/orders/ordersSummary'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
-import type { Order, Route } from '../types'
+import type { NegotiationItem, Order, Route } from '../types'
 
 interface PedidosProps {
   toast: (msg: string, type?: 'success' | 'error') => void
@@ -20,6 +20,8 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Order | null>(null)
+  const [selectedItems, setSelectedItems] = useState<NegotiationItem[]>([])
+  const openedId = useRef<number | null>(null)
   const [pendingApprove, setPendingApprove] = useState<Order | null>(null)
   const [approving, setApproving] = useState(false)
 
@@ -40,6 +42,26 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
   useEffect(() => {
     void reload()
   }, [])
+
+  const openDetail = async (order: Order) => {
+    openedId.current = order.id
+    setSelected(order)
+    setSelectedItems([])
+    try {
+      const detail = await ordersApi.findOne(order.id)
+      if (openedId.current === order.id) setSelectedItems(detail.items)
+    } catch (err) {
+      toast(
+        err instanceof ApiError ? err.message : 'Falha ao carregar os itens do pedido',
+        'error',
+      )
+    }
+  }
+
+  const closeDetail = () => {
+    openedId.current = null
+    setSelected(null)
+  }
 
   const summary = useMemo(() => summarizeAwaitingPayment(list), [list])
 
@@ -100,7 +122,7 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
             <OrdersDataGrid
               rows={list}
               loading={loading}
-              onOpen={setSelected}
+              onOpen={(order) => void openDetail(order)}
             />
           )}
         </SectionCard>
@@ -109,13 +131,14 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
       {selected && (
         <OrderDetailDrawer
           order={selected}
+          items={selectedItems}
           approving={approving}
           onApprove={() => setPendingApprove(selected)}
           onGoToNegotiations={() => {
-            setSelected(null)
+            closeDetail()
             onNavigate('negociacoes')
           }}
-          onClose={() => setSelected(null)}
+          onClose={closeDetail}
         />
       )}
 

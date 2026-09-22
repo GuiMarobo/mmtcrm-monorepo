@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
+import {
+  negotiationItemsSelect,
+  toItemResponse,
+} from '../negotiations/negotiation-item-response';
 
 // O Pedido só é lido com o Cliente e o Vendedor (via Negociação de origem), a
 // forma de pagamento, o valor e a situação — spec 005 §4/§5.
@@ -26,6 +30,23 @@ const orderSelect = {
 } satisfies Prisma.OrderSelect;
 
 type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
+
+// Spec 010 história 40 / RB7: o detalhe traz os itens vendidos, que são os da
+// Negociação de origem — o Pedido não tem tabela própria. A lista (fila de
+// cobrança) continua enxuta e não os traz.
+const orderDetailSelect = {
+  ...orderSelect,
+  negotiation: {
+    select: {
+      ...orderSelect.negotiation.select,
+      items: negotiationItemsSelect,
+    },
+  },
+} satisfies Prisma.OrderSelect;
+
+type OrderDetailRow = Prisma.OrderGetPayload<{
+  select: typeof orderDetailSelect;
+}>;
 
 // Fila de cobrança (RN14/D13): "Aguardando Pagamento" no topo, depois o restante.
 // Dentro de cada grupo, o mais antigo primeiro por statusChangedAt.
@@ -49,6 +70,17 @@ export class OrdersService {
       notes: negotiation.notes,
       client: negotiation.client,
       vendedor: negotiation.vendedor,
+    };
+  }
+
+  private toDetailResponse(order: OrderDetailRow) {
+    const {
+      negotiation: { items, ...negotiation },
+      ...rest
+    } = order;
+    return {
+      ...this.toResponse({ ...rest, negotiation }),
+      items: items.map(toItemResponse),
     };
   }
 
@@ -82,7 +114,12 @@ export class OrdersService {
   }
 
   async findOne(id: number) {
-    return this.toResponse(await this.ensureExists(id));
+    const order = await this.prisma.order.findFirst({
+      where: { ...NOT_DELETED, id },
+      select: orderDetailSelect,
+    });
+    if (!order) throw new NotFoundException('Pedido não encontrado');
+    return this.toDetailResponse(order);
   }
 
   // RN2: registra o pagamento confirmado. Só a partir de EM_NEGOCIACAO; a

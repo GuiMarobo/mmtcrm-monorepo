@@ -24,7 +24,12 @@ export class OrdersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Consultar um pedido e a negociação de origem' })
+  @ApiOperation({
+    summary: 'Consultar um pedido, a negociação de origem e os itens vendidos',
+    description:
+      'Os itens são os da negociação de origem (RB7) — lista vazia quando ela ' +
+      'não tem itens (antiga ou importada).',
+  })
   @ApiResponse({ status: 200, description: 'Pedido encontrado' })
   @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
   @ApiResponse({ status: 404, description: 'Pedido não encontrado' })

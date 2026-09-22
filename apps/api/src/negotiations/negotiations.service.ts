@@ -22,6 +22,11 @@ import {
   priceItem,
   SELLER_DISCOUNT_LIMIT_PERCENT,
 } from './negotiation-item-pricing';
+import {
+  fromCents,
+  negotiationItemsSelect,
+  toItemResponse,
+} from './negotiation-item-response';
 
 const negotiationSelect = {
   id: true,
@@ -52,30 +57,10 @@ type NegotiationRow = Prisma.NegotiationGetPayload<{
 }>;
 
 // UC3 §4.1 / UC6 §7: o detalhe carrega os itens — a lista (quadro, Pipeline)
-// continua enxuta e não os traz. RI2: nome e código vêm sempre do catálogo,
-// nunca copiados para o item; "deleted" avisa a tela que o Produto sumiu.
+// continua enxuta e não os traz.
 const negotiationDetailSelect = {
   ...negotiationSelect,
-  items: {
-    where: NOT_DELETED,
-    select: {
-      id: true,
-      quantity: true,
-      unitPrice: true,
-      discountType: true,
-      discountValue: true,
-      product: {
-        select: {
-          id: true,
-          name: true,
-          sku: true,
-          status: true,
-          deletedAt: true,
-        },
-      },
-    },
-    orderBy: { id: 'asc' },
-  },
+  items: negotiationItemsSelect,
   // RI8/RI9: conta também os itens excluídos — só quem nunca teve item
   // ainda guarda o valor informado; já tendo tido, ele não volta.
   _count: { select: { items: true } },
@@ -113,8 +98,6 @@ const discountRangeError = (item: CreateNegotiationItemDto) => {
   }
   return discountValue < 0 ? 'o desconto em reais não pode ser negativo' : null;
 };
-
-const fromCents = (cents: number) => cents / 100;
 
 type PricedItem = ItemPricingInput & { productId: string };
 
@@ -163,25 +146,7 @@ export class NegotiationsService {
     return {
       ...response,
       informedValue,
-      items: items.map((item) => {
-        const pricing = priceItem(item);
-        return {
-          id: item.id,
-          product: {
-            id: item.product.id,
-            name: item.product.name,
-            sku: item.product.sku,
-            status: item.product.status,
-            deleted: item.product.deletedAt !== null,
-          },
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-          discountType: item.discountType,
-          discountValue: Number(item.discountValue),
-          discountAmount: fromCents(pricing.discountCents),
-          subtotal: fromCents(pricing.subtotalCents),
-        };
-      }),
+      items: items.map(toItemResponse),
     };
   }
 

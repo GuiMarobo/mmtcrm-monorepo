@@ -1,13 +1,13 @@
 import { http } from './http'
-import type { Order } from '../types'
+import type { Order, OrderDetail } from '../types'
 
 export const ordersApi = {
   list(): Promise<Order[]> {
     return http.get<Order[]>('/orders')
   },
 
-  findOne(id: number): Promise<Order> {
-    return http.get<Order>(`/orders/${id}`)
+  findOne(id: number): Promise<OrderDetail> {
+    return http.get<OrderDetail>(`/orders/${id}`)
   },
 
   approve(id: number): Promise<Order> {
