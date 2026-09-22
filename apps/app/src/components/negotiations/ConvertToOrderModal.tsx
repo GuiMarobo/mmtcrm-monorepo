@@ -1,8 +1,10 @@
+import Alert from '@mui/material/Alert'
 import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
+import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
 import { formatCurrency } from '../../utils/format'
 import type { Negotiation, PaymentMethod } from '../../types'
@@ -11,7 +13,7 @@ import { PAYMENT_METHOD_OPTIONS } from '../../types'
 interface ConvertToOrderModalProps {
   negotiation: Negotiation
   loading: boolean
-  onConfirm: (paymentMethod: PaymentMethod) => void
+  onConfirm: (paymentMethod: PaymentMethod) => Promise<void>
   onCancel: () => void
 }
 
@@ -22,6 +24,17 @@ export function ConvertToOrderModal({
   onCancel,
 }: ConvertToOrderModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('')
+  const [error, setError] = useState<string | null>(null)
+
+  const confirm = async () => {
+    if (!paymentMethod) return
+    setError(null)
+    try {
+      await onConfirm(paymentMethod)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao converter em pedido')
+    }
+  }
 
   return (
     <FormDialog
@@ -37,7 +50,7 @@ export function ConvertToOrderModal({
           </Button>
           <Button
             variant="contained"
-            onClick={() => paymentMethod && onConfirm(paymentMethod)}
+            onClick={() => void confirm()}
             disabled={loading || !paymentMethod}
           >
             {loading ? 'Convertendo…' : 'Converter em pedido'}
@@ -45,6 +58,12 @@ export function ConvertToOrderModal({
         </>
       }
     >
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       <Typography sx={{ mb: 2 }}>
         A negociação passará a <b>Ganha</b>, o pedido será gerado e o cliente
         passará a <b>Ativo</b>.

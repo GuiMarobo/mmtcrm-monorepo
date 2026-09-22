@@ -149,7 +149,11 @@ export class NegotiationsController {
   })
   @ApiResponse({ status: 201, description: 'Negociação ganha e pedido gerado' })
   @ApiResponse({ status: 404, description: 'Negociação não encontrada' })
-  @ApiResponse({ status: 409, description: 'Transição não permitida' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Transição não permitida, ou saldo insuficiente de algum Produto dos itens',
+  })
   convert(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ConvertNegotiationDto,

@@ -141,12 +141,6 @@ export function Negociacoes({ toast }: NegociacoesProps) {
       toast(`Negociação ganha · pedido ${updated.order?.code ?? ''} gerado`)
       setConverting(null)
       settle(true)
-    } catch (err) {
-      toast(
-        err instanceof ApiError ? err.message : 'Erro ao converter em pedido',
-        'error',
-      )
-      settle(false)
     } finally {
       setBusy(false)
     }
@@ -269,7 +263,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
         <ConvertToOrderModal
           negotiation={converting}
           loading={busy}
-          onConfirm={(pm) => void applyConvert(pm)}
+          onConfirm={applyConvert}
           onCancel={() => {
             setConverting(null)
             settle(false)

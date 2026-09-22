@@ -30,6 +30,9 @@ import {
   toItemResponse,
 } from './negotiation-item-response';
 
+const insufficientStockForConversion = (productName: string, stock: number) =>
+  `Saldo insuficiente do Produto ${productName}: há ${stock} unidade(s) disponível(is)`;
+
 const negotiationSelect = {
   id: true,
   clientId: true,
@@ -603,6 +606,30 @@ export class NegotiationsService {
     const statusChangedAt = new Date();
 
     await this.prisma.$transaction(async (tx) => {
+      const items = await tx.negotiationItem.findMany({
+        where: { ...NOT_DELETED, negotiationId: id },
+        select: {
+          productId: true,
+          quantity: true,
+          product: { select: { name: true, stock: true } },
+        },
+      });
+
+      // RB2: todos os itens são conferidos antes de gravar qualquer coisa, para
+      // a recusa nomear o Produto. A baixa condicional de `recordStockMovement`
+      // continua sendo a guarda contra corrida entre esta leitura e a escrita.
+      const shortItem = items.find(
+        (item) => item.quantity > item.product.stock,
+      );
+      if (shortItem) {
+        throw new ConflictException(
+          insufficientStockForConversion(
+            shortItem.product.name,
+            shortItem.product.stock,
+          ),
+        );
+      }
+
       // upsert, e nao create: reabrir preserva o pedido como DESISTENCIA, entao
       // reconverter reaproveita a mesma linha em vez de colidir com o @unique
       // (RN4), devolvendo-a para EM_NEGOCIACAO.
@@ -629,10 +656,6 @@ export class NegotiationsService {
       // RB1 / ADR 0016: baixa de venda — uma Saída por item não excluído,
       // ligada ao Pedido e com o autor da conversão, pelo mesmo caminho do
       // movimento manual (ADR 0013). Negociação sem itens não mexe no estoque.
-      const items = await tx.negotiationItem.findMany({
-        where: { ...NOT_DELETED, negotiationId: id },
-        select: { productId: true, quantity: true },
-      });
       for (const item of items) {
         await this.products.recordStockMovement(tx, {
           productId: item.productId,

@@ -38,6 +38,17 @@ const negotiationRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+// Item como `convert` o lê: quantidade e o Produto com nome e saldo (RB2).
+const convertItem = (
+  productId: string,
+  quantity: number,
+  product: { name?: string; stock?: number } = {},
+) => ({
+  productId,
+  quantity,
+  product: { name: `Produto ${productId}`, stock: 99, ...product },
+});
+
 describe('NegotiationsService', () => {
   let service: NegotiationsService;
   let prisma: MockPrisma;
@@ -112,7 +123,7 @@ describe('NegotiationsService', () => {
 
       it('grava uma Saída do item ligada ao Pedido, com autor quem converteu', async () => {
         prisma.negotiationItem.findMany.mockResolvedValue([
-          { productId: 'p1', quantity: 2 },
+          convertItem('p1', 2),
         ]);
 
         await service.convert(3, PaymentMethodEnum.PIX, 42);
@@ -139,9 +150,9 @@ describe('NegotiationsService', () => {
 
       it('grava uma Saída por item, cada uma com a sua quantidade', async () => {
         prisma.negotiationItem.findMany.mockResolvedValue([
-          { productId: 'p1', quantity: 2 },
-          { productId: 'p2', quantity: 1 },
-          { productId: 'p3', quantity: 5 },
+          convertItem('p1', 2),
+          convertItem('p2', 1),
+          convertItem('p3', 5),
         ]);
 
         await service.convert(3, PaymentMethodEnum.PIX, 42);
@@ -167,7 +178,7 @@ describe('NegotiationsService', () => {
 
       it('baixa depois de criar o Pedido, dentro da transação da conversão', async () => {
         prisma.negotiationItem.findMany.mockResolvedValue([
-          { productId: 'p1', quantity: 1 },
+          convertItem('p1', 1),
         ]);
 
         await service.convert(3, PaymentMethodEnum.PIX, 42);
@@ -184,6 +195,91 @@ describe('NegotiationsService', () => {
         expect(prisma.order.upsert).toHaveBeenCalledTimes(1);
         expect(prisma.product.updateMany).not.toHaveBeenCalled();
         expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('saldo insuficiente (RB2, ticket 12)', () => {
+      beforeEach(() => {
+        prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+        prisma.product.updateMany.mockResolvedValue({ count: 1 });
+        prisma.stockMovement.create.mockResolvedValue({});
+      });
+
+      const expectNothingWritten = () => {
+        expect(prisma.order.upsert).not.toHaveBeenCalled();
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+        expect(prisma.negotiation.update).not.toHaveBeenCalled();
+        expect(prisma.client.update).not.toHaveBeenCalled();
+      };
+
+      it('lê o nome e o saldo do Produto de cada item', async () => {
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(
+          callArg<{ select: unknown }>(prisma.negotiationItem.findMany).select,
+        ).toEqual({
+          productId: true,
+          quantity: true,
+          product: { select: { name: true, stock: true } },
+        });
+      });
+
+      it('recusa com 409 e não grava nada quando um item pede mais que o saldo', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 3, { name: 'iPhone 15 Pro', stock: 2 }),
+        ]);
+
+        await expect(
+          service.convert(3, PaymentMethodEnum.PIX, 42),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expectNothingWritten();
+      });
+
+      it('a mensagem nomeia o Produto e o saldo disponível', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 3, { name: 'iPhone 15 Pro', stock: 2 }),
+        ]);
+
+        await expect(
+          service.convert(3, PaymentMethodEnum.PIX, 42),
+        ).rejects.toThrow(
+          'Saldo insuficiente do Produto iPhone 15 Pro: há 2 unidade(s) disponível(is)',
+        );
+      });
+
+      it('confere todos os itens antes de baixar qualquer um', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 1, { stock: 10 }),
+          convertItem('p2', 4, { name: 'AirPods Pro', stock: 0 }),
+        ]);
+
+        await expect(
+          service.convert(3, PaymentMethodEnum.PIX, 42),
+        ).rejects.toThrow(/AirPods Pro: há 0 unidade/);
+        expectNothingWritten();
+      });
+
+      it('com vários itens insuficientes, a mensagem cobre o primeiro', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 5, { name: 'iPhone 15 Pro', stock: 1 }),
+          convertItem('p2', 4, { name: 'AirPods Pro', stock: 0 }),
+        ]);
+
+        await expect(
+          service.convert(3, PaymentMethodEnum.PIX, 42),
+        ).rejects.toThrow(/iPhone 15 Pro: há 1 unidade/);
+      });
+
+      it('aceita quantidade igual ao saldo', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 2, { stock: 2 }),
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.stockMovement.create).toHaveBeenCalledTimes(1);
+        expect(prisma.negotiation.update).toHaveBeenCalled();
       });
     });
   });
