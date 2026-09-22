@@ -38,15 +38,27 @@ const negotiationRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-// Item como `convert` o lê: quantidade e o Produto com nome e saldo (RB2).
+// Item como `convert` o lê: quantidade e o Produto com nome, saldo (RB2) e
+// marca de exclusão (RB3).
 const convertItem = (
   productId: string,
   quantity: number,
-  product: { name?: string; stock?: number } = {},
+  product: {
+    name?: string;
+    sku?: string;
+    stock?: number;
+    deletedAt?: Date | null;
+  } = {},
 ) => ({
   productId,
   quantity,
-  product: { name: `Produto ${productId}`, stock: 99, ...product },
+  product: {
+    name: `Produto ${productId}`,
+    sku: `SKU-${productId}`,
+    stock: 99,
+    deletedAt: null,
+    ...product,
+  },
 });
 
 describe('NegotiationsService', () => {
@@ -221,7 +233,9 @@ describe('NegotiationsService', () => {
         ).toEqual({
           productId: true,
           quantity: true,
-          product: { select: { name: true, stock: true } },
+          product: {
+            select: { name: true, sku: true, stock: true, deletedAt: true },
+          },
         });
       });
 
@@ -280,6 +294,105 @@ describe('NegotiationsService', () => {
 
         expect(prisma.stockMovement.create).toHaveBeenCalledTimes(1);
         expect(prisma.negotiation.update).toHaveBeenCalled();
+      });
+    });
+
+    describe('Produto excluído ou zero itens (RB3, ticket 13)', () => {
+      beforeEach(() => {
+        prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+        prisma.product.updateMany.mockResolvedValue({ count: 1 });
+        prisma.stockMovement.create.mockResolvedValue({});
+        prisma.negotiationItem.count.mockResolvedValue(0);
+      });
+
+      const expectNothingWritten = () => {
+        expect(prisma.order.upsert).not.toHaveBeenCalled();
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+        expect(prisma.negotiation.update).not.toHaveBeenCalled();
+        expect(prisma.client.update).not.toHaveBeenCalled();
+      };
+
+      it('recusa com 409 e não grava nada quando um item aponta para Produto excluído', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 1),
+          convertItem('p2', 1, {
+            name: 'AirPods Pro',
+            sku: 'APP-2',
+            deletedAt: new Date('2026-09-01T00:00:00Z'),
+          }),
+        ]);
+
+        const attempt = service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow(
+          'O Produto AirPods Pro (APP-2) foi excluído do catálogo; remova o item',
+        );
+        expectNothingWritten();
+      });
+
+      it('Produto excluído é recusado antes de conferir o saldo', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 5, { name: 'iPhone 15 Pro', stock: 1 }),
+          convertItem('p2', 1, {
+            name: 'AirPods Pro',
+            deletedAt: new Date('2026-09-01T00:00:00Z'),
+          }),
+        ]);
+
+        await expect(
+          service.convert(3, PaymentMethodEnum.PIX, 42),
+        ).rejects.toThrow(/AirPods Pro .* foi excluído do catálogo/);
+      });
+
+      it('item de Produto só descontinuado converte normalmente (história 31)', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 1),
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.stockMovement.create).toHaveBeenCalledTimes(1);
+        expect(prisma.negotiation.update).toHaveBeenCalled();
+      });
+
+      it('recusa com 409 e não grava nada quando já teve itens e ficou com zero', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([]);
+        prisma.negotiationItem.count.mockResolvedValue(2);
+
+        const attempt = service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow(
+          'A Negociação teve todos os itens removidos; adicione ao menos um item antes de converter',
+        );
+        expect(
+          callArg<{ where: unknown }>(prisma.negotiationItem.count).where,
+        ).toEqual({ negotiationId: 3 });
+        expectNothingWritten();
+      });
+
+      it('nunca teve itens: converte normalmente, sem mexer no estoque (legado)', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([]);
+        prisma.negotiationItem.count.mockResolvedValue(0);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.order.upsert).toHaveBeenCalledTimes(1);
+        expect(prisma.negotiation.update).toHaveBeenCalled();
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+      });
+
+      it('com itens vivos não precisa contar os excluídos', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 1),
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.negotiationItem.count).not.toHaveBeenCalled();
       });
     });
   });

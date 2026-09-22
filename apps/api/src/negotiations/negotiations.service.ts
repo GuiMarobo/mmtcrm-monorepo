@@ -611,9 +611,35 @@ export class NegotiationsService {
         select: {
           productId: true,
           quantity: true,
-          product: { select: { name: true, stock: true } },
+          product: {
+            select: { name: true, sku: true, stock: true, deletedAt: true },
+          },
         },
       });
+
+      // RB3: item de Produto excluído não baixa estoque de algo que não existe
+      // mais — o VENDEDOR remove o item antes. Só descontinuado converte normal.
+      const deletedProductItem = items.find((item) => item.product.deletedAt);
+      if (deletedProductItem) {
+        throw new ConflictException(
+          `O ${productLabel(deletedProductItem.product)} foi excluído do catálogo; remova o item`,
+        );
+      }
+
+      // RB3/RI10: zero itens vivos só converte se a Negociação nunca teve item
+      // (legado, importação). Itens excluídos marcam que já teve — convertê-la
+      // geraria um Pedido vazio.
+      if (items.length === 0) {
+        const everHadItems =
+          (await tx.negotiationItem.count({
+            where: { negotiationId: id },
+          })) > 0;
+        if (everHadItems) {
+          throw new ConflictException(
+            'A Negociação teve todos os itens removidos; adicione ao menos um item antes de converter',
+          );
+        }
+      }
 
       // RB2: todos os itens são conferidos antes de gravar qualquer coisa, para
       // a recusa nomear o Produto. A baixa condicional de `recordStockMovement`
@@ -655,7 +681,8 @@ export class NegotiationsService {
 
       // RB1 / ADR 0016: baixa de venda — uma Saída por item não excluído,
       // ligada ao Pedido e com o autor da conversão, pelo mesmo caminho do
-      // movimento manual (ADR 0013). Negociação sem itens não mexe no estoque.
+      // movimento manual (ADR 0013). Negociação sem itens desde sempre não mexe
+      // no estoque.
       for (const item of items) {
         await this.products.recordStockMovement(tx, {
           productId: item.productId,

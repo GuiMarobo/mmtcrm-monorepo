@@ -152,7 +152,7 @@ export class NegotiationsController {
   @ApiResponse({
     status: 409,
     description:
-      'Transição não permitida, ou saldo insuficiente de algum Produto dos itens',
+      'Transição não permitida, saldo insuficiente de algum Produto dos itens, item de Produto excluído, ou Negociação que teve todos os itens removidos',
   })
   convert(
     @Param('id', ParseIntPipe) id: number,

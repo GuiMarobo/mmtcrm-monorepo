@@ -22,6 +22,10 @@ const negotiation: Negotiation = {
 
 const SHORT_STOCK =
   'Saldo insuficiente do Produto iPhone 15 Pro: há 2 unidade(s) disponível(is)'
+const DELETED_PRODUCT =
+  'O Produto AirPods Pro (APP-2) foi excluído do catálogo; remova o item'
+const ALL_ITEMS_REMOVED =
+  'A Negociação teve todos os itens removidos; adicione ao menos um item antes de converter'
 
 const setup = (onConfirm = vi.fn().mockResolvedValue(undefined)) => {
   const onCancel = vi.fn()
@@ -53,15 +57,19 @@ describe('ConvertToOrderModal', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('mostra a recusa do backend sem fechar o diálogo', async () => {
+  it.each([
+    ['saldo insuficiente', SHORT_STOCK],
+    ['Produto excluído', DELETED_PRODUCT],
+    ['todos os itens removidos', ALL_ITEMS_REMOVED],
+  ])('mostra a recusa do backend (%s) sem fechar o diálogo', async (_, message) => {
     const user = userEvent.setup()
     const { onConfirm, onCancel } = setup(
-      vi.fn().mockRejectedValue(new ApiError(409, SHORT_STOCK)),
+      vi.fn().mockRejectedValue(new ApiError(409, message)),
     )
 
     await choosePixAndConfirm(user)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(SHORT_STOCK)
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
     expect(onCancel).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Converter em pedido' })).toBeEnabled()
     expect(onConfirm).toHaveBeenCalledTimes(1)
