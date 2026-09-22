@@ -13,6 +13,7 @@ import {
   CreateNegotiationDto,
   PaymentMethodEnum,
 } from './dto/create-negotiation.dto';
+import { CreateNegotiationItemDto } from './dto/create-negotiation-item.dto';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 import { ReplaceNegotiationDto } from './dto/replace-negotiation.dto';
 
@@ -43,6 +44,41 @@ const negotiationSelect = {
 type NegotiationRow = Prisma.NegotiationGetPayload<{
   select: typeof negotiationSelect;
 }>;
+
+// UC3 §4.1 / UC6 §7: o detalhe carrega os itens — a lista (quadro, Pipeline)
+// continua enxuta e não os traz. RI2: nome e código vêm sempre do catálogo,
+// nunca copiados para o item; "deleted" avisa a tela que o Produto sumiu.
+const negotiationDetailSelect = {
+  ...negotiationSelect,
+  items: {
+    where: NOT_DELETED,
+    select: {
+      id: true,
+      quantity: true,
+      unitPrice: true,
+      product: {
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          status: true,
+          deletedAt: true,
+        },
+      },
+    },
+    orderBy: { id: 'asc' },
+  },
+} satisfies Prisma.NegotiationSelect;
+
+type NegotiationDetailRow = Prisma.NegotiationGetPayload<{
+  select: typeof negotiationDetailSelect;
+}>;
+
+const ITEM_NOT_ACTIVE =
+  'Só é possível adicionar Produtos ativos e não excluídos do catálogo';
+
+const ITEM_DUPLICATED =
+  'Um Produto não pode aparecer duas vezes na mesma negociação';
 
 // A maquina de estados da spec 001 tem exatamente estas quatro arestas.
 // Converter em pedido e o que torna a negociacao GANHA; nao existe "concluir".
@@ -76,12 +112,81 @@ export class NegotiationsService {
     };
   }
 
+  private toDetailResponse(negotiation: NegotiationDetailRow) {
+    const { items, ...rest } = negotiation;
+    return {
+      ...this.toResponse(rest),
+      items: items.map((item) => {
+        const unitPrice = Number(item.unitPrice);
+        return {
+          id: item.id,
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            sku: item.product.sku,
+            status: item.product.status,
+            deleted: item.product.deletedAt !== null,
+          },
+          quantity: item.quantity,
+          unitPrice,
+          subtotal: unitPrice * item.quantity,
+        };
+      }),
+    };
+  }
+
   private assertTransition(from: NegotiationStatus, to: NegotiationStatus) {
     if (!ALLOWED_TRANSITIONS[from].includes(to)) {
       throw new ConflictException(
         `Não é possível passar de ${from} para ${to}. Reabra a negociação antes.`,
       );
     }
+  }
+
+  // RI2/RI3: valida a lista recebida e copia o preço praticado de cada Produto
+  // ativo e não excluído. tx: a mesma transação da escrita dos itens, para que
+  // a checagem de status/existência não fique defasada entre a leitura e a
+  // gravação.
+  private async buildItemsData(
+    tx: Prisma.TransactionClient,
+    items: CreateNegotiationItemDto[],
+  ) {
+    const productIds = items.map((item) => item.productId);
+    if (new Set(productIds).size !== productIds.length) {
+      throw new BadRequestException(ITEM_DUPLICATED);
+    }
+    if (productIds.length === 0) return [];
+
+    const products = await tx.product.findMany({
+      where: { ...NOT_DELETED, id: { in: productIds }, status: 'ATIVO' },
+      select: { id: true, price: true },
+    });
+    const productById = new Map(products.map((p) => [p.id, p]));
+
+    return items.map((item) => {
+      const product = productById.get(item.productId);
+      if (!product) throw new BadRequestException(ITEM_NOT_ACTIVE);
+
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: product.price,
+      };
+    });
+  }
+
+  // RI7: soma dos subtotais dos itens não excluídos (sem desconto ainda —
+  // ticket 08). Soma em centavos (inteiro) para não acumular erro de ponto
+  // flutuante entre itens, e só volta a reais no fim.
+  private sumSubtotals(
+    items: { quantity: number; unitPrice: Prisma.Decimal }[],
+  ) {
+    const cents = items.reduce(
+      (total, item) =>
+        total + Math.round(Number(item.unitPrice) * 100) * item.quantity,
+      0,
+    );
+    return cents / 100;
   }
 
   private async ensureExists(id: number) {
@@ -120,18 +225,27 @@ export class NegotiationsService {
     }
   }
 
+  // RI4/RI7: dentro da mesma transação, valida e precifica os itens, soma o
+  // total e cria a Negociação com os dois já resolvidos — o total nunca
+  // existe sem os itens que o explicam.
   async create(dto: CreateNegotiationDto, vendedorId: number) {
     await this.ensureClientEditable(dto.clientId);
 
-    const negotiation = await this.prisma.negotiation.create({
-      data: {
-        clientId: dto.clientId,
-        vendedorId,
-        status: 'ABERTA',
-        totalValue: dto.totalValue,
-        notes: dto.notes,
-      },
-      select: negotiationSelect,
+    const negotiation = await this.prisma.$transaction(async (tx) => {
+      const itemsData = await this.buildItemsData(tx, dto.items);
+      const totalValue = this.sumSubtotals(itemsData);
+
+      return tx.negotiation.create({
+        data: {
+          clientId: dto.clientId,
+          vendedorId,
+          status: 'ABERTA',
+          totalValue,
+          notes: dto.notes,
+          items: { create: itemsData },
+        },
+        select: negotiationSelect,
+      });
     });
 
     return this.toResponse(negotiation);
@@ -147,7 +261,12 @@ export class NegotiationsService {
   }
 
   async findOne(id: number) {
-    return this.toResponse(await this.ensureExists(id));
+    const negotiation = await this.prisma.negotiation.findFirst({
+      where: { ...NOT_DELETED, id },
+      select: negotiationDetailSelect,
+    });
+    if (!negotiation) throw new NotFoundException('Negociação não encontrada');
+    return this.toDetailResponse(negotiation);
   }
 
   async replace(id: number, dto: ReplaceNegotiationDto) {
@@ -219,7 +338,10 @@ export class NegotiationsService {
     return this.toResponse(updated);
   }
 
-  async convert(id: number, paymentMethod: PaymentMethodEnum) {
+  // userId: autor da baixa de venda gravada na transação de conversão (ticket
+  // 11 da spec 010). Ainda não usado aqui — este ticket só faz o dado chegar.
+  async convert(id: number, paymentMethod: PaymentMethodEnum, userId: number) {
+    void userId;
     const negotiation = await this.ensureExists(id);
     // RN12: converter não passa por `ensureClientEditable` — a anonimização não
     // congela o ciclo. O Cliente vem no próprio select da Negociação.
@@ -272,7 +394,11 @@ export class NegotiationsService {
     return this.findOne(id);
   }
 
-  async reopen(id: number, actorRole: RoleEnum) {
+  // userId: autor da devolução de venda gravada na transação de reabertura
+  // (ticket 14 da spec 010). Ainda não usado aqui — este ticket só faz o dado
+  // chegar.
+  async reopen(id: number, actorRole: RoleEnum, userId: number) {
+    void userId;
     const negotiation = await this.ensureExists(id);
     this.assertTransition(negotiation.status, 'ABERTA');
 

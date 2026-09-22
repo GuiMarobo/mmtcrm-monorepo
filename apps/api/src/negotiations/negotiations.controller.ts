@@ -27,12 +27,17 @@ export class NegotiationsController {
 
   @Post()
   @ApiOperation({
-    summary: 'Abrir uma negociação para um cliente',
+    summary: 'Abrir uma negociação para um cliente, com os itens (spec 010)',
     description:
       'A negociação nasce ABERTA. O vendedor responsável é sempre o usuário ' +
-      'autenticado — mandar vendedorId no corpo não tem efeito.',
+      'autenticado — mandar vendedorId no corpo não tem efeito. O total é ' +
+      'sempre a soma dos itens: sem itens, nasce R$ 0,00.',
   })
   @ApiResponse({ status: 201, description: 'Negociação aberta' })
+  @ApiResponse({
+    status: 400,
+    description: 'Item de Produto inativo/excluído ou repetido na lista',
+  })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   @ApiResponse({ status: 409, description: 'Cliente anonimizado (LGPD)' })
   create(
@@ -127,8 +132,9 @@ export class NegotiationsController {
   convert(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ConvertNegotiationDto,
+    @Req() req: { user: { id: number } },
   ) {
-    return this.negotiationsService.convert(id, dto.paymentMethod);
+    return this.negotiationsService.convert(id, dto.paymentMethod, req.user.id);
   }
 
   @Patch(':id/reopen')
@@ -146,8 +152,8 @@ export class NegotiationsController {
   @ApiResponse({ status: 409, description: 'Negociação já está aberta' })
   reopen(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: { user: { role: RoleEnum } },
+    @Req() req: { user: { id: number; role: RoleEnum } },
   ) {
-    return this.negotiationsService.reopen(id, req.user.role);
+    return this.negotiationsService.reopen(id, req.user.role, req.user.id);
   }
 }

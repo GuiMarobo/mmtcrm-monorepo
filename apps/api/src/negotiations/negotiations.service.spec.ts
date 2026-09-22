@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NegotiationsService } from './negotiations.service';
@@ -24,6 +24,7 @@ const negotiationRow = (overrides: Record<string, unknown> = {}) => ({
   client: { id: 'c1', name: 'Fulana', status: 'LEAD' },
   vendedor: { id: 2, name: 'Vendedora' },
   order: null,
+  items: [],
   ...overrides,
 });
 
@@ -58,7 +59,7 @@ describe('NegotiationsService', () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
       const before = Date.now();
-      await service.convert(3, PaymentMethodEnum.PIX);
+      await service.convert(3, PaymentMethodEnum.PIX, 42);
       const after = Date.now();
 
       const arg = callArg<{
@@ -82,7 +83,7 @@ describe('NegotiationsService', () => {
     it('ativa o Cliente na conversão mesmo com o Pedido ainda EM_NEGOCIACAO (RN7)', async () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
-      await service.convert(3, PaymentMethodEnum.PIX);
+      await service.convert(3, PaymentMethodEnum.PIX, 42);
 
       expect(prisma.client.update).toHaveBeenCalledWith({
         where: { id: 'c1' },
@@ -117,7 +118,7 @@ describe('NegotiationsService', () => {
       );
 
       const before = Date.now();
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
       const after = Date.now();
 
       const arg = callArg<{
@@ -135,7 +136,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'PERDIDA' }),
       );
 
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
 
       expect(prisma.order.updateMany).not.toHaveBeenCalled();
     });
@@ -145,10 +146,10 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
       );
 
-      await expect(service.reopen(3, RoleEnum.VENDEDOR)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-      await expect(service.reopen(3, RoleEnum.VENDEDOR)).rejects.toThrow(
+      await expect(
+        service.reopen(3, RoleEnum.VENDEDOR, 42),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.reopen(3, RoleEnum.VENDEDOR, 42)).rejects.toThrow(
         'Venda com pagamento confirmado só pode ser reaberta por um administrador',
       );
       expect(prisma.negotiation.update).not.toHaveBeenCalled();
@@ -159,7 +160,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
       );
 
-      await service.reopen(3, RoleEnum.ADMIN);
+      await service.reopen(3, RoleEnum.ADMIN, 42);
 
       expect(prisma.negotiation.update).toHaveBeenCalled();
       const arg = callArg<{ data: { status: string } }>(
@@ -173,7 +174,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
       );
 
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
 
       expect(prisma.negotiation.update).toHaveBeenCalled();
     });
@@ -194,7 +195,7 @@ describe('NegotiationsService', () => {
     it('convert não checa o Cliente (nem anonimização)', async () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
-      await service.convert(3, PaymentMethodEnum.PIX);
+      await service.convert(3, PaymentMethodEnum.PIX, 42);
 
       expect(prisma.client.findFirst).not.toHaveBeenCalled();
     });
@@ -212,7 +213,7 @@ describe('NegotiationsService', () => {
         negotiationRow({ status: 'GANHA', order: null }),
       );
 
-      await service.reopen(3, RoleEnum.VENDEDOR);
+      await service.reopen(3, RoleEnum.VENDEDOR, 42);
 
       expect(prisma.client.findFirst).not.toHaveBeenCalled();
     });
@@ -246,9 +247,175 @@ describe('NegotiationsService', () => {
       });
       prisma.negotiation.create.mockResolvedValue(negotiationRow());
 
-      await service.create({ clientId: 'c1', totalValue: 100 }, 2);
+      await service.create({ clientId: 'c1', items: [] }, 2);
 
       expect(prisma.client.findFirst).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('create — compor itens ao criar (RI2-RI4, RI7-RI9, ticket 03)', () => {
+    beforeEach(() => {
+      prisma.client.findFirst.mockResolvedValue({
+        id: 'c1',
+        status: 'LEAD',
+        anonymizedAt: null,
+      });
+      prisma.negotiation.create.mockResolvedValue(negotiationRow());
+    });
+
+    it('cria sem itens com total R$ 0,00 e não consulta o catálogo (RI8)', async () => {
+      await service.create({ clientId: 'c1', items: [] }, 2);
+
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.create,
+      );
+      expect(arg.data.totalValue).toBe(0);
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+    });
+
+    it('cria com um item copiando o preço do Produto e somando o total (RI4/RI7)', async () => {
+      const price = { toString: () => '799.90' };
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1', price }]);
+
+      await service.create(
+        { clientId: 'c1', items: [{ productId: 'p1', quantity: 2 }] },
+        2,
+      );
+
+      const arg = callArg<{
+        data: {
+          totalValue: number;
+          items: {
+            create: {
+              productId: string;
+              quantity: number;
+              unitPrice: unknown;
+            }[];
+          };
+        };
+      }>(prisma.negotiation.create);
+      expect(arg.data.items.create).toEqual([
+        { productId: 'p1', quantity: 2, unitPrice: price },
+      ]);
+      expect(arg.data.totalValue).toBe(1599.8);
+    });
+
+    it('cria com vários itens somando os subtotais', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        { id: 'p1', price: { toString: () => '100.00' } },
+        { id: 'p2', price: { toString: () => '50.00' } },
+      ]);
+
+      await service.create(
+        {
+          clientId: 'c1',
+          items: [
+            { productId: 'p1', quantity: 2 },
+            { productId: 'p2', quantity: 3 },
+          ],
+        },
+        2,
+      );
+
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.create,
+      );
+      expect(arg.data.totalValue).toBe(350);
+    });
+
+    it('recusa Produto inativo ou excluído, sem gravar nada (RI2)', async () => {
+      prisma.product.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.create(
+          { clientId: 'c1', items: [{ productId: 'fantasma', quantity: 1 }] },
+          2,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.negotiation.create).not.toHaveBeenCalled();
+    });
+
+    it('recusa Produto repetido no mesmo envio, sem consultar o catálogo (RI3)', async () => {
+      await expect(
+        service.create(
+          {
+            clientId: 'c1',
+            items: [
+              { productId: 'p1', quantity: 1 },
+              { productId: 'p1', quantity: 2 },
+            ],
+          },
+          2,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+      expect(prisma.negotiation.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findOne — detalhe com itens (ticket 03)', () => {
+    it('devolve os itens não excluídos com Produto, quantidade, preço e subtotal', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({
+          items: [
+            {
+              id: 1,
+              quantity: 2,
+              unitPrice: { toString: () => '100.00' },
+              product: {
+                id: 'p1',
+                name: 'iPhone 15 Pro',
+                sku: 'IP15P',
+                status: 'ATIVO',
+                deletedAt: null,
+              },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.items).toEqual([
+        {
+          id: 1,
+          product: {
+            id: 'p1',
+            name: 'iPhone 15 Pro',
+            sku: 'IP15P',
+            status: 'ATIVO',
+            deleted: false,
+          },
+          quantity: 2,
+          unitPrice: 100,
+          subtotal: 200,
+        },
+      ]);
+    });
+
+    it('marca o item como excluído quando o Produto foi excluído do catálogo (RI2)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({
+          items: [
+            {
+              id: 1,
+              quantity: 1,
+              unitPrice: { toString: () => '100.00' },
+              product: {
+                id: 'p1',
+                name: 'iPhone 15 Pro',
+                sku: 'IP15P',
+                status: 'ATIVO',
+                deletedAt: new Date('2026-09-20T00:00:00Z'),
+              },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.items[0].product.deleted).toBe(true);
     });
   });
 });

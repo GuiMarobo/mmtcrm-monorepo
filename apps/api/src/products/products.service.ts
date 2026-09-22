@@ -185,11 +185,62 @@ export class ProductsService {
   }
 
   // RP5 / ADR 0013: o único caminho de escrita do saldo. O movimento e o saldo
-  // mudam na mesma transação. A Saída só decrementa onde stock >= quantidade,
-  // numa única escrita condicional — duas saídas simultâneas não conseguem
-  // passar ambas por uma checagem lida antes. Nenhuma linha afetada significa
-  // Produto inexistente/excluído (404) ou saldo insuficiente (409); o throw
-  // desfaz a transação, então nada é gravado.
+  // mudam na mesma transação, aberta pelo chamador — assim a baixa e a
+  // devolução de venda (specs 010/11 e 010/14) conseguem gravar dentro da
+  // transação da conversão/reabertura de negociations. A Saída só decrementa
+  // onde stock >= quantidade, numa única escrita condicional — duas saídas
+  // simultâneas não conseguem passar ambas por uma checagem lida antes.
+  // Nenhuma linha afetada significa Produto inexistente/excluído (404) ou
+  // saldo insuficiente (409); o throw desfaz a transação do chamador, então
+  // nada é gravado.
+  async recordStockMovement(
+    tx: Prisma.TransactionClient,
+    params: {
+      productId: string;
+      type: StockMovementTypeEnum;
+      quantity: number;
+      note?: string;
+      userId?: number;
+      orderId?: number;
+    },
+  ) {
+    const { productId, type, quantity, note, userId, orderId } = params;
+    const isOut = type === StockMovementTypeEnum.SAIDA;
+
+    const { count } = await tx.product.updateMany({
+      where: {
+        ...NOT_DELETED,
+        id: productId,
+        ...(isOut && { stock: { gte: quantity } }),
+      },
+      data: {
+        stock: isOut ? { decrement: quantity } : { increment: quantity },
+      },
+    });
+
+    if (count === 0) {
+      const product = await tx.product.findFirst({
+        where: { ...NOT_DELETED, id: productId },
+        select: { stock: true },
+      });
+      if (!product) throw new NotFoundException(NOT_FOUND);
+      throw new ConflictException(insufficientStock(product.stock));
+    }
+
+    await tx.stockMovement.create({
+      data: {
+        productId,
+        type,
+        quantity,
+        note,
+        userId,
+        orderId,
+      },
+    });
+  }
+
+  // Rota manual (`POST /products/:id/stock-movements`): abre a própria
+  // transação e chama o caminho compartilhado com `orderId` nulo.
   async moveStock(id: string, dto: CreateStockMovementDto, userId: number) {
     // O DTO já barra isto na borda HTTP; repetido aqui porque o service é o
     // guardião da invariante "saldo nunca negativo", seja quem for o chamador.
@@ -201,41 +252,15 @@ export class ProductsService {
       throw new BadRequestException(INVALID_QUANTITY);
     }
 
-    const isOut = dto.type === StockMovementTypeEnum.SAIDA;
-
-    await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.product.updateMany({
-        where: {
-          ...NOT_DELETED,
-          id,
-          ...(isOut && { stock: { gte: dto.quantity } }),
-        },
-        data: {
-          stock: isOut
-            ? { decrement: dto.quantity }
-            : { increment: dto.quantity },
-        },
-      });
-
-      if (count === 0) {
-        const product = await tx.product.findFirst({
-          where: { ...NOT_DELETED, id },
-          select: { stock: true },
-        });
-        if (!product) throw new NotFoundException(NOT_FOUND);
-        throw new ConflictException(insufficientStock(product.stock));
-      }
-
-      await tx.stockMovement.create({
-        data: {
-          productId: id,
-          type: dto.type,
-          quantity: dto.quantity,
-          note: dto.note,
-          userId,
-        },
-      });
-    });
+    await this.prisma.$transaction((tx) =>
+      this.recordStockMovement(tx, {
+        productId: id,
+        type: dto.type,
+        quantity: dto.quantity,
+        note: dto.note,
+        userId,
+      }),
+    );
 
     return this.findOne(id);
   }
