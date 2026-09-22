@@ -201,6 +201,13 @@ enum StockMovementType {
   SAIDA
 }
 
+// Forma do desconto do item (ADR 0015): guarda a intenção, não o resultado.
+// Sem desconto é VALOR com número zero.
+enum DiscountType {
+  PERCENTUAL
+  VALOR
+}
+
 model Product {
   id          String          @id @default(uuid())
   name        String
@@ -236,6 +243,10 @@ model NegotiationItem {
   productId     String    @map("product_id")
   quantity      Int
   unitPrice     Decimal   @map("unit_price") @db.Decimal(12, 2)
+  // Número informado: percentual (0–100) ou reais, conforme discountType. O
+  // desconto em R$ e o subtotal são derivados no service, nunca guardados.
+  discountType  DiscountType @default(VALOR) @map("discount_type")
+  discountValue Decimal      @default(0) @map("discount_value") @db.Decimal(12, 2)
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")

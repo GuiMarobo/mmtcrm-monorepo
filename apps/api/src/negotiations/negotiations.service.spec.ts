@@ -7,6 +7,10 @@ import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NegotiationsService } from './negotiations.service';
 import { PaymentMethodEnum } from './dto/create-negotiation.dto';
+import {
+  CreateNegotiationItemDto,
+  DiscountTypeEnum,
+} from './dto/create-negotiation-item.dto';
 import { RoleEnum } from '../users/dto/create-user.dto';
 import {
   asPrismaService,
@@ -300,7 +304,13 @@ describe('NegotiationsService', () => {
         };
       }>(prisma.negotiation.create);
       expect(arg.data.items.create).toEqual([
-        { productId: 'p1', quantity: 2, unitPrice: price },
+        {
+          productId: 'p1',
+          quantity: 2,
+          unitPrice: price,
+          discountType: 'VALOR',
+          discountValue: 0,
+        },
       ]);
       expect(arg.data.totalValue).toBe(1599.8);
     });
@@ -367,6 +377,8 @@ describe('NegotiationsService', () => {
               id: 1,
               quantity: 2,
               unitPrice: { toString: () => '100.00' },
+              discountType: 'VALOR',
+              discountValue: { toString: () => '0.00' },
               product: {
                 id: 'p1',
                 name: 'iPhone 15 Pro',
@@ -393,6 +405,9 @@ describe('NegotiationsService', () => {
           },
           quantity: 2,
           unitPrice: 100,
+          discountType: 'VALOR',
+          discountValue: 0,
+          discountAmount: 0,
           subtotal: 200,
         },
       ]);
@@ -406,6 +421,8 @@ describe('NegotiationsService', () => {
               id: 1,
               quantity: 1,
               unitPrice: { toString: () => '100.00' },
+              discountType: 'VALOR',
+              discountValue: { toString: () => '0.00' },
               product: {
                 id: 'p1',
                 name: 'iPhone 15 Pro',
@@ -517,6 +534,8 @@ describe('NegotiationsService', () => {
             productId: 'p1',
             quantity: 2,
             unitPrice: price,
+            discountType: 'VALOR',
+            discountValue: 0,
             negotiationId: 3,
           },
         ],
@@ -535,6 +554,8 @@ describe('NegotiationsService', () => {
           productId: 'p1',
           quantity: 2,
           unitPrice: { toString: () => '100.00' },
+          discountType: 'VALOR',
+          discountValue: { toString: () => '0.00' },
         },
       ]);
 
@@ -560,6 +581,8 @@ describe('NegotiationsService', () => {
           productId: 'p1',
           quantity: 2,
           unitPrice: { toString: () => '100.00' },
+          discountType: 'VALOR',
+          discountValue: { toString: () => '0.00' },
           product: { name: 'iPhone 15 Pro', sku: 'IP15P-256', deletedAt: null },
         },
       ]);
@@ -571,7 +594,7 @@ describe('NegotiationsService', () => {
 
       expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
         where: { id: 10 },
-        data: { quantity: 5 },
+        data: { quantity: 5, discountType: 'VALOR', discountValue: 0 },
       });
       const arg = callArg<{ data: { totalValue: number } }>(
         prisma.negotiation.update,
@@ -587,12 +610,16 @@ describe('NegotiationsService', () => {
           productId: 'p1',
           quantity: 2,
           unitPrice: { toString: () => '100.00' },
+          discountType: 'VALOR',
+          discountValue: { toString: () => '0.00' },
         },
         {
           id: 11,
           productId: 'p2',
           quantity: 1,
           unitPrice: { toString: () => '50.00' },
+          discountType: 'VALOR',
+          discountValue: { toString: () => '0.00' },
         },
       ]);
 
@@ -619,6 +646,8 @@ describe('NegotiationsService', () => {
           productId: 'p1',
           quantity: 2,
           unitPrice: { toString: () => '100.00' },
+          discountType: 'VALOR',
+          discountValue: { toString: () => '0.00' },
         },
       ]);
 
@@ -783,6 +812,8 @@ describe('NegotiationsService', () => {
           productId: 'p1',
           quantity: 2,
           unitPrice: { toString: () => '100.00' },
+          discountType: 'VALOR',
+          discountValue: { toString: () => '0.00' },
         },
       ]);
       prisma.product.findFirst.mockResolvedValue(catalogProduct());
@@ -802,6 +833,8 @@ describe('NegotiationsService', () => {
       productId: 'p1',
       quantity: 2,
       unitPrice: { toString: () => '100.00' },
+      discountType: 'VALOR',
+      discountValue: { toString: () => '0.00' },
       product: {
         name: 'iPhone 15 Pro',
         sku: 'IP15P-256',
@@ -828,7 +861,7 @@ describe('NegotiationsService', () => {
 
       expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
         where: { id: 10 },
-        data: { quantity: 4 },
+        data: { quantity: 4, discountType: 'VALOR', discountValue: 0 },
       });
       expect(prisma.product.findMany).not.toHaveBeenCalled();
       const arg = callArg<{ data: { totalValue: number } }>(
@@ -890,6 +923,315 @@ describe('NegotiationsService', () => {
         prisma.negotiation.update,
       );
       expect(arg.data.totalValue).toBe(0);
+    });
+  });
+
+  describe('desconto do item em % ou em R$ (RI5, ADR 0015, ticket 08)', () => {
+    const { PERCENTUAL, VALOR } = DiscountTypeEnum;
+    const catalog = (price: string) => [
+      { id: 'p1', price: { toString: () => price } },
+    ];
+    const savedItem = (
+      discountType: DiscountTypeEnum,
+      discountValue: string,
+      overrides: Record<string, unknown> = {},
+    ) => ({
+      id: 10,
+      productId: 'p1',
+      quantity: 2,
+      unitPrice: { toString: () => '100.00' },
+      discountType,
+      discountValue: { toString: () => discountValue },
+      product: { name: 'iPhone 15 Pro', sku: 'IP15P-256', deletedAt: null },
+      ...overrides,
+    });
+    const createWith = (item: Omit<CreateNegotiationItemDto, 'productId'>) =>
+      service.create(
+        { clientId: 'c1', items: [{ productId: 'p1', ...item }] },
+        2,
+      );
+    const replaceWith = (item: Omit<CreateNegotiationItemDto, 'productId'>) =>
+      service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', ...item }],
+      });
+    const createdTotal = () =>
+      callArg<{ data: { totalValue: number } }>(prisma.negotiation.create).data
+        .totalValue;
+    const replacedTotal = () =>
+      callArg<{ data: { totalValue: number } }>(prisma.negotiation.update).data
+        .totalValue;
+    const expectNothingWritten = () => {
+      expect(prisma.negotiation.create).not.toHaveBeenCalled();
+      expect(prisma.negotiation.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.createMany).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.updateMany).not.toHaveBeenCalled();
+    };
+
+    beforeEach(() => {
+      prisma.client.findFirst.mockResolvedValue({
+        id: 'c1',
+        status: 'LEAD',
+        anonymizedAt: null,
+      });
+      prisma.negotiation.create.mockResolvedValue(negotiationRow());
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiation.update.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
+      prisma.product.findFirst.mockResolvedValue({
+        name: 'iPhone 15 Pro',
+        sku: 'IP15P-256',
+        deletedAt: null,
+      });
+    });
+
+    it('desconto percentual é aplicado sobre a linha inteira e gravado como forma e número', async () => {
+      prisma.product.findMany.mockResolvedValue(catalog('100.00'));
+
+      await createWith({
+        quantity: 2,
+        discountType: PERCENTUAL,
+        discountValue: 10,
+      });
+
+      const arg = callArg<{
+        data: { items: { create: Record<string, unknown>[] } };
+      }>(prisma.negotiation.create);
+      expect(arg.data.items.create[0]).toMatchObject({
+        discountType: 'PERCENTUAL',
+        discountValue: 10,
+      });
+      expect(createdTotal()).toBe(180);
+    });
+
+    it('desconto em reais é abatido direto da linha', async () => {
+      prisma.product.findMany.mockResolvedValue(catalog('100.00'));
+
+      await createWith({ quantity: 2, discountType: VALOR, discountValue: 50 });
+
+      expect(createdTotal()).toBe(150);
+    });
+
+    it('item sem desconto é gravado como Valor com número zero', async () => {
+      prisma.product.findMany.mockResolvedValue(catalog('100.00'));
+
+      await createWith({ quantity: 1 });
+
+      const arg = callArg<{
+        data: { items: { create: Record<string, unknown>[] } };
+      }>(prisma.negotiation.create);
+      expect(arg.data.items.create[0]).toMatchObject({
+        discountType: 'VALOR',
+        discountValue: 0,
+      });
+      expect(createdTotal()).toBe(100);
+    });
+
+    it('arredonda o desconto percentual ao centavo, meio para cima', async () => {
+      prisma.product.findMany.mockResolvedValue(catalog('10.05'));
+
+      await createWith({
+        quantity: 1,
+        discountType: PERCENTUAL,
+        discountValue: 10,
+      });
+
+      expect(createdTotal()).toBe(9.04);
+    });
+
+    it('desconto igual à linha zera o subtotal, sem recusar', async () => {
+      prisma.product.findMany.mockResolvedValue(catalog('100.00'));
+
+      await createWith({
+        quantity: 2,
+        discountType: VALOR,
+        discountValue: 200,
+      });
+
+      expect(createdTotal()).toBe(0);
+    });
+
+    it('recusa desconto em reais maior que a linha, sem gravar nada', async () => {
+      prisma.product.findMany.mockResolvedValue(catalog('100.00'));
+
+      const attempt = createWith({
+        quantity: 2,
+        discountType: VALOR,
+        discountValue: 200.01,
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(
+        'Desconto inválido para o Produto iPhone 15 Pro (IP15P-256): o desconto não pode ser maior que o valor da linha',
+      );
+      expectNothingWritten();
+    });
+
+    it.each([-1, 100.01])(
+      'recusa percentual %p fora de 0–100, sem gravar nada',
+      async (discountValue) => {
+        const attempt = createWith({
+          quantity: 1,
+          discountType: PERCENTUAL,
+          discountValue,
+        });
+
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toThrow(
+          'Desconto inválido para o Produto iPhone 15 Pro (IP15P-256): o percentual deve estar entre 0 e 100',
+        );
+        expect(prisma.product.findMany).not.toHaveBeenCalled();
+        expectNothingWritten();
+      },
+    );
+
+    it('recusa desconto em reais negativo, sem gravar nada', async () => {
+      const attempt = replaceWith({
+        quantity: 1,
+        discountType: VALOR,
+        discountValue: -5,
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(
+        'Desconto inválido para o Produto iPhone 15 Pro (IP15P-256): o desconto em reais não pode ser negativo',
+      );
+      expectNothingWritten();
+    });
+
+    it('mudar a quantidade mantém o percentual: o desconto em R$ acompanha a linha (história 16)', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem(PERCENTUAL, '10.00'),
+      ]);
+
+      await replaceWith({
+        quantity: 4,
+        discountType: PERCENTUAL,
+        discountValue: 10,
+      });
+
+      expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { quantity: 4, discountType: 'PERCENTUAL', discountValue: 10 },
+      });
+      expect(replacedTotal()).toBe(360);
+    });
+
+    it('mudar a quantidade mantém o desconto em R$: o percentual efetivo muda (história 16)', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem(VALOR, '20.00'),
+      ]);
+
+      await replaceWith({
+        quantity: 4,
+        discountType: VALOR,
+        discountValue: 20,
+      });
+
+      expect(replacedTotal()).toBe(380);
+    });
+
+    it('altera só o desconto de um item mantido, preservando o preço praticado', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem(VALOR, '0.00'),
+      ]);
+
+      await replaceWith({
+        quantity: 2,
+        discountType: PERCENTUAL,
+        discountValue: 5,
+      });
+
+      expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { quantity: 2, discountType: 'PERCENTUAL', discountValue: 5 },
+      });
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+      expect(replacedTotal()).toBe(190);
+    });
+
+    it('item mantido com o mesmo desconto não é regravado', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem(PERCENTUAL, '10.00'),
+      ]);
+
+      await replaceWith({
+        quantity: 2,
+        discountType: PERCENTUAL,
+        discountValue: 10,
+      });
+
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      expect(replacedTotal()).toBe(180);
+    });
+
+    it('recusa reduzir a quantidade quando o desconto em R$ passaria a exceder a linha', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem(VALOR, '150.00'),
+      ]);
+
+      const attempt = replaceWith({
+        quantity: 1,
+        discountType: VALOR,
+        discountValue: 150,
+      });
+
+      await expect(attempt).rejects.toThrow(
+        'Desconto inválido para o Produto iPhone 15 Pro (IP15P-256): o desconto não pode ser maior que o valor da linha',
+      );
+      expectNothingWritten();
+    });
+
+    it('item de Produto excluído recusa mudar o desconto', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem(VALOR, '0.00', {
+          product: {
+            name: 'iPhone 15 Pro',
+            sku: 'IP15P-256',
+            deletedAt: new Date('2026-09-01T00:00:00Z'),
+          },
+        }),
+      ]);
+
+      await expect(
+        replaceWith({ quantity: 2, discountType: VALOR, discountValue: 10 }),
+      ).rejects.toThrow(/foi excluído do catálogo/);
+      expectNothingWritten();
+    });
+
+    it('o detalhe devolve forma, número, desconto em R$ e subtotal de cada item', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({
+          items: [
+            {
+              id: 1,
+              quantity: 3,
+              unitPrice: { toString: () => '33.35' },
+              discountType: 'PERCENTUAL',
+              discountValue: { toString: () => '10.00' },
+              product: {
+                id: 'p1',
+                name: 'iPhone 15 Pro',
+                sku: 'IP15P-256',
+                status: 'ATIVO',
+                deletedAt: null,
+              },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.items[0]).toMatchObject({
+        quantity: 3,
+        unitPrice: 33.35,
+        discountType: 'PERCENTUAL',
+        discountValue: 10,
+        discountAmount: 10.01,
+        subtotal: 90.04,
+      });
     });
   });
 });

@@ -44,6 +44,8 @@ export function NegotiationFormModal({
           productId: item.product.id,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          discountType: item.discountType,
+          discountValue: item.discountValue,
           product: item.product,
         }))
       : [],
@@ -61,10 +63,14 @@ export function NegotiationFormModal({
       return
     }
 
-    const payloadItems = items.map(({ productId, quantity }) => ({
-      productId,
-      quantity,
-    }))
+    const payloadItems = items.map(
+      ({ productId, quantity, discountType, discountValue }) => ({
+        productId,
+        quantity,
+        discountType: discountType ?? 'VALOR',
+        discountValue: discountValue ?? 0,
+      }),
+    )
 
     setSaving(true)
     try {

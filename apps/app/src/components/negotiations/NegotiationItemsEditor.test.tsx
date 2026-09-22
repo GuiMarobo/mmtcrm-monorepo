@@ -31,7 +31,9 @@ describe('NegotiationItemsEditor', () => {
     await user.click(screen.getByLabelText('Adicionar produto'))
     await user.click(screen.getByRole('option', { name: /iPhone 15 Pro/ }))
 
-    expect(onChange).toHaveBeenCalledWith([{ productId: 'p1', quantity: 1 }])
+    expect(onChange).toHaveBeenCalledWith([
+      { productId: 'p1', quantity: 1, discountType: 'VALOR', discountValue: 0 },
+    ])
   })
 
   it('esconde do seletor um Produto já adicionado, mas mantém a linha dele na lista', async () => {
@@ -208,6 +210,132 @@ describe('NegotiationItemsEditor', () => {
       expect(onChange).toHaveBeenLastCalledWith([{ productId: 'p1', quantity: 5 }])
       expect(screen.getByLabelText('Qtd.')).toHaveValue(5)
       expect(screen.getByText(/Saldo em estoque: 2/)).toBeInTheDocument()
+    })
+  })
+
+  describe('desconto do item em % ou em R$ (ticket 08)', () => {
+    function StatefulEditor({
+      initialItems,
+      onChange = vi.fn(),
+    }: {
+      initialItems: NegotiationItemFormValue[]
+      onChange?: (items: NegotiationItemFormValue[]) => void
+    }) {
+      const [items, setItems] = useState(initialItems)
+      return (
+        <NegotiationItemsEditor
+          products={[product({ price: 100 })]}
+          items={items}
+          onChange={(next) => {
+            setItems(next)
+            onChange(next)
+          }}
+        />
+      )
+    }
+
+    it('alterna a forma do desconto entre R$ e % e recalcula o subtotal e o total', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(
+        <StatefulEditor
+          initialItems={[
+            { productId: 'p1', quantity: 2, discountType: 'VALOR', discountValue: 10 },
+          ]}
+          onChange={onChange}
+        />,
+      )
+
+      expect(screen.getAllByText(/R\$\s*190,00/)).toHaveLength(2)
+
+      await user.click(screen.getByRole('button', { name: '%' }))
+
+      expect(onChange).toHaveBeenLastCalledWith([
+        { productId: 'p1', quantity: 2, discountType: 'PERCENTUAL', discountValue: 10 },
+      ])
+      expect(screen.getAllByText(/R\$\s*180,00/)).toHaveLength(2)
+    })
+
+    it('recalcula o subtotal ao digitar o número do desconto', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(
+        <StatefulEditor
+          initialItems={[
+            { productId: 'p1', quantity: 2, discountType: 'PERCENTUAL', discountValue: 0 },
+          ]}
+          onChange={onChange}
+        />,
+      )
+
+      const discount = screen.getByLabelText('Desconto')
+      await user.tripleClick(discount)
+      await user.keyboard('15')
+
+      expect(onChange).toHaveBeenLastCalledWith([
+        { productId: 'p1', quantity: 2, discountType: 'PERCENTUAL', discountValue: 15 },
+      ])
+      expect(screen.getAllByText(/R\$\s*170,00/)).toHaveLength(2)
+    })
+
+    it('não aceita mais de duas casas decimais no desconto', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(
+        <StatefulEditor
+          initialItems={[
+            { productId: 'p1', quantity: 1, discountType: 'VALOR', discountValue: 0 },
+          ]}
+          onChange={onChange}
+        />,
+      )
+
+      await user.tripleClick(screen.getByLabelText('Desconto'))
+      await user.keyboard('1.255')
+
+      expect(onChange).toHaveBeenLastCalledWith([
+        { productId: 'p1', quantity: 1, discountType: 'VALOR', discountValue: 1.25 },
+      ])
+    })
+
+    it('aponta na linha um desconto maior que a linha', () => {
+      render(
+        <StatefulEditor
+          initialItems={[
+            { productId: 'p1', quantity: 1, discountType: 'VALOR', discountValue: 150 },
+          ]}
+        />,
+      )
+
+      expect(screen.getByText('Maior que a linha')).toBeInTheDocument()
+    })
+
+    it('item de Produto excluído não permite mudar o desconto', () => {
+      render(
+        <NegotiationItemsEditor
+          products={[]}
+          items={[
+            {
+              productId: 'p1',
+              quantity: 1,
+              unitPrice: 100,
+              discountType: 'VALOR',
+              discountValue: 0,
+              product: {
+                id: 'p1',
+                name: 'iPhone 15 Pro',
+                sku: 'IP15P-256',
+                status: 'ATIVO',
+                deleted: true,
+              },
+            },
+          ]}
+          onChange={vi.fn()}
+        />,
+      )
+
+      expect(screen.getByLabelText('Desconto')).toBeDisabled()
+      expect(screen.getByRole('button', { name: '%' })).toBeDisabled()
     })
   })
 })

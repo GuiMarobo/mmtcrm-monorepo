@@ -207,3 +207,14 @@ export const STOCK_MOVEMENT_TYPE_OPTIONS: {
   value: v,
   label: STOCK_MOVEMENT_TYPE_LABELS[v],
 }))
+
+export const DISCOUNT_TYPES = ['PERCENTUAL', 'VALOR'] as const
+export type DiscountType = (typeof DISCOUNT_TYPES)[number]
+
+export const DISCOUNT_TYPE_LABELS: Record<DiscountType, string> = {
+  PERCENTUAL: '%',
+  VALOR: 'R$',
+}
+
+export const DISCOUNT_TYPE_OPTIONS: { value: DiscountType; label: string }[] =
+  DISCOUNT_TYPES.map((v) => ({ value: v, label: DISCOUNT_TYPE_LABELS[v] }))

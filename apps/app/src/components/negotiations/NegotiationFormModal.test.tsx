@@ -60,6 +60,9 @@ const negotiationDetail = (
       product: { id: 'p1', name: 'iPhone 15 Pro', sku: 'IP15P-256', status: 'ATIVO', deleted: false },
       quantity: 2,
       unitPrice: 100,
+      discountType: 'VALOR',
+      discountValue: 0,
+      discountAmount: 0,
       subtotal: 200,
     },
   ],
@@ -104,7 +107,7 @@ describe('NegotiationFormModal — editar itens de Negociação Aberta (ticket 0
 
     expect(onUpdate).toHaveBeenCalledWith({
       clientId: 'c1',
-      items: [{ productId: 'p1', quantity: 2 }],
+      items: [{ productId: 'p1', quantity: 2, discountType: 'VALOR', discountValue: 0 }],
       notes: null,
     })
   })
@@ -203,7 +206,7 @@ describe('NegotiationFormModal — Negociação antiga ou importada sem itens (t
 
     expect(onUpdate).toHaveBeenCalledWith({
       clientId: 'c1',
-      items: [{ productId: 'p1', quantity: 1 }],
+      items: [{ productId: 'p1', quantity: 1, discountType: 'VALOR', discountValue: 0 }],
       notes: null,
     })
   })
@@ -244,7 +247,51 @@ describe('NegotiationFormModal — validações do item (ticket 06)', () => {
 
     expect(onUpdate).toHaveBeenCalledWith({
       clientId: 'c1',
-      items: [{ productId: 'p1', quantity: 2 }],
+      items: [{ productId: 'p1', quantity: 2, discountType: 'VALOR', discountValue: 0 }],
+      notes: null,
+    })
+  })
+})
+
+describe('NegotiationFormModal — desconto do item (ticket 08)', () => {
+  it('carrega forma e número do desconto do detalhe e os devolve ao salvar', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <NegotiationFormModal
+        negotiation={negotiationDetail({
+          totalValue: 180,
+          items: [
+            {
+              id: 10,
+              product: { id: 'p1', name: 'iPhone 15 Pro', sku: 'IP15P-256', status: 'ATIVO', deleted: false },
+              quantity: 2,
+              unitPrice: 100,
+              discountType: 'PERCENTUAL',
+              discountValue: 10,
+              discountAmount: 20,
+              subtotal: 180,
+            },
+          ],
+        })}
+        clients={[client()]}
+        products={[product()]}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '%' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('Desconto')).toHaveValue(10)
+    expect(screen.getAllByText(/R\$\s*180,00/)).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      clientId: 'c1',
+      items: [{ productId: 'p1', quantity: 2, discountType: 'PERCENTUAL', discountValue: 10 }],
       notes: null,
     })
   })
@@ -266,6 +313,9 @@ describe('NegotiationFormModal — item de Produto descontinuado ou excluído (R
           },
           quantity: 2,
           unitPrice: 100,
+          discountType: 'VALOR',
+          discountValue: 0,
+          discountAmount: 0,
           subtotal: 200,
         },
       ],
@@ -307,7 +357,7 @@ describe('NegotiationFormModal — item de Produto descontinuado ou excluído (R
 
     expect(onUpdate).toHaveBeenCalledWith({
       clientId: 'c1',
-      items: [{ productId: 'p1', quantity: 2 }],
+      items: [{ productId: 'p1', quantity: 2, discountType: 'VALOR', discountValue: 0 }],
       notes: null,
     })
   })
@@ -341,7 +391,7 @@ describe('NegotiationFormModal — item de Produto descontinuado ou excluído (R
 
     expect(onUpdate).toHaveBeenCalledWith({
       clientId: 'c1',
-      items: [{ productId: 'p1', quantity: 3 }],
+      items: [{ productId: 'p1', quantity: 3, discountType: 'VALOR', discountValue: 0 }],
       notes: null,
     })
   })

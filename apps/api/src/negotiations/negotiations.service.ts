@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { RoleEnum } from '../users/dto/create-user.dto';
 import { Prisma } from '../../generated/prisma/client';
-import { NegotiationStatus } from '../../generated/prisma/enums';
+import { DiscountType, NegotiationStatus } from '../../generated/prisma/enums';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import {
   CreateNegotiationDto,
@@ -16,6 +16,7 @@ import {
 import { CreateNegotiationItemDto } from './dto/create-negotiation-item.dto';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 import { ReplaceNegotiationDto } from './dto/replace-negotiation.dto';
+import { ItemPricingInput, priceItem } from './negotiation-item-pricing';
 
 const negotiationSelect = {
   id: true,
@@ -56,6 +57,8 @@ const negotiationDetailSelect = {
       id: true,
       quantity: true,
       unitPrice: true,
+      discountType: true,
+      discountValue: true,
       product: {
         select: {
           id: true,
@@ -85,6 +88,28 @@ const productLabel = (product: Pick<ItemProduct, 'name' | 'sku'>) =>
 // RI5: quantidade é inteiro >= 1. O teto técnico da coluna fica no DTO.
 const isValidQuantity = (quantity: number) =>
   Number.isInteger(quantity) && quantity >= 1;
+
+// ADR 0015: item sem desconto é gravado como forma Valor, número zero.
+const discountOf = (
+  item: CreateNegotiationItemDto,
+): { discountType: DiscountType; discountValue: number } => ({
+  discountType: item.discountType ?? 'VALOR',
+  discountValue: item.discountValue ?? 0,
+});
+
+// RI5: percentual entre 0 e 100; desconto em reais >= 0. O teto "nunca maior
+// que a linha" depende do preço e é conferido depois de precificar.
+const discountRangeError = (item: CreateNegotiationItemDto) => {
+  const { discountType, discountValue } = discountOf(item);
+  if (discountType === 'PERCENTUAL') {
+    return discountValue < 0 || discountValue > 100
+      ? 'o percentual deve estar entre 0 e 100'
+      : null;
+  }
+  return discountValue < 0 ? 'o desconto em reais não pode ser negativo' : null;
+};
+
+const fromCents = (cents: number) => cents / 100;
 
 // A maquina de estados da spec 001 tem exatamente estas quatro arestas.
 // Converter em pedido e o que torna a negociacao GANHA; nao existe "concluir".
@@ -132,7 +157,7 @@ export class NegotiationsService {
       ...response,
       informedValue,
       items: items.map((item) => {
-        const unitPrice = Number(item.unitPrice);
+        const pricing = priceItem(item);
         return {
           id: item.id,
           product: {
@@ -143,8 +168,11 @@ export class NegotiationsService {
             deleted: item.product.deletedAt !== null,
           },
           quantity: item.quantity,
-          unitPrice,
-          subtotal: unitPrice * item.quantity,
+          unitPrice: Number(item.unitPrice),
+          discountType: item.discountType,
+          discountValue: Number(item.discountValue),
+          discountAmount: fromCents(pricing.discountCents),
+          subtotal: fromCents(pricing.subtotalCents),
         };
       }),
     };
@@ -180,8 +208,9 @@ export class NegotiationsService {
     );
   }
 
-  // RI3/RI5: um Produto não aparece duas vezes no mesmo envio e toda
-  // quantidade é inteiro >= 1 — vale para itens novos e já gravados.
+  // RI3/RI5: um Produto não aparece duas vezes no mesmo envio, toda
+  // quantidade é inteiro >= 1 e todo desconto está na faixa da sua forma —
+  // vale para itens novos e já gravados.
   private async assertValidItems(
     tx: Prisma.TransactionClient,
     items: CreateNegotiationItemDto[],
@@ -206,6 +235,37 @@ export class NegotiationsService {
         invalid.productId,
         (product) =>
           `Quantidade inválida para o ${productLabel(product)}: informe um número inteiro maior ou igual a 1`,
+      );
+    }
+
+    for (const item of items) {
+      const error = discountRangeError(item);
+      if (error) {
+        await this.rejectItem(
+          tx,
+          item.productId,
+          (product) =>
+            `Desconto inválido para o ${productLabel(product)}: ${error}`,
+        );
+      }
+    }
+  }
+
+  // RI5: o desconto nunca deixa o subtotal negativo. Conferido sobre a lista
+  // final já precificada e antes de qualquer escrita, para recusar sem gravar
+  // nada — inclusive um item mantido cuja quantidade caiu abaixo de um
+  // desconto em R$.
+  private async assertDiscountsWithinLine(
+    tx: Prisma.TransactionClient,
+    items: (ItemPricingInput & { productId: string })[],
+  ) {
+    const exceeding = items.find((item) => priceItem(item).subtotalCents < 0);
+    if (exceeding) {
+      await this.rejectItem(
+        tx,
+        exceeding.productId,
+        (product) =>
+          `Desconto inválido para o ${productLabel(product)}: o desconto não pode ser maior que o valor da linha`,
       );
     }
   }
@@ -245,27 +305,25 @@ export class NegotiationsService {
       productId: item.productId,
       quantity: item.quantity,
       unitPrice: productById.get(item.productId)!.price,
+      ...discountOf(item),
     }));
   }
 
-  // RI7: soma dos subtotais dos itens não excluídos (sem desconto ainda —
-  // ticket 08). Soma em centavos (inteiro) para não acumular erro de ponto
-  // flutuante entre itens, e só volta a reais no fim.
-  private sumSubtotals(
-    items: { quantity: number; unitPrice: Prisma.Decimal }[],
-  ) {
-    const cents = items.reduce(
-      (total, item) =>
-        total + Math.round(Number(item.unitPrice) * 100) * item.quantity,
-      0,
+  // RI7: soma dos subtotais dos itens não excluídos, já com desconto. Soma em
+  // centavos (inteiro) para não acumular erro de ponto flutuante entre itens,
+  // e só volta a reais no fim.
+  private sumSubtotals(items: ItemPricingInput[]) {
+    return fromCents(
+      items.reduce((total, item) => total + priceItem(item).subtotalCents, 0),
     );
-    return cents / 100;
   }
 
   // RI3/RI4/RI9/RI10: compara a lista recebida com os itens não excluídos já
-  // gravados, por Produto. Novo copia o preço na hora; mesma quantidade não é
-  // regravado (preço preservado); quantidade alterada só atualiza a
-  // quantidade; o que saiu da lista é excluído logicamente. Devolve o novo
+  // gravados, por Produto. Novo copia o preço na hora; mesma quantidade e
+  // mesmo desconto não é regravado (preço preservado); quantidade ou desconto
+  // alterado atualiza só esses campos — a forma e o número são regravados como
+  // informados, então um % continua % e um R$ continua R$ (ADR 0015); o que
+  // saiu da lista é excluído logicamente. Devolve o novo
   // totalValue quando há algo a recalcular, ou undefined quando a Negociação
   // nunca teve itens e continua sem eles (RI8: o valor informado fica como
   // está).
@@ -283,6 +341,8 @@ export class NegotiationsService {
         productId: true,
         quantity: true,
         unitPrice: true,
+        discountType: true,
+        discountValue: true,
         product: { select: { name: true, sku: true, deletedAt: true } },
       },
     });
@@ -300,7 +360,14 @@ export class NegotiationsService {
         item,
         existing: currentByProduct.get(item.productId)!,
       }))
-      .filter(({ item, existing }) => existing.quantity !== item.quantity);
+      .filter(({ item, existing }) => {
+        const discount = discountOf(item);
+        return (
+          existing.quantity !== item.quantity ||
+          existing.discountType !== discount.discountType ||
+          Number(existing.discountValue) !== discount.discountValue
+        );
+      });
 
     // RI2: item de Produto excluído do catálogo só pode ser mantido como está
     // ou removido. Confere antes de qualquer escrita, para recusar sem gravar
@@ -312,10 +379,21 @@ export class NegotiationsService {
       );
     }
 
+    const finalItems = [
+      ...kept.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: currentByProduct.get(item.productId)!.unitPrice,
+        ...discountOf(item),
+      })),
+      ...created,
+    ];
+    await this.assertDiscountsWithinLine(tx, finalItems);
+
     for (const { item, existing } of changed) {
       await tx.negotiationItem.update({
         where: { id: existing.id },
-        data: { quantity: item.quantity },
+        data: { quantity: item.quantity, ...discountOf(item) },
       });
     }
 
@@ -336,16 +414,8 @@ export class NegotiationsService {
     }
 
     const hadItemsBefore = current.length > 0;
-    const finalCount = kept.length + created.length;
-    if (finalCount === 0 && !hadItemsBefore) return undefined;
+    if (finalItems.length === 0 && !hadItemsBefore) return undefined;
 
-    const finalItems = [
-      ...kept.map((item) => ({
-        quantity: item.quantity,
-        unitPrice: currentByProduct.get(item.productId)!.unitPrice,
-      })),
-      ...created,
-    ];
     return this.sumSubtotals(finalItems);
   }
 
@@ -394,6 +464,7 @@ export class NegotiationsService {
     const negotiation = await this.prisma.$transaction(async (tx) => {
       await this.assertValidItems(tx, dto.items);
       const itemsData = await this.buildItemsData(tx, dto.items);
+      await this.assertDiscountsWithinLine(tx, itemsData);
       const totalValue = this.sumSubtotals(itemsData);
 
       return tx.negotiation.create({

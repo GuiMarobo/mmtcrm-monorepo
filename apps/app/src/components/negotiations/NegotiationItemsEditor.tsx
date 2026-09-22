@@ -5,12 +5,20 @@ import Box from '@mui/material/Box'
 import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
 import TextField from '@mui/material/TextField'
+import ToggleButton from '@mui/material/ToggleButton'
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import Typography from '@mui/material/Typography'
-import { calculateItemSubtotal, sumItemsAtPracticedPrice } from './negotiationItemsSummary'
+import {
+  calculateItemSubtotal,
+  itemDiscountError,
+  sumItemsAtPracticedPrice,
+} from './negotiationItemsSummary'
 import { ToneChip } from '../common/ToneChip'
 import { formatCurrency } from '../../utils/format'
+import { DISCOUNT_TYPE_OPTIONS } from '../../types'
 import type {
   CreateNegotiationItemPayload,
+  DiscountType,
   NegotiationItemProduct,
   Product,
 } from '../../types'
@@ -66,17 +74,23 @@ export function NegotiationItemsEditor({
   const total = sumItemsAtPracticedPrice(items, products)
 
   const addItem = (product: Product) => {
-    onChange([...items, { productId: product.id, quantity: 1 }])
+    onChange([
+      ...items,
+      { productId: product.id, quantity: 1, discountType: 'VALOR', discountValue: 0 },
+    ])
   }
 
   const removeItem = (productId: string) => {
     onChange(items.filter((item) => item.productId !== productId))
   }
 
-  const setQuantity = (productId: string, quantity: number) => {
+  const updateItem = (
+    productId: string,
+    changes: Partial<Pick<NegotiationItemFormValue, 'quantity' | 'discountType' | 'discountValue'>>,
+  ) => {
     onChange(
       items.map((item) =>
-        item.productId === productId ? { ...item, quantity } : item,
+        item.productId === productId ? { ...item, ...changes } : item,
       ),
     )
   }
@@ -126,10 +140,9 @@ export function NegotiationItemsEditor({
           }}
         >
           {rows.map(({ item, name, sku, unitPrice, stock, deleted }, index) => {
-            const subtotal = calculateItemSubtotal({
-              quantity: item.quantity,
-              unitPrice,
-            })
+            const pricedItem = { ...item, unitPrice }
+            const subtotal = calculateItemSubtotal(pricedItem)
+            const discountError = itemDiscountError(pricedItem)
             const overStock = stock !== null && item.quantity > stock
 
             return (
@@ -139,6 +152,7 @@ export function NegotiationItemsEditor({
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
+                    flexWrap: 'wrap',
                     gap: 1.25,
                     px: 1.5,
                     py: 1,
@@ -185,11 +199,59 @@ export function NegotiationItemsEditor({
                     onChange={(e) => {
                       const quantity = Number(e.target.value)
                       if (Number.isInteger(quantity) && quantity >= 1) {
-                        setQuantity(item.productId, quantity)
+                        updateItem(item.productId, { quantity })
                       }
                     }}
                     slotProps={{ htmlInput: { min: 1, step: 1 } }}
                     sx={{ width: 84 }}
+                  />
+
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={item.discountType ?? 'VALOR'}
+                    disabled={deleted}
+                    onChange={(_, discountType: DiscountType | null) => {
+                      if (discountType) updateItem(item.productId, { discountType })
+                    }}
+                    aria-label={`Forma do desconto de ${name}`}
+                  >
+                    {DISCOUNT_TYPE_OPTIONS.map((option) => (
+                      <ToggleButton
+                        key={option.value}
+                        value={option.value}
+                        sx={{ px: 1, py: 0.5, fontSize: 12.5 }}
+                      >
+                        {option.label}
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+
+                  <TextField
+                    label="Desconto"
+                    type="number"
+                    size="small"
+                    value={item.discountValue ?? 0}
+                    disabled={deleted}
+                    error={!!discountError}
+                    helperText={discountError ?? undefined}
+                    onChange={(e) => {
+                      const discountValue = Number(e.target.value)
+                      if (
+                        Number.isFinite(discountValue) &&
+                        Math.round(discountValue * 100) === discountValue * 100
+                      ) {
+                        updateItem(item.productId, { discountValue })
+                      }
+                    }}
+                    slotProps={{
+                      htmlInput: {
+                        min: 0,
+                        max: item.discountType === 'PERCENTUAL' ? 100 : undefined,
+                        step: 0.01,
+                      },
+                    }}
+                    sx={{ width: 104 }}
                   />
 
                   <Typography
