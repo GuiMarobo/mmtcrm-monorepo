@@ -4,6 +4,7 @@ import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
 import { NegotiationBoard } from '../components/negotiations/NegotiationBoard'
@@ -40,6 +41,7 @@ interface PendingTransition {
 }
 
 export function Negociacoes({ toast }: NegociacoesProps) {
+  const { user } = useAuth()
   const [list, setList] = useState<Negotiation[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -251,6 +253,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
       {(creating || editing) && (
         <NegotiationFormModal
           negotiation={editing}
+          isAdmin={user?.role === 'ADMIN'}
           clients={clients}
           products={products}
           onClose={() => {

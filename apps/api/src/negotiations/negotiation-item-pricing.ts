@@ -37,3 +37,15 @@ export function priceItem(item: ItemPricingInput): ItemPricing {
     subtotalCents: lineCents - discountCents,
   };
 }
+
+// RI6 (spec 010, "Alçada de desconto" no glossário): teto do VENDEDOR sobre o percentual efetivo
+// do item. Constante de propósito — alçada configurável está fora de escopo.
+export const SELLER_DISCOUNT_LIMIT_PERCENT = 15;
+
+// Percentual efetivo = desconto em R$ ÷ linha, qualquer que seja a forma. A
+// comparação é feita em inteiros (centavos × 100) para não depender de
+// arredondamento: exatamente 15% passa.
+export function exceedsSellerDiscountLimit(item: ItemPricingInput): boolean {
+  const { lineCents, discountCents } = priceItem(item);
+  return discountCents * 100 > lineCents * SELLER_DISCOUNT_LIMIT_PERCENT;
+}

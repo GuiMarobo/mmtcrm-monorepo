@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography'
 import {
   calculateItemSubtotal,
   itemDiscountError,
+  sellerDiscountLimitError,
   sumItemsAtPracticedPrice,
 } from './negotiationItemsSummary'
 import { ToneChip } from '../common/ToneChip'
@@ -41,15 +42,20 @@ interface NegotiationItemsEditorProps {
   products: Product[]
   items: NegotiationItemFormValue[]
   onChange: (items: NegotiationItemFormValue[]) => void
+  savedItems?: NegotiationItemFormValue[]
+  limitDiscount?: boolean
 }
 
 export function NegotiationItemsEditor({
   products,
   items,
   onChange,
+  savedItems = [],
+  limitDiscount = false,
 }: NegotiationItemsEditorProps) {
   const [search, setSearch] = useState('')
   const productById = new Map(products.map((p) => [p.id, p]))
+  const savedById = new Map(savedItems.map((item) => [item.productId, item]))
   const availableProducts = products.filter(
     (p) => p.status === 'ATIVO' && !items.some((item) => item.productId === p.id),
   )
@@ -142,7 +148,11 @@ export function NegotiationItemsEditor({
           {rows.map(({ item, name, sku, unitPrice, stock, deleted }, index) => {
             const pricedItem = { ...item, unitPrice }
             const subtotal = calculateItemSubtotal(pricedItem)
-            const discountError = itemDiscountError(pricedItem)
+            const discountError =
+              itemDiscountError(pricedItem) ??
+              (limitDiscount
+                ? sellerDiscountLimitError(pricedItem, savedById.get(item.productId))
+                : null)
             const overStock = stock !== null && item.quantity > stock
 
             return (

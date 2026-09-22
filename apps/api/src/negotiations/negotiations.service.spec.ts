@@ -256,7 +256,7 @@ describe('NegotiationsService', () => {
       });
       prisma.negotiation.create.mockResolvedValue(negotiationRow());
 
-      await service.create({ clientId: 'c1', items: [] }, 2);
+      await service.create({ clientId: 'c1', items: [] }, 2, RoleEnum.VENDEDOR);
 
       expect(prisma.client.findFirst).toHaveBeenCalledTimes(1);
     });
@@ -273,7 +273,7 @@ describe('NegotiationsService', () => {
     });
 
     it('cria sem itens com total R$ 0,00 e não consulta o catálogo (RI8)', async () => {
-      await service.create({ clientId: 'c1', items: [] }, 2);
+      await service.create({ clientId: 'c1', items: [] }, 2, RoleEnum.VENDEDOR);
 
       const arg = callArg<{ data: { totalValue: number } }>(
         prisma.negotiation.create,
@@ -289,6 +289,7 @@ describe('NegotiationsService', () => {
       await service.create(
         { clientId: 'c1', items: [{ productId: 'p1', quantity: 2 }] },
         2,
+        RoleEnum.VENDEDOR,
       );
 
       const arg = callArg<{
@@ -330,6 +331,7 @@ describe('NegotiationsService', () => {
           ],
         },
         2,
+        RoleEnum.VENDEDOR,
       );
 
       const arg = callArg<{ data: { totalValue: number } }>(
@@ -345,6 +347,7 @@ describe('NegotiationsService', () => {
         service.create(
           { clientId: 'c1', items: [{ productId: 'fantasma', quantity: 1 }] },
           2,
+          RoleEnum.VENDEDOR,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.negotiation.create).not.toHaveBeenCalled();
@@ -361,6 +364,7 @@ describe('NegotiationsService', () => {
             ],
           },
           2,
+          RoleEnum.VENDEDOR,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.product.findMany).not.toHaveBeenCalled();
@@ -511,7 +515,7 @@ describe('NegotiationsService', () => {
       );
 
       await expect(
-        service.replace(3, { clientId: 'c1', items: [] }),
+        service.replace(3, { clientId: 'c1', items: [] }, RoleEnum.VENDEDOR),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.negotiation.update).not.toHaveBeenCalled();
     });
@@ -523,10 +527,14 @@ describe('NegotiationsService', () => {
       prisma.product.findMany.mockResolvedValue([{ id: 'p1', price }]);
       prisma.negotiationItem.createMany.mockResolvedValue({ count: 1 });
 
-      await service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', quantity: 2 }],
-      });
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 2 }],
+        },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.createMany).toHaveBeenCalledWith({
         data: [
@@ -559,10 +567,14 @@ describe('NegotiationsService', () => {
         },
       ]);
 
-      await service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', quantity: 2 }],
-      });
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 2 }],
+        },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
       expect(prisma.negotiationItem.updateMany).not.toHaveBeenCalled();
@@ -587,10 +599,14 @@ describe('NegotiationsService', () => {
         },
       ]);
 
-      await service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', quantity: 5 }],
-      });
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 5 }],
+        },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
         where: { id: 10 },
@@ -623,10 +639,14 @@ describe('NegotiationsService', () => {
         },
       ]);
 
-      await service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', quantity: 2 }],
-      });
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 2 }],
+        },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.updateMany).toHaveBeenCalledWith({
         where: { id: { in: [11] } },
@@ -651,7 +671,11 @@ describe('NegotiationsService', () => {
         },
       ]);
 
-      await service.replace(3, { clientId: 'c1', items: [] });
+      await service.replace(
+        3,
+        { clientId: 'c1', items: [] },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.updateMany).toHaveBeenCalledWith({
         where: { id: { in: [10] } },
@@ -669,7 +693,11 @@ describe('NegotiationsService', () => {
       );
       prisma.negotiationItem.findMany.mockResolvedValue([]);
 
-      await service.replace(3, { clientId: 'c1', items: [] });
+      await service.replace(
+        3,
+        { clientId: 'c1', items: [] },
+        RoleEnum.VENDEDOR,
+      );
 
       const arg = callArg<{ data: Record<string, unknown> }>(
         prisma.negotiation.update,
@@ -681,13 +709,17 @@ describe('NegotiationsService', () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
       await expect(
-        service.replace(3, {
-          clientId: 'c1',
-          items: [
-            { productId: 'p1', quantity: 1 },
-            { productId: 'p1', quantity: 2 },
-          ],
-        }),
+        service.replace(
+          3,
+          {
+            clientId: 'c1',
+            items: [
+              { productId: 'p1', quantity: 1 },
+              { productId: 'p1', quantity: 2 },
+            ],
+          },
+          RoleEnum.VENDEDOR,
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.negotiation.update).not.toHaveBeenCalled();
     });
@@ -723,9 +755,9 @@ describe('NegotiationsService', () => {
 
     const write = {
       create: (items: { productId: string; quantity: number }[]) =>
-        service.create({ clientId: 'c1', items }, 2),
+        service.create({ clientId: 'c1', items }, 2, RoleEnum.VENDEDOR),
       replace: (items: { productId: string; quantity: number }[]) =>
-        service.replace(3, { clientId: 'c1', items }),
+        service.replace(3, { clientId: 'c1', items }, RoleEnum.VENDEDOR),
     };
 
     describe.each(['create', 'replace'] as const)('%s', (operation) => {
@@ -819,10 +851,14 @@ describe('NegotiationsService', () => {
       prisma.product.findFirst.mockResolvedValue(catalogProduct());
 
       await expect(
-        service.replace(3, {
-          clientId: 'c1',
-          items: [{ productId: 'p1', quantity: 0 }],
-        }),
+        service.replace(
+          3,
+          {
+            clientId: 'c1',
+            items: [{ productId: 'p1', quantity: 0 }],
+          },
+          RoleEnum.VENDEDOR,
+        ),
       ).rejects.toThrow(/Quantidade inválida para o Produto iPhone 15 Pro/);
       expectNothingWritten();
     });
@@ -854,10 +890,14 @@ describe('NegotiationsService', () => {
         savedItem({ status: 'INATIVO' }),
       ]);
 
-      await service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', quantity: 4 }],
-      });
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 4 }],
+        },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
         where: { id: 10 },
@@ -876,10 +916,14 @@ describe('NegotiationsService', () => {
         { ...savedItem({}), id: 11, productId: 'p2' },
       ]);
 
-      const attempt = service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', quantity: 3 }],
-      });
+      const attempt = service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 3 }],
+        },
+        RoleEnum.VENDEDOR,
+      );
 
       await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
       await expect(attempt).rejects.toThrow(
@@ -896,10 +940,14 @@ describe('NegotiationsService', () => {
         savedItem({ deletedAt }),
       ]);
 
-      await service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', quantity: 2 }],
-      });
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 2 }],
+        },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
       const arg = callArg<{ data: { totalValue: number } }>(
@@ -913,7 +961,11 @@ describe('NegotiationsService', () => {
         savedItem({ deletedAt }),
       ]);
 
-      await service.replace(3, { clientId: 'c1', items: [] });
+      await service.replace(
+        3,
+        { clientId: 'c1', items: [] },
+        RoleEnum.VENDEDOR,
+      );
 
       expect(prisma.negotiationItem.updateMany).toHaveBeenCalledWith({
         where: { id: { in: [10] } },
@@ -949,12 +1001,17 @@ describe('NegotiationsService', () => {
       service.create(
         { clientId: 'c1', items: [{ productId: 'p1', ...item }] },
         2,
+        RoleEnum.ADMIN,
       );
     const replaceWith = (item: Omit<CreateNegotiationItemDto, 'productId'>) =>
-      service.replace(3, {
-        clientId: 'c1',
-        items: [{ productId: 'p1', ...item }],
-      });
+      service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ productId: 'p1', ...item }],
+        },
+        RoleEnum.ADMIN,
+      );
     const createdTotal = () =>
       callArg<{ data: { totalValue: number } }>(prisma.negotiation.create).data
         .totalValue;
@@ -1231,6 +1288,250 @@ describe('NegotiationsService', () => {
         discountValue: 10,
         discountAmount: 10.01,
         subtotal: 90.04,
+      });
+    });
+  });
+  describe('alçada de desconto (RI6, ticket 09)', () => {
+    const { PERCENTUAL, VALOR } = DiscountTypeEnum;
+    const OVER_LIMIT =
+      'Desconto acima de 15% exige administrador: o desconto do Produto iPhone 15 Pro (IP15P-256) passa de 15% da linha';
+    // Item com 20% dado antes por um ADMIN.
+    const adminDiscountedItem = {
+      id: 10,
+      productId: 'p1',
+      quantity: 2,
+      unitPrice: { toString: () => '100.00' },
+      discountType: PERCENTUAL,
+      discountValue: { toString: () => '20.00' },
+      product: { name: 'iPhone 15 Pro', sku: 'IP15P-256', deletedAt: null },
+    };
+    const keptAsIs: CreateNegotiationItemDto = {
+      productId: 'p1',
+      quantity: 2,
+      discountType: PERCENTUAL,
+      discountValue: 20,
+    };
+    const expectNothingWritten = () => {
+      expect(prisma.negotiation.create).not.toHaveBeenCalled();
+      expect(prisma.negotiation.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.createMany).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.updateMany).not.toHaveBeenCalled();
+    };
+
+    beforeEach(() => {
+      prisma.client.findFirst.mockResolvedValue({
+        id: 'c1',
+        status: 'LEAD',
+        anonymizedAt: null,
+      });
+      prisma.negotiation.create.mockResolvedValue(negotiationRow());
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiation.update.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
+      prisma.product.findMany.mockResolvedValue([
+        { id: 'p1', price: { toString: () => '100.00' } },
+        { id: 'p2', price: { toString: () => '50.00' } },
+      ]);
+      prisma.product.findFirst.mockResolvedValue({
+        name: 'iPhone 15 Pro',
+        sku: 'IP15P-256',
+        deletedAt: null,
+      });
+    });
+
+    it('VENDEDOR incluindo item a 20% é recusado (403), sem gravar nada', async () => {
+      const attempt = service.create(
+        {
+          clientId: 'c1',
+          items: [
+            {
+              productId: 'p1',
+              quantity: 2,
+              discountType: PERCENTUAL,
+              discountValue: 20,
+            },
+          ],
+        },
+        2,
+        RoleEnum.VENDEDOR,
+      );
+
+      await expect(attempt).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(attempt).rejects.toThrow(OVER_LIMIT);
+      expectNothingWritten();
+    });
+
+    it('VENDEDOR incluindo item a exatamente 15% passa', async () => {
+      await service.create(
+        {
+          clientId: 'c1',
+          items: [
+            {
+              productId: 'p1',
+              quantity: 2,
+              discountType: PERCENTUAL,
+              discountValue: 15,
+            },
+          ],
+        },
+        2,
+        RoleEnum.VENDEDOR,
+      );
+
+      expect(prisma.negotiation.create).toHaveBeenCalled();
+    });
+
+    it('a alçada olha o percentual efetivo: desconto em R$ acima de 15% da linha é recusado', async () => {
+      const attempt = service.create(
+        {
+          clientId: 'c1',
+          items: [
+            {
+              productId: 'p1',
+              quantity: 2,
+              discountType: VALOR,
+              discountValue: 30.01,
+            },
+          ],
+        },
+        2,
+        RoleEnum.VENDEDOR,
+      );
+
+      await expect(attempt).rejects.toBeInstanceOf(ForbiddenException);
+      expectNothingWritten();
+    });
+
+    it('VENDEDOR adicionando na edição um item novo a 20% é recusado', async () => {
+      const attempt = service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [
+            {
+              productId: 'p1',
+              quantity: 2,
+              discountType: PERCENTUAL,
+              discountValue: 20,
+            },
+          ],
+        },
+        RoleEnum.VENDEDOR,
+      );
+
+      await expect(attempt).rejects.toBeInstanceOf(ForbiddenException);
+      expectNothingWritten();
+    });
+
+    it('VENDEDOR alterando a quantidade de item a 20% (dado por ADMIN) é recusado', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([adminDiscountedItem]);
+
+      const attempt = service.replace(
+        3,
+        { clientId: 'c1', items: [{ ...keptAsIs, quantity: 3 }] },
+        RoleEnum.VENDEDOR,
+      );
+
+      await expect(attempt).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(attempt).rejects.toThrow(OVER_LIMIT);
+      expectNothingWritten();
+    });
+
+    it('VENDEDOR trazendo o desconto do item para 15% passa', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([adminDiscountedItem]);
+
+      await service.replace(
+        3,
+        { clientId: 'c1', items: [{ ...keptAsIs, discountValue: 15 }] },
+        RoleEnum.VENDEDOR,
+      );
+
+      expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { quantity: 2, discountType: 'PERCENTUAL', discountValue: 15 },
+      });
+    });
+
+    it('VENDEDOR salvando sem mexer nesse item passa, mesmo adicionando outro item', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([adminDiscountedItem]);
+
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          notes: 'cliente pediu entrega rápida',
+          items: [
+            keptAsIs,
+            {
+              productId: 'p2',
+              quantity: 1,
+              discountType: PERCENTUAL,
+              discountValue: 5,
+            },
+          ],
+        },
+        RoleEnum.VENDEDOR,
+      );
+
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.createMany).toHaveBeenCalled();
+      expect(
+        callArg<{ data: { totalValue: number } }>(prisma.negotiation.update)
+          .data.totalValue,
+      ).toBe(207.5);
+    });
+
+    it('VENDEDOR removendo esse item passa', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([adminDiscountedItem]);
+
+      await service.replace(
+        3,
+        { clientId: 'c1', items: [] },
+        RoleEnum.VENDEDOR,
+      );
+
+      expect(prisma.negotiationItem.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [10] } },
+        data: { deletedAt: expect.any(Date) as Date },
+      });
+    });
+
+    it('ADMIN inclui item a qualquer percentual', async () => {
+      await service.create(
+        {
+          clientId: 'c1',
+          items: [
+            {
+              productId: 'p1',
+              quantity: 2,
+              discountType: PERCENTUAL,
+              discountValue: 80,
+            },
+          ],
+        },
+        1,
+        RoleEnum.ADMIN,
+      );
+
+      expect(prisma.negotiation.create).toHaveBeenCalled();
+    });
+
+    it('ADMIN altera item a qualquer percentual', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([adminDiscountedItem]);
+
+      await service.replace(
+        3,
+        {
+          clientId: 'c1',
+          items: [{ ...keptAsIs, quantity: 3, discountValue: 60 }],
+        },
+        RoleEnum.ADMIN,
+      );
+
+      expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { quantity: 3, discountType: 'PERCENTUAL', discountValue: 60 },
       });
     });
   });

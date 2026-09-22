@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ApiError } from '../../api'
 import { NegotiationFormModal } from './NegotiationFormModal'
 import type { Client, NegotiationDetail, Product } from '../../types'
 
@@ -74,6 +75,7 @@ describe('NegotiationFormModal — editar itens de Negociação Aberta (ticket 0
   it('carrega os itens existentes do detalhe, com o preço praticado congelado', () => {
     render(
       <NegotiationFormModal
+        isAdmin={false}
         negotiation={negotiationDetail()}
         clients={[client()]}
         products={[product({ price: 500 })]}
@@ -94,6 +96,7 @@ describe('NegotiationFormModal — editar itens de Negociação Aberta (ticket 0
 
     render(
       <NegotiationFormModal
+        isAdmin={false}
         negotiation={negotiationDetail()}
         clients={[client()]}
         products={[product()]}
@@ -118,6 +121,7 @@ describe('NegotiationFormModal — editar itens de Negociação Aberta (ticket 0
 
     render(
       <NegotiationFormModal
+        isAdmin={false}
         negotiation={negotiationDetail()}
         clients={[client()]}
         products={[product()]}
@@ -152,6 +156,7 @@ const renderModal = (
 ) =>
   render(
     <NegotiationFormModal
+      isAdmin={false}
       negotiation={negotiation}
       clients={[client()]}
       products={[product()]}
@@ -233,6 +238,7 @@ describe('NegotiationFormModal — validações do item (ticket 06)', () => {
 
     render(
       <NegotiationFormModal
+        isAdmin={false}
         negotiation={negotiationDetail()}
         clients={[client()]}
         products={[product({ stock: 1 })]}
@@ -260,6 +266,7 @@ describe('NegotiationFormModal — desconto do item (ticket 08)', () => {
 
     render(
       <NegotiationFormModal
+        isAdmin={false}
         negotiation={negotiationDetail({
           totalValue: 180,
           items: [
@@ -328,6 +335,7 @@ describe('NegotiationFormModal — item de Produto descontinuado ou excluído (R
   ) =>
     render(
       <NegotiationFormModal
+        isAdmin={false}
         negotiation={negotiation}
         clients={[client()]}
         products={products}
@@ -394,5 +402,106 @@ describe('NegotiationFormModal — item de Produto descontinuado ou excluído (R
       items: [{ productId: 'p1', quantity: 3, discountType: 'VALOR', discountValue: 0 }],
       notes: null,
     })
+  })
+})
+
+describe('NegotiationFormModal — alçada de desconto (RI6, ticket 09)', () => {
+  const itemAt = (discountValue: number) => ({
+    id: 10,
+    product: { id: 'p1', name: 'iPhone 15 Pro', sku: 'IP15P-256', status: 'ATIVO' as const, deleted: false },
+    quantity: 2,
+    unitPrice: 100,
+    discountType: 'PERCENTUAL' as const,
+    discountValue,
+    discountAmount: 2 * discountValue,
+    subtotal: 200 - 2 * discountValue,
+  })
+
+  const renderModal = ({
+    isAdmin,
+    discountValue,
+    onUpdate = vi.fn().mockResolvedValue(undefined),
+  }: {
+    isAdmin: boolean
+    discountValue: number
+    onUpdate?: ReturnType<typeof vi.fn>
+  }) => {
+    render(
+      <NegotiationFormModal
+        isAdmin={isAdmin}
+        negotiation={negotiationDetail({ items: [itemAt(discountValue)] })}
+        clients={[client()]}
+        products={[product()]}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={onUpdate}
+      />,
+    )
+    return onUpdate
+  }
+
+  const typeDiscount = async (user: ReturnType<typeof userEvent.setup>, value: string) => {
+    await user.tripleClick(screen.getByLabelText('Desconto'))
+    await user.keyboard(value)
+  }
+
+  it('VENDEDOR: a linha alterada acima de 15% mostra o erro e não é enviada', async () => {
+    const user = userEvent.setup()
+    const onUpdate = renderModal({ isAdmin: false, discountValue: 10 })
+
+    await typeDiscount(user, '20')
+
+    expect(screen.getByText('Acima de 15% exige administrador')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Desconto acima de 15% exige administrador',
+    )
+  })
+
+  it('VENDEDOR: item acima de 15% dado pelo ADMIN e não alterado não é apontado e salva', async () => {
+    const user = userEvent.setup()
+    const onUpdate = renderModal({ isAdmin: false, discountValue: 20 })
+
+    expect(screen.queryByText('Acima de 15% exige administrador')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalled()
+  })
+
+  it('VENDEDOR: removendo o item acima de 15% salva normalmente', async () => {
+    const user = userEvent.setup()
+    const onUpdate = renderModal({ isAdmin: false, discountValue: 20 })
+
+    await user.click(screen.getByRole('button', { name: 'Remover iPhone 15 Pro' }))
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({ clientId: 'c1', items: [], notes: null })
+  })
+
+  it('ADMIN: qualquer percentual é aceito', async () => {
+    const user = userEvent.setup()
+    const onUpdate = renderModal({ isAdmin: true, discountValue: 10 })
+
+    await typeDiscount(user, '60')
+
+    expect(screen.queryByText('Acima de 15% exige administrador')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(onUpdate).toHaveBeenCalled()
+  })
+
+  it('a recusa 403 do backend vira mensagem', async () => {
+    const user = userEvent.setup()
+    const message =
+      'Desconto acima de 15% exige administrador: o desconto do Produto iPhone 15 Pro (IP15P-256) passa de 15% da linha'
+    renderModal({
+      isAdmin: false,
+      discountValue: 10,
+      onUpdate: vi.fn().mockRejectedValue(new ApiError(403, message)),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
   })
 })

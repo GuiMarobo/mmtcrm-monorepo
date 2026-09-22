@@ -338,4 +338,48 @@ describe('NegotiationItemsEditor', () => {
       expect(screen.getByRole('button', { name: '%' })).toBeDisabled()
     })
   })
+
+  describe('alçada de desconto (RI6, ticket 09)', () => {
+    const item = (discountValue: number): NegotiationItemFormValue => ({
+      productId: 'p1',
+      quantity: 2,
+      discountType: 'PERCENTUAL',
+      discountValue,
+    })
+
+    it('com a alçada ligada, aponta item novo acima de 15%', () => {
+      render(
+        <NegotiationItemsEditor
+          products={[product()]}
+          items={[item(20)]}
+          onChange={vi.fn()}
+          limitDiscount
+        />,
+      )
+
+      expect(screen.getByText('Acima de 15% exige administrador')).toBeInTheDocument()
+    })
+
+    it('com a alçada ligada, não aponta item gravado que não foi alterado', () => {
+      render(
+        <NegotiationItemsEditor
+          products={[product()]}
+          items={[item(20)]}
+          savedItems={[item(20)]}
+          onChange={vi.fn()}
+          limitDiscount
+        />,
+      )
+
+      expect(screen.queryByText('Acima de 15% exige administrador')).not.toBeInTheDocument()
+    })
+
+    it('sem a alçada (ADMIN), não aponta nada', () => {
+      render(
+        <NegotiationItemsEditor products={[product()]} items={[item(60)]} onChange={vi.fn()} />,
+      )
+
+      expect(screen.queryByText('Acima de 15% exige administrador')).not.toBeInTheDocument()
+    })
+  })
 })

@@ -50,6 +50,46 @@ export function itemDiscountError(item: PricedItem): string | null {
   return calculateItemCents(item).subtotalCents < 0 ? 'Maior que a linha' : null
 }
 
+export const SELLER_DISCOUNT_LIMIT_PERCENT = 15
+
+type SavedDiscount = Pick<PricedItem, 'quantity' | 'discountType' | 'discountValue'>
+
+function isChanged(item: PricedItem, saved: SavedDiscount | undefined) {
+  return (
+    !saved ||
+    saved.quantity !== item.quantity ||
+    (saved.discountType ?? 'VALOR') !== (item.discountType ?? 'VALOR') ||
+    (saved.discountValue ?? 0) !== (item.discountValue ?? 0)
+  )
+}
+
+export function sellerDiscountLimitError(
+  item: PricedItem,
+  saved: SavedDiscount | undefined,
+): string | null {
+  if (!isChanged(item, saved)) return null
+  const { lineCents, discountCents } = calculateItemCents(item)
+  return discountCents * 100 > lineCents * SELLER_DISCOUNT_LIMIT_PERCENT
+    ? `Acima de ${SELLER_DISCOUNT_LIMIT_PERCENT}% exige administrador`
+    : null
+}
+
+export function findItemOverSellerLimit<T extends Omit<NegotiationItemDraft, 'unitPrice'> & { unitPrice?: number }>(
+  items: T[],
+  savedItems: (SavedDiscount & { productId: string })[],
+  products: { id: string; price: number }[],
+): T | undefined {
+  const savedById = new Map(savedItems.map((item) => [item.productId, item]))
+  const priceById = new Map(products.map((p) => [p.id, p.price]))
+  return items.find((item) => {
+    const unitPrice = item.unitPrice ?? priceById.get(item.productId)
+    return (
+      unitPrice !== undefined &&
+      sellerDiscountLimitError({ ...item, unitPrice }, savedById.get(item.productId)) !== null
+    )
+  })
+}
+
 export function sumNegotiationItems(items: PricedItem[]): number {
   const cents = items.reduce(
     (total, item) => total + calculateItemCents(item).subtotalCents,

@@ -16,7 +16,12 @@ import {
 import { CreateNegotiationItemDto } from './dto/create-negotiation-item.dto';
 import { UpdateNegotiationDto } from './dto/update-negotiation.dto';
 import { ReplaceNegotiationDto } from './dto/replace-negotiation.dto';
-import { ItemPricingInput, priceItem } from './negotiation-item-pricing';
+import {
+  exceedsSellerDiscountLimit,
+  ItemPricingInput,
+  priceItem,
+  SELLER_DISCOUNT_LIMIT_PERCENT,
+} from './negotiation-item-pricing';
 
 const negotiationSelect = {
   id: true,
@@ -111,6 +116,8 @@ const discountRangeError = (item: CreateNegotiationItemDto) => {
 
 const fromCents = (cents: number) => cents / 100;
 
+type PricedItem = ItemPricingInput & { productId: string };
+
 // A maquina de estados da spec 001 tem exatamente estas quatro arestas.
 // Converter em pedido e o que torna a negociacao GANHA; nao existe "concluir".
 const ALLOWED_TRANSITIONS: Record<NegotiationStatus, NegotiationStatus[]> = {
@@ -199,9 +206,10 @@ export class NegotiationsService {
     tx: Prisma.TransactionClient,
     productId: string,
     reason: (product: ItemProduct) => string,
+    Exception: new (message: string) => Error = BadRequestException,
   ): Promise<never> {
     const product = await this.findItemProduct(tx, productId);
-    throw new BadRequestException(
+    throw new Exception(
       product
         ? reason(product)
         : `O Produto ${productId} não existe no catálogo`,
@@ -257,7 +265,7 @@ export class NegotiationsService {
   // desconto em R$.
   private async assertDiscountsWithinLine(
     tx: Prisma.TransactionClient,
-    items: (ItemPricingInput & { productId: string })[],
+    items: PricedItem[],
   ) {
     const exceeding = items.find((item) => priceItem(item).subtotalCents < 0);
     if (exceeding) {
@@ -266,6 +274,28 @@ export class NegotiationsService {
         exceeding.productId,
         (product) =>
           `Desconto inválido para o ${productLabel(product)}: o desconto não pode ser maior que o valor da linha`,
+      );
+    }
+  }
+
+  // RI6: o VENDEDOR não passa de 15% de percentual efetivo nos itens que ele
+  // incluiu ou alterou nesta gravação — quem chama passa só esses. Os demais
+  // (ex.: 20% dado antes por um ADMIN) não são conferidos, e remover nunca é
+  // barrado porque item removido não chega aqui. ADMIN não tem limite.
+  private async assertWithinDiscountLimit(
+    tx: Prisma.TransactionClient,
+    touched: PricedItem[],
+    actorRole: RoleEnum,
+  ) {
+    if (actorRole === RoleEnum.ADMIN) return;
+    const exceeding = touched.find(exceedsSellerDiscountLimit);
+    if (exceeding) {
+      await this.rejectItem(
+        tx,
+        exceeding.productId,
+        (product) =>
+          `Desconto acima de ${SELLER_DISCOUNT_LIMIT_PERCENT}% exige administrador: o desconto do ${productLabel(product)} passa de ${SELLER_DISCOUNT_LIMIT_PERCENT}% da linha`,
+        ForbiddenException,
       );
     }
   }
@@ -331,6 +361,7 @@ export class NegotiationsService {
     tx: Prisma.TransactionClient,
     negotiationId: number,
     items: CreateNegotiationItemDto[],
+    actorRole: RoleEnum,
   ): Promise<number | undefined> {
     await this.assertValidItems(tx, items);
 
@@ -379,16 +410,24 @@ export class NegotiationsService {
       );
     }
 
+    const priceKept = ({ item, existing }: (typeof changed)[number]) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: existing.unitPrice,
+      ...discountOf(item),
+    });
     const finalItems = [
-      ...kept.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: currentByProduct.get(item.productId)!.unitPrice,
-        ...discountOf(item),
-      })),
+      ...kept.map((item) =>
+        priceKept({ item, existing: currentByProduct.get(item.productId)! }),
+      ),
       ...created,
     ];
     await this.assertDiscountsWithinLine(tx, finalItems);
+    await this.assertWithinDiscountLimit(
+      tx,
+      [...changed.map(priceKept), ...created],
+      actorRole,
+    );
 
     for (const { item, existing } of changed) {
       await tx.negotiationItem.update({
@@ -458,13 +497,18 @@ export class NegotiationsService {
   // RI4/RI7: dentro da mesma transação, valida e precifica os itens, soma o
   // total e cria a Negociação com os dois já resolvidos — o total nunca
   // existe sem os itens que o explicam.
-  async create(dto: CreateNegotiationDto, vendedorId: number) {
+  async create(
+    dto: CreateNegotiationDto,
+    vendedorId: number,
+    actorRole: RoleEnum,
+  ) {
     await this.ensureClientEditable(dto.clientId);
 
     const negotiation = await this.prisma.$transaction(async (tx) => {
       await this.assertValidItems(tx, dto.items);
       const itemsData = await this.buildItemsData(tx, dto.items);
       await this.assertDiscountsWithinLine(tx, itemsData);
+      await this.assertWithinDiscountLimit(tx, itemsData, actorRole);
       const totalValue = this.sumSubtotals(itemsData);
 
       return tx.negotiation.create({
@@ -503,7 +547,7 @@ export class NegotiationsService {
 
   // RI7: o total é recalculado e gravado na mesma transação da escrita dos
   // itens — nunca em dois passos separados.
-  async replace(id: number, dto: ReplaceNegotiationDto) {
+  async replace(id: number, dto: ReplaceNegotiationDto, actorRole: RoleEnum) {
     const current = await this.ensureExists(id);
     this.ensureOpen(current);
     if (dto.clientId !== current.clientId) {
@@ -511,7 +555,7 @@ export class NegotiationsService {
     }
 
     const negotiation = await this.prisma.$transaction(async (tx) => {
-      const totalValue = await this.syncItems(tx, id, dto.items);
+      const totalValue = await this.syncItems(tx, id, dto.items, actorRole);
       return tx.negotiation.update({
         where: { id },
         data: {

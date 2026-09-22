@@ -3,6 +3,7 @@ import {
   calculateItem,
   calculateItemSubtotal,
   itemDiscountError,
+  sellerDiscountLimitError,
   sumItemsAtPracticedPrice,
   sumNegotiationItems,
 } from './negotiationItemsSummary'
@@ -124,5 +125,45 @@ describe('itemDiscountError (RI5, só para UX — o backend decide)', () => {
     { quantity: 1, unitPrice: 100 },
   ])('aceita %o', (item) => {
     expect(itemDiscountError(item)).toBeNull()
+  })
+})
+
+describe('sellerDiscountLimitError (RI6, só para UX — o backend decide)', () => {
+  const item = (discountType: 'PERCENTUAL' | 'VALOR', discountValue: number, quantity = 2) => ({
+    quantity,
+    unitPrice: 100,
+    discountType,
+    discountValue,
+  })
+
+  it('aponta item novo com percentual efetivo acima de 15%', () => {
+    expect(sellerDiscountLimitError(item('PERCENTUAL', 20), undefined)).toBe(
+      'Acima de 15% exige administrador',
+    )
+  })
+
+  it('usa o percentual efetivo também no desconto em R$', () => {
+    expect(sellerDiscountLimitError(item('VALOR', 30.01), undefined)).not.toBeNull()
+    expect(sellerDiscountLimitError(item('VALOR', 30), undefined)).toBeNull()
+  })
+
+  it('aceita exatamente 15%', () => {
+    expect(sellerDiscountLimitError(item('PERCENTUAL', 15), undefined)).toBeNull()
+  })
+
+  it('não confere item gravado que não foi alterado, mesmo acima de 15%', () => {
+    expect(sellerDiscountLimitError(item('PERCENTUAL', 20), item('PERCENTUAL', 20))).toBeNull()
+  })
+
+  it('confere item gravado cuja quantidade mudou', () => {
+    expect(
+      sellerDiscountLimitError(item('PERCENTUAL', 20, 3), item('PERCENTUAL', 20)),
+    ).not.toBeNull()
+  })
+
+  it('confere item gravado cujo desconto mudou', () => {
+    expect(
+      sellerDiscountLimitError(item('PERCENTUAL', 18), item('PERCENTUAL', 20)),
+    ).not.toBeNull()
   })
 })

@@ -9,7 +9,11 @@ import { ApiError } from '../../api'
 import { formatCurrency } from '../../utils/format'
 import { FormDialog } from '../common/FormDialog'
 import { NegotiationItemsEditor } from './NegotiationItemsEditor'
-import { sumItemsAtPracticedPrice } from './negotiationItemsSummary'
+import {
+  SELLER_DISCOUNT_LIMIT_PERCENT,
+  findItemOverSellerLimit,
+  sumItemsAtPracticedPrice,
+} from './negotiationItemsSummary'
 import type { NegotiationItemFormValue } from './NegotiationItemsEditor'
 import type {
   Client,
@@ -21,6 +25,7 @@ import type {
 
 interface NegotiationFormModalProps {
   negotiation: NegotiationDetail | null
+  isAdmin: boolean
   clients: Client[]
   products: Product[]
   onClose: () => void
@@ -30,6 +35,7 @@ interface NegotiationFormModalProps {
 
 export function NegotiationFormModal({
   negotiation,
+  isAdmin,
   clients,
   products,
   onClose,
@@ -38,18 +44,17 @@ export function NegotiationFormModal({
 }: NegotiationFormModalProps) {
   const isEdit = !!negotiation
   const [clientId, setClientId] = useState(negotiation?.clientId ?? '')
-  const [items, setItems] = useState<NegotiationItemFormValue[]>(
-    negotiation
-      ? negotiation.items.map((item) => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          discountType: item.discountType,
-          discountValue: item.discountValue,
-          product: item.product,
-        }))
-      : [],
-  )
+  const savedItems: NegotiationItemFormValue[] = negotiation
+    ? negotiation.items.map((item) => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discountType: item.discountType,
+        discountValue: item.discountValue,
+        product: item.product,
+      }))
+    : []
+  const [items, setItems] = useState<NegotiationItemFormValue[]>(savedItems)
   const [notes, setNotes] = useState(negotiation?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -60,6 +65,18 @@ export function NegotiationFormModal({
     setError(null)
     if (!clientId) {
       setError('Selecione o cliente da negociação.')
+      return
+    }
+
+    const overLimit = isAdmin ? undefined : findItemOverSellerLimit(items, savedItems, products)
+    if (overLimit) {
+      const name =
+        products.find((p) => p.id === overLimit.productId)?.name ??
+        overLimit.product?.name ??
+        'item'
+      setError(
+        `Desconto acima de ${SELLER_DISCOUNT_LIMIT_PERCENT}% exige administrador: reduza o desconto de ${name} para ${SELLER_DISCOUNT_LIMIT_PERCENT}% ou menos.`,
+      )
       return
     }
 
@@ -174,6 +191,8 @@ export function NegotiationFormModal({
             products={products}
             items={items}
             onChange={setItems}
+            savedItems={savedItems}
+            limitDiscount={!isAdmin}
           />
         </Box>
 
