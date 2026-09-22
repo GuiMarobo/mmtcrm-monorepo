@@ -5,7 +5,7 @@ import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { calculateItemSubtotal, sumNegotiationItems } from './negotiationItemsSummary'
+import { calculateItemSubtotal, sumItemsAtPracticedPrice } from './negotiationItemsSummary'
 import { formatCurrency } from '../../utils/format'
 import type { CreateNegotiationItemPayload, Product } from '../../types'
 
@@ -36,13 +36,7 @@ export function NegotiationItemsEditor({
         !!row.product,
     )
 
-  const total = sumNegotiationItems(
-    rows.map(({ item, product }) => ({
-      productId: item.productId,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice ?? product.price,
-    })),
-  )
+  const total = sumItemsAtPracticedPrice(items, products)
 
   const addItem = (product: Product) => {
     onChange([...items, { productId: product.id, quantity: 1 }])

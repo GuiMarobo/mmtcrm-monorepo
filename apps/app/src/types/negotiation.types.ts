@@ -58,6 +58,7 @@ export interface NegotiationItem {
 
 export interface NegotiationDetail extends Negotiation {
   items: NegotiationItem[]
+  informedValue: number | null
 }
 
 export interface CreateNegotiationItemPayload {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { calculateItemSubtotal, sumNegotiationItems } from './negotiationItemsSummary'
+import {
+  calculateItemSubtotal,
+  sumItemsAtPracticedPrice,
+  sumNegotiationItems,
+} from './negotiationItemsSummary'
 
 describe('calculateItemSubtotal', () => {
   it('multiplica quantidade pelo preço praticado', () => {
@@ -23,5 +27,30 @@ describe('sumNegotiationItems', () => {
 
   it('lista vazia soma zero (RI8: negociação nasce com total R$ 0,00)', () => {
     expect(sumNegotiationItems([])).toBe(0)
+  })
+})
+
+describe('sumItemsAtPracticedPrice', () => {
+  const products = [
+    { id: 'p1', price: 500 },
+    { id: 'p2', price: 50 },
+  ]
+
+  it('usa o preço praticado do item e, sem ele, o preço atual do catálogo', () => {
+    const total = sumItemsAtPracticedPrice(
+      [
+        { productId: 'p1', quantity: 2, unitPrice: 100 },
+        { productId: 'p2', quantity: 3 },
+      ],
+      products,
+    )
+
+    expect(total).toBe(350)
+  })
+
+  it('ignora item cujo Produto não está no catálogo carregado', () => {
+    expect(
+      sumItemsAtPracticedPrice([{ productId: 'p9', quantity: 1 }], products),
+    ).toBe(0)
   })
 })

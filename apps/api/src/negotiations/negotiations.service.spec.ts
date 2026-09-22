@@ -29,6 +29,7 @@ const negotiationRow = (overrides: Record<string, unknown> = {}) => ({
   vendedor: { id: 2, name: 'Vendedora' },
   order: null,
   items: [],
+  _count: { items: 0 },
   ...overrides,
 });
 
@@ -420,6 +421,65 @@ describe('NegotiationsService', () => {
       const result = await service.findOne(3);
 
       expect(result.items[0].product.deleted).toBe(true);
+    });
+
+    it('conta itens excluídos para saber se a Negociação já teve itens (RI8/RI9, ticket 05)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await service.findOne(3);
+
+      expect(
+        callArg<{ select: { _count: unknown } }>(prisma.negotiation.findFirst)
+          .select._count,
+      ).toEqual({ select: { items: true } });
+    });
+
+    it('Negociação que nunca teve item (antiga ou importada) expõe o valor informado', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ _count: { items: 0 } }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.informedValue).toBe(1500);
+      expect(result).not.toHaveProperty('_count');
+    });
+
+    it('Negociação cujos itens foram todos removidos não volta ao valor informado (RI9)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({
+          totalValue: { toString: () => '0.00' },
+          items: [],
+          _count: { items: 2 },
+        }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.informedValue).toBeNull();
+    });
+
+    it('Negociação com itens não tem valor informado', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ _count: { items: 1 } }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.informedValue).toBeNull();
+    });
+
+    it('Negociação nova criada sem itens (R$ 0,00) não tem valor informado a preservar (RI8)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({
+          totalValue: { toString: () => '0.00' },
+          _count: { items: 0 },
+        }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.informedValue).toBeNull();
     });
   });
 

@@ -63,6 +63,7 @@ const negotiationDetail = (
       subtotal: 200,
     },
   ],
+  informedValue: null,
   ...overrides,
 })
 
@@ -124,6 +125,94 @@ describe('NegotiationFormModal — editar itens de Negociação Aberta (ticket 0
     )
 
     await user.click(screen.getByLabelText('Remover iPhone 15 Pro'))
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      clientId: 'c1',
+      items: [],
+      notes: null,
+    })
+  })
+})
+
+const legacyNegotiation = (overrides: Partial<NegotiationDetail> = {}) =>
+  negotiationDetail({
+    totalValue: 1500,
+    items: [],
+    informedValue: 1500,
+    ...overrides,
+  })
+
+const renderModal = (
+  negotiation: NegotiationDetail,
+  onUpdate = vi.fn().mockResolvedValue(undefined),
+) =>
+  render(
+    <NegotiationFormModal
+      negotiation={negotiation}
+      clients={[client()]}
+      products={[product()]}
+      onClose={vi.fn()}
+      onCreate={vi.fn()}
+      onUpdate={onUpdate}
+    />,
+  )
+
+describe('NegotiationFormModal — Negociação antiga ou importada sem itens (ticket 05)', () => {
+  it('mostra o valor informado só para leitura e o aviso de substituição', () => {
+    renderModal(legacyNegotiation())
+
+    const field = screen.getByLabelText('Valor informado')
+    expect((field as HTMLInputElement).value).toMatch(/R\$\s*1\.500,00/)
+    expect(field).toHaveAttribute('readonly')
+    expect(
+      screen.getByText(/adicionar o primeiro item substitui esse valor pela soma dos itens/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/o valor informado não volta/i)).toBeInTheDocument()
+  })
+
+  it('Negociação com itens não mostra o valor informado nem o aviso', () => {
+    renderModal(negotiationDetail())
+
+    expect(screen.queryByLabelText('Valor informado')).not.toBeInTheDocument()
+    expect(screen.queryByText(/o valor informado não volta/i)).not.toBeInTheDocument()
+  })
+
+  it('Negociação sem itens e sem valor informado mostra só a lista vazia', () => {
+    renderModal(negotiationDetail({ totalValue: 0, items: [], informedValue: null }))
+
+    expect(screen.queryByLabelText('Valor informado')).not.toBeInTheDocument()
+    expect(screen.queryByText(/o valor informado não volta/i)).not.toBeInTheDocument()
+  })
+
+  it('ao adicionar o primeiro item, confirma antes de salvar que o valor será substituído pela soma', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderModal(legacyNegotiation(), onUpdate)
+
+    await user.click(screen.getByLabelText('Adicionar produto'))
+    await user.click(screen.getByRole('option', { name: /iPhone 15 Pro/ }))
+
+    expect(
+      screen.getByText(
+        /ao salvar, o valor informado de R\$\s*1\.500,00 será substituído por R\$\s*100,00/i,
+      ),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      clientId: 'c1',
+      items: [{ productId: 'p1', quantity: 1 }],
+      notes: null,
+    })
+  })
+
+  it('salvar sem mexer nos itens envia a lista vazia (o backend mantém o valor informado)', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderModal(legacyNegotiation(), onUpdate)
+
     await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
 
     expect(onUpdate).toHaveBeenCalledWith({

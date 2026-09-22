@@ -6,8 +6,10 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
+import { formatCurrency } from '../../utils/format'
 import { FormDialog } from '../common/FormDialog'
 import { NegotiationItemsEditor } from './NegotiationItemsEditor'
+import { sumItemsAtPracticedPrice } from './negotiationItemsSummary'
 import type { NegotiationItemFormValue } from './NegotiationItemsEditor'
 import type {
   Client,
@@ -48,6 +50,8 @@ export function NegotiationFormModal({
   const [notes, setNotes] = useState(negotiation?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const informedValue = negotiation?.informedValue ?? null
 
   const submit = async () => {
     setError(null)
@@ -129,6 +133,31 @@ export function NegotiationFormModal({
             />
           )}
         />
+
+        {informedValue !== null && (
+          <>
+            <TextField
+              label="Valor informado"
+              value={formatCurrency(informedValue)}
+              slotProps={{ htmlInput: { readOnly: true } }}
+              helperText="Registrado antes dos itens; não pode ser editado."
+              fullWidth
+            />
+            {items.length === 0 ? (
+              <Alert severity="info">
+                Esta negociação não tem itens. Adicionar o primeiro item substitui
+                esse valor pela soma dos itens — depois disso, o valor informado não
+                volta.
+              </Alert>
+            ) : (
+              <Alert severity="warning">
+                Ao salvar, o valor informado de {formatCurrency(informedValue)} será
+                substituído por {formatCurrency(sumItemsAtPracticedPrice(items, products))} (soma dos itens), e o
+                valor informado não volta.
+              </Alert>
+            )}
+          </>
+        )}
 
         <Box>
           <Typography sx={{ fontSize: 12.5, fontWeight: 600, mb: 0.75 }}>

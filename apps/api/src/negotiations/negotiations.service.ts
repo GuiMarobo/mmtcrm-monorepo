@@ -68,6 +68,9 @@ const negotiationDetailSelect = {
     },
     orderBy: { id: 'asc' },
   },
+  // RI8/RI9: conta também os itens excluídos — só quem nunca teve item
+  // ainda guarda o valor informado; já tendo tido, ele não volta.
+  _count: { select: { items: true } },
 } satisfies Prisma.NegotiationSelect;
 
 type NegotiationDetailRow = Prisma.NegotiationGetPayload<{
@@ -113,9 +116,18 @@ export class NegotiationsService {
   }
 
   private toDetailResponse(negotiation: NegotiationDetailRow) {
-    const { items, ...rest } = negotiation;
+    const { items, _count, ...rest } = negotiation;
+    const response = this.toResponse(rest);
+    // Antiga ou importada: a tela mostra o valor informado só para leitura e
+    // avisa que o primeiro item o substitui. Com R$ 0,00 (Negociação nova
+    // criada vazia) não há o que preservar.
+    const informedValue =
+      _count.items === 0 && response.totalValue > 0
+        ? response.totalValue
+        : null;
     return {
-      ...this.toResponse(rest),
+      ...response,
+      informedValue,
       items: items.map((item) => {
         const unitPrice = Number(item.unitPrice);
         return {
