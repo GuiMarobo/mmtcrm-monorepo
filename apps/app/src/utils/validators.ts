@@ -36,3 +36,18 @@ export function isPositiveInteger(value: string): boolean {
   const n = Number(value)
   return Number.isInteger(n) && n > 0
 }
+
+export function validityDaysError(value: string): string | undefined {
+  if (!value.trim()) return 'Informe a validade padrão.'
+  const days = Number(value)
+  if (!Number.isInteger(days) || days < 1 || days > 90)
+    return 'A validade deve ser de 1 a 90 dias.'
+  return undefined
+}
+
+export function ratePercentError(value: string): string | undefined {
+  if (!value.trim()) return 'Informe a taxa.'
+  const rate = Number(value)
+  if (Number.isNaN(rate) || rate < 0 || rate > 100) return 'De 0 a 100%.'
+  return /^\d+(\.\d{1,2})?$/.test(value.trim()) ? undefined : 'Até duas casas decimais.'
+}

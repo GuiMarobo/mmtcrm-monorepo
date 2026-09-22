@@ -31,6 +31,8 @@ describe('Sidebar', () => {
     expect(labels).toContain('Produtos')
     expect(labels).toContain('Negociações')
     expect(labels).toContain('Dispositivos Usados')
+    expect(labels).toContain('Configurações')
+    expect(labels).not.toContain('Orçamentos')
   })
 
   it('esconde Negociações e Pedidos do ATENDENTE (arquitetura §5)', () => {
@@ -58,6 +60,7 @@ describe('Sidebar', () => {
     renderSidebar('VENDEDOR')
     const labels = menuLabels()
     expect(labels).not.toContain('Usuários')
+    expect(labels).not.toContain('Configurações')
     expect(labels).toContain('Produtos')
     expect(labels).toContain('Negociações')
   })

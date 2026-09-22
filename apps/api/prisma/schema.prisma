@@ -285,3 +285,30 @@ model StockMovement {
   @@index([orderId])
   @@map("stock_movements")
 }
+
+// Configuração da loja (spec 011): uma única linha, id fixo 1, garantida pelo
+// seed. Os textos saem no cabeçalho de todo Orçamento; a validade padrão
+// preenche a validade sugerida na emissão (RQ6). Tabela tipada de propósito,
+// não um depósito chave-valor.
+model CompanySettings {
+  id                  Int      @id @default(1)
+  name                String
+  cnpj                String?
+  address             String?
+  phone               String?
+  defaultValidityDays Int      @default(7) @map("default_validity_days")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("company_settings")
+}
+
+// Taxa de parcelamento no cartão de crédito, de 1x a 12x (spec 011). Sempre
+// 12 linhas, garantidas pelo seed com 0% e reescritas em bloco (RS2).
+model InstallmentRate {
+  id           Int      @id @default(autoincrement())
+  installments Int      @unique
+  ratePercent  Decimal  @default(0) @map("rate_percent") @db.Decimal(5, 2)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("installment_rates")
+}

@@ -25,6 +25,8 @@ export interface MockPrisma {
   client: Model;
   user: Model;
   dataErasureLog: Model;
+  companySettings: Model;
+  installmentRate: Model;
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
 }
@@ -41,6 +43,8 @@ export function createMockPrisma(): MockPrisma {
     client: model(),
     user: model(),
     dataErasureLog: model(),
+    companySettings: model(),
+    installmentRate: model(),
     $queryRaw: jest.fn(),
   } as unknown as MockPrisma;
 

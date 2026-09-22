@@ -1,11 +1,11 @@
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined'
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import HandshakeOutlinedIcon from '@mui/icons-material/HandshakeOutlined'
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
 import PhoneIphoneOutlinedIcon from '@mui/icons-material/PhoneIphoneOutlined'
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
 import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined'
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
@@ -41,7 +41,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'negociacoes', label: 'Negociações', icon: <HandshakeOutlinedIcon /> },
       { id: 'clientes', label: 'Clientes & Leads', icon: <PeopleAltOutlinedIcon /> },
-      { id: 'orcamentos', label: 'Orçamentos', icon: <DescriptionOutlinedIcon /> },
       { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBagOutlinedIcon /> },
     ],
   },
@@ -54,7 +53,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Sistema',
-    items: [{ id: 'usuarios', label: 'Usuários', icon: <ManageAccountsOutlinedIcon /> }],
+    items: [
+      { id: 'usuarios', label: 'Usuários', icon: <ManageAccountsOutlinedIcon /> },
+      { id: 'configuracoes', label: 'Configurações', icon: <SettingsOutlinedIcon /> },
+    ],
   },
 ]
 
