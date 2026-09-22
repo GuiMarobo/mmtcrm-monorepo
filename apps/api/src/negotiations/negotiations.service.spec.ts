@@ -560,6 +560,7 @@ describe('NegotiationsService', () => {
           productId: 'p1',
           quantity: 2,
           unitPrice: { toString: () => '100.00' },
+          product: { name: 'iPhone 15 Pro', sku: 'IP15P-256', deletedAt: null },
         },
       ]);
 
@@ -793,6 +794,102 @@ describe('NegotiationsService', () => {
         }),
       ).rejects.toThrow(/Quantidade inválida para o Produto iPhone 15 Pro/);
       expectNothingWritten();
+    });
+  });
+  describe('item de Produto descontinuado ou excluído depois de gravado (RI2, ticket 07)', () => {
+    const savedItem = (product: Record<string, unknown>) => ({
+      id: 10,
+      productId: 'p1',
+      quantity: 2,
+      unitPrice: { toString: () => '100.00' },
+      product: {
+        name: 'iPhone 15 Pro',
+        sku: 'IP15P-256',
+        deletedAt: null,
+        ...product,
+      },
+    });
+    const deletedAt = new Date('2026-09-01T00:00:00Z');
+
+    beforeEach(() => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiation.update.mockResolvedValue(negotiationRow());
+    });
+
+    it('item de Produto descontinuado aceita alterar a quantidade, com o preço congelado', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem({ status: 'INATIVO' }),
+      ]);
+
+      await service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', quantity: 4 }],
+      });
+
+      expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { quantity: 4 },
+      });
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(400);
+    });
+
+    it('item de Produto excluído recusa alterar a quantidade, sem gravar nada', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem({ deletedAt }),
+        { ...savedItem({}), id: 11, productId: 'p2' },
+      ]);
+
+      const attempt = service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', quantity: 3 }],
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toThrow(
+        'O Produto iPhone 15 Pro (IP15P-256) foi excluído do catálogo: o item só pode ser mantido como está ou removido',
+      );
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.updateMany).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.createMany).not.toHaveBeenCalled();
+      expect(prisma.negotiation.update).not.toHaveBeenCalled();
+    });
+
+    it('item de Produto excluído pode ser mantido como está', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem({ deletedAt }),
+      ]);
+
+      await service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', quantity: 2 }],
+      });
+
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(200);
+    });
+
+    it('item de Produto excluído pode ser removido', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        savedItem({ deletedAt }),
+      ]);
+
+      await service.replace(3, { clientId: 'c1', items: [] });
+
+      expect(prisma.negotiationItem.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [10] } },
+        data: { deletedAt: expect.any(Date) as Date },
+      });
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(0);
     });
   });
 });

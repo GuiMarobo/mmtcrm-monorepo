@@ -7,11 +7,26 @@ import IconButton from '@mui/material/IconButton'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { calculateItemSubtotal, sumItemsAtPracticedPrice } from './negotiationItemsSummary'
+import { ToneChip } from '../common/ToneChip'
 import { formatCurrency } from '../../utils/format'
-import type { CreateNegotiationItemPayload, Product } from '../../types'
+import type {
+  CreateNegotiationItemPayload,
+  NegotiationItemProduct,
+  Product,
+} from '../../types'
 
 export interface NegotiationItemFormValue extends CreateNegotiationItemPayload {
   unitPrice?: number
+  product?: NegotiationItemProduct
+}
+
+interface ItemRow {
+  item: NegotiationItemFormValue
+  name: string
+  sku: string
+  unitPrice: number
+  stock: number | null
+  deleted: boolean
 }
 
 interface NegotiationItemsEditorProps {
@@ -31,12 +46,22 @@ export function NegotiationItemsEditor({
     (p) => p.status === 'ATIVO' && !items.some((item) => item.productId === p.id),
   )
 
-  const rows = items
-    .map((item) => ({ item, product: productById.get(item.productId) }))
-    .filter(
-      (row): row is { item: NegotiationItemFormValue; product: Product } =>
-        !!row.product,
-    )
+  const rows = items.flatMap((item): ItemRow[] => {
+    const catalog = productById.get(item.productId)
+    const source = catalog ?? item.product
+    const unitPrice = item.unitPrice ?? catalog?.price
+    if (!source || unitPrice === undefined) return []
+    return [
+      {
+        item,
+        name: source.name,
+        sku: source.sku,
+        unitPrice,
+        stock: catalog?.stock ?? null,
+        deleted: item.product?.deleted ?? false,
+      },
+    ]
+  })
 
   const total = sumItemsAtPracticedPrice(items, products)
 
@@ -100,13 +125,12 @@ export function NegotiationItemsEditor({
             overflow: 'hidden',
           }}
         >
-          {rows.map(({ item, product }, index) => {
-            const unitPrice = item.unitPrice ?? product.price
+          {rows.map(({ item, name, sku, unitPrice, stock, deleted }, index) => {
             const subtotal = calculateItemSubtotal({
               quantity: item.quantity,
               unitPrice,
             })
-            const overStock = item.quantity > product.stock
+            const overStock = stock !== null && item.quantity > stock
 
             return (
               <Box key={item.productId}>
@@ -121,24 +145,34 @@ export function NegotiationItemsEditor({
                   }}
                 >
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography
-                      sx={{
-                        fontSize: 13.5,
-                        fontWeight: 600,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {product.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
-                      {product.sku} · {formatCurrency(unitPrice)}
-                    </Typography>
-                    {overStock && (
-                      <Typography sx={{ fontSize: 11, color: 'warning.main', mt: 0.25 }}>
-                        Saldo em estoque: {product.stock} — abaixo da quantidade
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          color: deleted ? 'text.disabled' : undefined,
+                        }}
+                      >
+                        {name}
                       </Typography>
+                      {deleted && <ToneChip tone="red">Excluído do catálogo</ToneChip>}
+                    </Box>
+                    <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                      {sku} · {formatCurrency(unitPrice)}
+                    </Typography>
+                    {deleted ? (
+                      <Typography sx={{ fontSize: 11, color: 'text.disabled', mt: 0.25 }}>
+                        Só pode ser mantido como está ou removido — remova antes de converter em pedido
+                      </Typography>
+                    ) : (
+                      overStock && (
+                        <Typography sx={{ fontSize: 11, color: 'warning.main', mt: 0.25 }}>
+                          Saldo em estoque: {stock} — abaixo da quantidade
+                        </Typography>
+                      )
                     )}
                   </Box>
 
@@ -147,6 +181,7 @@ export function NegotiationItemsEditor({
                     type="number"
                     size="small"
                     value={item.quantity}
+                    disabled={deleted}
                     onChange={(e) => {
                       const quantity = Number(e.target.value)
                       if (Number.isInteger(quantity) && quantity >= 1) {
@@ -165,7 +200,7 @@ export function NegotiationItemsEditor({
 
                   <IconButton
                     onClick={() => removeItem(item.productId)}
-                    aria-label={`Remover ${product.name}`}
+                    aria-label={`Remover ${name}`}
                     size="small"
                   >
                     <DeleteOutlinedIcon fontSize="small" />

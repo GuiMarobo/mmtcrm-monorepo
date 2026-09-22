@@ -249,3 +249,100 @@ describe('NegotiationFormModal — validações do item (ticket 06)', () => {
     })
   })
 })
+
+describe('NegotiationFormModal — item de Produto descontinuado ou excluído (RI2, ticket 07)', () => {
+  const withItemProduct = (productOverrides: Partial<NegotiationDetail['items'][number]['product']>) =>
+    negotiationDetail({
+      items: [
+        {
+          id: 10,
+          product: {
+            id: 'p1',
+            name: 'iPhone 15 Pro',
+            sku: 'IP15P-256',
+            status: 'ATIVO',
+            deleted: false,
+            ...productOverrides,
+          },
+          quantity: 2,
+          unitPrice: 100,
+          subtotal: 200,
+        },
+      ],
+    })
+
+  const renderWithCatalog = (
+    negotiation: NegotiationDetail,
+    products: Product[],
+    onUpdate = vi.fn().mockResolvedValue(undefined),
+  ) =>
+    render(
+      <NegotiationFormModal
+        negotiation={negotiation}
+        clients={[client()]}
+        products={products}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={onUpdate}
+      />,
+    )
+
+  it('item de Produto excluído aparece marcado, com a quantidade desabilitada e só o remover', () => {
+    renderWithCatalog(withItemProduct({ deleted: true }), [])
+
+    expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
+    expect(screen.getByText('Excluído do catálogo')).toBeInTheDocument()
+    expect(screen.getByLabelText('Qtd.')).toBeDisabled()
+    expect(screen.getByLabelText('Qtd.')).toHaveValue(2)
+    expect(screen.getByLabelText('Remover iPhone 15 Pro')).toBeEnabled()
+    expect(screen.getAllByText(/R\$\s*200,00/)).toHaveLength(2)
+  })
+
+  it('manter o item de Produto excluído envia o item sem alteração', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderWithCatalog(withItemProduct({ deleted: true }), [], onUpdate)
+
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      clientId: 'c1',
+      items: [{ productId: 'p1', quantity: 2 }],
+      notes: null,
+    })
+  })
+
+  it('remover o item de Produto excluído o tira da lista enviada', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderWithCatalog(withItemProduct({ deleted: true }), [], onUpdate)
+
+    await user.click(screen.getByLabelText('Remover iPhone 15 Pro'))
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({ clientId: 'c1', items: [], notes: null })
+  })
+
+  it('item de Produto descontinuado continua editável e sem a marca de excluído', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+    renderWithCatalog(
+      withItemProduct({ status: 'INATIVO' }),
+      [product({ status: 'INATIVO' })],
+      onUpdate,
+    )
+
+    expect(screen.queryByText('Excluído do catálogo')).not.toBeInTheDocument()
+    const quantity = screen.getByLabelText('Qtd.')
+    expect(quantity).toBeEnabled()
+    await user.tripleClick(quantity)
+    await user.keyboard('3')
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      clientId: 'c1',
+      items: [{ productId: 'p1', quantity: 3 }],
+      notes: null,
+    })
+  })
+})

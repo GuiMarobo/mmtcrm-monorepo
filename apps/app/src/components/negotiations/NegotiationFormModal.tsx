@@ -44,6 +44,7 @@ export function NegotiationFormModal({
           productId: item.product.id,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          product: item.product,
         }))
       : [],
   )

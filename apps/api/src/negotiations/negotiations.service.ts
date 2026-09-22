@@ -278,7 +278,13 @@ export class NegotiationsService {
 
     const current = await tx.negotiationItem.findMany({
       where: { negotiationId, ...NOT_DELETED },
-      select: { id: true, productId: true, quantity: true, unitPrice: true },
+      select: {
+        id: true,
+        productId: true,
+        quantity: true,
+        unitPrice: true,
+        product: { select: { name: true, sku: true, deletedAt: true } },
+      },
     });
     const currentByProduct = new Map(current.map((i) => [i.productId, i]));
     const incomingProductIds = new Set(items.map((item) => item.productId));
@@ -289,14 +295,28 @@ export class NegotiationsService {
     const created = await this.buildItemsData(tx, toCreateDtos);
 
     const kept = items.filter((item) => currentByProduct.has(item.productId));
-    for (const item of kept) {
-      const existing = currentByProduct.get(item.productId)!;
-      if (existing.quantity !== item.quantity) {
-        await tx.negotiationItem.update({
-          where: { id: existing.id },
-          data: { quantity: item.quantity },
-        });
-      }
+    const changed = kept
+      .map((item) => ({
+        item,
+        existing: currentByProduct.get(item.productId)!,
+      }))
+      .filter(({ item, existing }) => existing.quantity !== item.quantity);
+
+    // RI2: item de Produto excluído do catálogo só pode ser mantido como está
+    // ou removido. Confere antes de qualquer escrita, para recusar sem gravar
+    // nada. Descontinuado não entra aqui: continua alterável.
+    const frozen = changed.find(({ existing }) => existing.product.deletedAt);
+    if (frozen) {
+      throw new BadRequestException(
+        `O ${productLabel(frozen.existing.product)} foi excluído do catálogo: o item só pode ser mantido como está ou removido`,
+      );
+    }
+
+    for (const { item, existing } of changed) {
+      await tx.negotiationItem.update({
+        where: { id: existing.id },
+        data: { quantity: item.quantity },
+      });
     }
 
     const removed = current.filter(
