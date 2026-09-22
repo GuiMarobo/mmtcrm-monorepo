@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NegotiationItemsEditor } from './NegotiationItemsEditor'
+import { NegotiationItemsEditor, type NegotiationItemFormValue } from './NegotiationItemsEditor'
 import type { Product } from '../../types'
 
 const product = (overrides: Partial<Product> = {}): Product => ({
@@ -125,5 +126,88 @@ describe('NegotiationItemsEditor', () => {
     await user.click(screen.getByLabelText('Remover iPhone 15 Pro'))
 
     expect(onChange).toHaveBeenCalledWith([])
+  })
+
+  describe('validações do item (RI2, RI3, RI5, ticket 06)', () => {
+    function StatefulEditor({
+      products,
+      initialItems = [],
+      onChange = vi.fn(),
+    }: {
+      products: Product[]
+      initialItems?: NegotiationItemFormValue[]
+      onChange?: (items: NegotiationItemFormValue[]) => void
+    }) {
+      const [items, setItems] = useState(initialItems)
+      return (
+        <NegotiationItemsEditor
+          products={products}
+          items={items}
+          onChange={(next) => {
+            setItems(next)
+            onChange(next)
+          }}
+        />
+      )
+    }
+
+    it('oferece só Produtos Ativos no seletor (a listagem de Produtos já exclui os excluídos)', async () => {
+      const user = userEvent.setup()
+      render(
+        <StatefulEditor
+          products={[
+            product({ id: 'p1', name: 'iPhone 15 Pro' }),
+            product({ id: 'p2', name: 'iPad Antigo', sku: 'IPAD-OLD', status: 'INATIVO' }),
+          ]}
+        />,
+      )
+
+      await user.click(screen.getByLabelText('Adicionar produto'))
+
+      expect(screen.getByRole('option', { name: /iPhone 15 Pro/ })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /iPad Antigo/ })).not.toBeInTheDocument()
+    })
+
+    it('um Produto adicionado some das opções restantes', async () => {
+      const user = userEvent.setup()
+      render(
+        <StatefulEditor
+          products={[
+            product({ id: 'p1', name: 'iPhone 15 Pro' }),
+            product({ id: 'p2', name: 'AirPods Pro', sku: 'APP2' }),
+          ]}
+        />,
+      )
+
+      await user.click(screen.getByLabelText('Adicionar produto'))
+      await user.click(screen.getByRole('option', { name: /iPhone 15 Pro/ }))
+      await user.keyboard('{ArrowDown}')
+
+      expect(screen.getAllByRole('option')).toHaveLength(1)
+      expect(screen.queryByRole('option', { name: /iPhone 15 Pro/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /AirPods Pro/ })).toBeInTheDocument()
+    })
+
+    it('ao digitar quantidade acima do saldo, avisa sem impedir a alteração', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(
+        <StatefulEditor
+          products={[product({ stock: 2 })]}
+          initialItems={[{ productId: 'p1', quantity: 1 }]}
+          onChange={onChange}
+        />,
+      )
+
+      expect(screen.queryByText(/Saldo em estoque/)).not.toBeInTheDocument()
+
+      const quantity = screen.getByLabelText('Qtd.')
+      await user.tripleClick(quantity)
+      await user.keyboard('5')
+
+      expect(onChange).toHaveBeenLastCalledWith([{ productId: 'p1', quantity: 5 }])
+      expect(screen.getByLabelText('Qtd.')).toHaveValue(5)
+      expect(screen.getByText(/Saldo em estoque: 2/)).toBeInTheDocument()
+    })
   })
 })

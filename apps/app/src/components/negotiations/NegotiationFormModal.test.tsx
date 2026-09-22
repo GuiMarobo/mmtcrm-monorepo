@@ -222,3 +222,30 @@ describe('NegotiationFormModal — Negociação antiga ou importada sem itens (t
     })
   })
 })
+
+describe('NegotiationFormModal — validações do item (ticket 06)', () => {
+  it('salva mesmo com quantidade acima do saldo: o aviso não bloqueia', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <NegotiationFormModal
+        negotiation={negotiationDetail()}
+        clients={[client()]}
+        products={[product({ stock: 1 })]}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    expect(screen.getByText(/Saldo em estoque: 1/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      clientId: 'c1',
+      items: [{ productId: 'p1', quantity: 2 }],
+      notes: null,
+    })
+  })
+})

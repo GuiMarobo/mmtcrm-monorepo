@@ -77,11 +77,14 @@ type NegotiationDetailRow = Prisma.NegotiationGetPayload<{
   select: typeof negotiationDetailSelect;
 }>;
 
-const ITEM_NOT_ACTIVE =
-  'Só é possível adicionar Produtos ativos e não excluídos do catálogo';
+type ItemProduct = { name: string; sku: string; deletedAt: Date | null };
 
-const ITEM_DUPLICATED =
-  'Um Produto não pode aparecer duas vezes na mesma negociação';
+const productLabel = (product: Pick<ItemProduct, 'name' | 'sku'>) =>
+  `Produto ${product.name} (${product.sku})`;
+
+// RI5: quantidade é inteiro >= 1. O teto técnico da coluna fica no DTO.
+const isValidQuantity = (quantity: number) =>
+  Number.isInteger(quantity) && quantity >= 1;
 
 // A maquina de estados da spec 001 tem exatamente estas quatro arestas.
 // Converter em pedido e o que torna a negociacao GANHA; nao existe "concluir".
@@ -155,13 +158,56 @@ export class NegotiationsService {
     }
   }
 
-  // RI3: um Produto não pode aparecer duas vezes no mesmo envio.
-  private assertNoDuplicateProducts(items: CreateNegotiationItemDto[]) {
-    const productIds = items.map((item) => item.productId);
-    if (new Set(productIds).size !== productIds.length) {
-      throw new BadRequestException(ITEM_DUPLICATED);
+  // Só o caminho de recusa lê o Produto sem filtro: a mensagem nomeia o
+  // Produto e diz o motivo, mesmo que ele esteja descontinuado ou excluído.
+  private findItemProduct(tx: Prisma.TransactionClient, productId: string) {
+    return tx.product.findFirst({
+      where: { id: productId },
+      select: { name: true, sku: true, deletedAt: true },
+    });
+  }
+
+  private async rejectItem(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    reason: (product: ItemProduct) => string,
+  ): Promise<never> {
+    const product = await this.findItemProduct(tx, productId);
+    throw new BadRequestException(
+      product
+        ? reason(product)
+        : `O Produto ${productId} não existe no catálogo`,
+    );
+  }
+
+  // RI3/RI5: um Produto não aparece duas vezes no mesmo envio e toda
+  // quantidade é inteiro >= 1 — vale para itens novos e já gravados.
+  private async assertValidItems(
+    tx: Prisma.TransactionClient,
+    items: CreateNegotiationItemDto[],
+  ) {
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (seen.has(item.productId)) {
+        await this.rejectItem(
+          tx,
+          item.productId,
+          (product) =>
+            `O ${productLabel(product)} aparece mais de uma vez — aumente a quantidade em vez de repetir o Produto`,
+        );
+      }
+      seen.add(item.productId);
     }
-    return productIds;
+
+    const invalid = items.find((item) => !isValidQuantity(item.quantity));
+    if (invalid) {
+      await this.rejectItem(
+        tx,
+        invalid.productId,
+        (product) =>
+          `Quantidade inválida para o ${productLabel(product)}: informe um número inteiro maior ou igual a 1`,
+      );
+    }
   }
 
   // RI2/RI3: valida a lista recebida e copia o preço praticado de cada Produto
@@ -172,25 +218,34 @@ export class NegotiationsService {
     tx: Prisma.TransactionClient,
     items: CreateNegotiationItemDto[],
   ) {
-    const productIds = this.assertNoDuplicateProducts(items);
-    if (productIds.length === 0) return [];
+    if (items.length === 0) return [];
 
     const products = await tx.product.findMany({
-      where: { ...NOT_DELETED, id: { in: productIds }, status: 'ATIVO' },
+      where: {
+        ...NOT_DELETED,
+        id: { in: items.map((item) => item.productId) },
+        status: 'ATIVO',
+      },
       select: { id: true, price: true },
     });
     const productById = new Map(products.map((p) => [p.id, p]));
 
-    return items.map((item) => {
-      const product = productById.get(item.productId);
-      if (!product) throw new BadRequestException(ITEM_NOT_ACTIVE);
+    // RI2: explica por que o Produto ficou fora da consulta acima.
+    const unavailable = items.find((item) => !productById.has(item.productId));
+    if (unavailable) {
+      await this.rejectItem(
+        tx,
+        unavailable.productId,
+        (product) =>
+          `O ${productLabel(product)} ${product.deletedAt ? 'foi excluído do catálogo' : 'está descontinuado'} e não pode ser adicionado`,
+      );
+    }
 
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: product.price,
-      };
-    });
+    return items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: productById.get(item.productId)!.price,
+    }));
   }
 
   // RI7: soma dos subtotais dos itens não excluídos (sem desconto ainda —
@@ -219,14 +274,14 @@ export class NegotiationsService {
     negotiationId: number,
     items: CreateNegotiationItemDto[],
   ): Promise<number | undefined> {
-    const productIds = this.assertNoDuplicateProducts(items);
+    await this.assertValidItems(tx, items);
 
     const current = await tx.negotiationItem.findMany({
       where: { negotiationId, ...NOT_DELETED },
       select: { id: true, productId: true, quantity: true, unitPrice: true },
     });
     const currentByProduct = new Map(current.map((i) => [i.productId, i]));
-    const incomingProductIds = new Set(productIds);
+    const incomingProductIds = new Set(items.map((item) => item.productId));
 
     const toCreateDtos = items.filter(
       (item) => !currentByProduct.has(item.productId),
@@ -317,6 +372,7 @@ export class NegotiationsService {
     await this.ensureClientEditable(dto.clientId);
 
     const negotiation = await this.prisma.$transaction(async (tx) => {
+      await this.assertValidItems(tx, dto.items);
       const itemsData = await this.buildItemsData(tx, dto.items);
       const totalValue = this.sumSubtotals(itemsData);
 

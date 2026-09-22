@@ -340,7 +340,7 @@ describe('NegotiationsService', () => {
       expect(prisma.negotiation.create).not.toHaveBeenCalled();
     });
 
-    it('recusa Produto repetido no mesmo envio, sem consultar o catálogo (RI3)', async () => {
+    it('recusa Produto repetido no mesmo envio antes de precificar (RI3)', async () => {
       await expect(
         service.create(
           {
@@ -660,6 +660,139 @@ describe('NegotiationsService', () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.negotiation.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('validações do item — recusas com Produto e motivo (RI2, RI3, RI5, ticket 06)', () => {
+    const catalogProduct = (overrides: Record<string, unknown> = {}) => ({
+      id: 'p1',
+      name: 'iPhone 15 Pro',
+      sku: 'IP15P-256',
+      status: 'ATIVO',
+      deletedAt: null,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      prisma.client.findFirst.mockResolvedValue({
+        id: 'c1',
+        status: 'LEAD',
+        anonymizedAt: null,
+      });
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
+    });
+
+    const expectNothingWritten = () => {
+      expect(prisma.negotiation.create).not.toHaveBeenCalled();
+      expect(prisma.negotiation.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.createMany).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.updateMany).not.toHaveBeenCalled();
+    };
+
+    const write = {
+      create: (items: { productId: string; quantity: number }[]) =>
+        service.create({ clientId: 'c1', items }, 2),
+      replace: (items: { productId: string; quantity: number }[]) =>
+        service.replace(3, { clientId: 'c1', items }),
+    };
+
+    describe.each(['create', 'replace'] as const)('%s', (operation) => {
+      it('recusa Produto descontinuado, nomeando o Produto (RI2)', async () => {
+        prisma.product.findMany.mockResolvedValue([]);
+        prisma.product.findFirst.mockResolvedValue(
+          catalogProduct({ status: 'INATIVO' }),
+        );
+
+        const attempt = write[operation]([{ productId: 'p1', quantity: 1 }]);
+
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toThrow(
+          'O Produto iPhone 15 Pro (IP15P-256) está descontinuado e não pode ser adicionado',
+        );
+        expectNothingWritten();
+      });
+
+      it('recusa Produto excluído do catálogo, nomeando o Produto (RI2)', async () => {
+        prisma.product.findMany.mockResolvedValue([]);
+        prisma.product.findFirst.mockResolvedValue(
+          catalogProduct({ deletedAt: new Date('2026-09-01T00:00:00Z') }),
+        );
+
+        const attempt = write[operation]([{ productId: 'p1', quantity: 1 }]);
+
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toThrow(
+          'O Produto iPhone 15 Pro (IP15P-256) foi excluído do catálogo e não pode ser adicionado',
+        );
+        expectNothingWritten();
+      });
+
+      it('recusa Produto que não existe no catálogo (RI2)', async () => {
+        prisma.product.findMany.mockResolvedValue([]);
+        prisma.product.findFirst.mockResolvedValue(null);
+
+        const attempt = write[operation]([
+          { productId: 'fantasma', quantity: 1 },
+        ]);
+
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toThrow(
+          'O Produto fantasma não existe no catálogo',
+        );
+        expectNothingWritten();
+      });
+
+      it('recusa Produto repetido, nomeando o Produto (RI3)', async () => {
+        prisma.product.findFirst.mockResolvedValue(catalogProduct());
+
+        const attempt = write[operation]([
+          { productId: 'p1', quantity: 1 },
+          { productId: 'p1', quantity: 2 },
+        ]);
+
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toThrow(
+          'O Produto iPhone 15 Pro (IP15P-256) aparece mais de uma vez — aumente a quantidade em vez de repetir o Produto',
+        );
+        expectNothingWritten();
+      });
+
+      it.each([0, -1, 1.5])(
+        'recusa quantidade %p, nomeando o Produto (RI5)',
+        async (quantity) => {
+          prisma.product.findFirst.mockResolvedValue(catalogProduct());
+
+          const attempt = write[operation]([{ productId: 'p1', quantity }]);
+
+          await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+          await expect(attempt).rejects.toThrow(
+            'Quantidade inválida para o Produto iPhone 15 Pro (IP15P-256): informe um número inteiro maior ou igual a 1',
+          );
+          expectNothingWritten();
+        },
+      );
+    });
+
+    it('replace recusa quantidade inválida também em item já gravado (RI5)', async () => {
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        {
+          id: 10,
+          productId: 'p1',
+          quantity: 2,
+          unitPrice: { toString: () => '100.00' },
+        },
+      ]);
+      prisma.product.findFirst.mockResolvedValue(catalogProduct());
+
+      await expect(
+        service.replace(3, {
+          clientId: 'c1',
+          items: [{ productId: 'p1', quantity: 0 }],
+        }),
+      ).rejects.toThrow(/Quantidade inválida para o Produto iPhone 15 Pro/);
+      expectNothingWritten();
     });
   });
 });

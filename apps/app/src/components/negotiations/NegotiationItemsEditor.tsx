@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
@@ -24,6 +25,7 @@ export function NegotiationItemsEditor({
   items,
   onChange,
 }: NegotiationItemsEditorProps) {
+  const [search, setSearch] = useState('')
   const productById = new Map(products.map((p) => [p.id, p]))
   const availableProducts = products.filter(
     (p) => p.status === 'ATIVO' && !items.some((item) => item.productId === p.id),
@@ -61,6 +63,8 @@ export function NegotiationItemsEditor({
         getOptionLabel={(p) => `${p.name} — ${p.sku}`}
         value={null}
         onChange={(_, option) => option && addItem(option)}
+        inputValue={search}
+        onInputChange={(_, value, reason) => setSearch(reason === 'input' ? value : '')}
         isOptionEqualToValue={(o, v) => o.id === v.id}
         noOptionsText="Nenhum produto ativo disponível"
         fullWidth
