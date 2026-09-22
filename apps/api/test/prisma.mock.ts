@@ -21,6 +21,7 @@ export interface MockPrisma {
   product: Model;
   stockMovement: Model;
   negotiation: Model;
+  negotiationItem: Model;
   client: Model;
   user: Model;
   dataErasureLog: Model;
@@ -36,6 +37,7 @@ export function createMockPrisma(): MockPrisma {
     product: model(),
     stockMovement: model(),
     negotiation: model(),
+    negotiationItem: model(),
     client: model(),
     user: model(),
     dataErasureLog: model(),

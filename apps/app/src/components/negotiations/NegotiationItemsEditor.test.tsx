@@ -82,6 +82,34 @@ describe('NegotiationItemsEditor', () => {
     expect(screen.getByText(/Saldo em estoque: 1/)).toBeInTheDocument()
   })
 
+  it('mantém a linha de um item cujo Produto foi descontinuado (RI2)', () => {
+    render(
+      <NegotiationItemsEditor
+        products={[product({ status: 'INATIVO' })]}
+        items={[{ productId: 'p1', quantity: 2, unitPrice: 100 }]}
+        onChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
+    expect(screen.getByLabelText('Qtd.')).toHaveValue(2)
+  })
+
+  it('esconde do seletor de adicionar um Produto descontinuado', async () => {
+    const user = userEvent.setup()
+    render(
+      <NegotiationItemsEditor
+        products={[product({ status: 'INATIVO' })]}
+        items={[]}
+        onChange={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByLabelText('Adicionar produto'))
+
+    expect(screen.getByText('Nenhum produto ativo disponível')).toBeInTheDocument()
+  })
+
   it('remove um item ao clicar no botão de remover', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()

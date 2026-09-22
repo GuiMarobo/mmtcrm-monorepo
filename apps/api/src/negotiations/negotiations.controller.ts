@@ -61,7 +61,18 @@ export class NegotiationsController {
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Substituir os dados da negociação' })
+  @ApiOperation({
+    summary: 'Substituir os dados e os itens da negociação (spec 010)',
+    description:
+      'Só é permitido em Negociação Aberta. Recebe a lista completa de ' +
+      'itens: item novo copia o preço na hora, item mantido preserva o ' +
+      'preço praticado, item que saiu da lista é excluído logicamente. O ' +
+      'total é recalculado e gravado na mesma transação.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Item de Produto inativo/excluído ou repetido na lista',
+  })
   @ApiResponse({
     status: 404,
     description: 'Negociação ou cliente não encontrado',

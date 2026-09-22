@@ -4,7 +4,7 @@ import type {
   Negotiation,
   NegotiationDetail,
   PaymentMethod,
-  UpdateNegotiationPayload,
+  ReplaceNegotiationPayload,
 } from '../types'
 
 export const negotiationsApi = {
@@ -20,8 +20,8 @@ export const negotiationsApi = {
     return http.post<Negotiation>('/negotiations', payload)
   },
 
-  update(id: number, payload: UpdateNegotiationPayload): Promise<Negotiation> {
-    return http.patch<Negotiation>(`/negotiations/${id}`, payload)
+  replace(id: number, payload: ReplaceNegotiationPayload): Promise<Negotiation> {
+    return http.put<Negotiation>(`/negotiations/${id}`, payload)
   },
 
   remove(id: number): Promise<Negotiation> {

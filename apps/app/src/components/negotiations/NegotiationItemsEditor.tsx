@@ -9,10 +9,14 @@ import { calculateItemSubtotal, sumNegotiationItems } from './negotiationItemsSu
 import { formatCurrency } from '../../utils/format'
 import type { CreateNegotiationItemPayload, Product } from '../../types'
 
+export interface NegotiationItemFormValue extends CreateNegotiationItemPayload {
+  unitPrice?: number
+}
+
 interface NegotiationItemsEditorProps {
   products: Product[]
-  items: CreateNegotiationItemPayload[]
-  onChange: (items: CreateNegotiationItemPayload[]) => void
+  items: NegotiationItemFormValue[]
+  onChange: (items: NegotiationItemFormValue[]) => void
 }
 
 export function NegotiationItemsEditor({
@@ -22,13 +26,13 @@ export function NegotiationItemsEditor({
 }: NegotiationItemsEditorProps) {
   const productById = new Map(products.map((p) => [p.id, p]))
   const availableProducts = products.filter(
-    (p) => !items.some((item) => item.productId === p.id),
+    (p) => p.status === 'ATIVO' && !items.some((item) => item.productId === p.id),
   )
 
   const rows = items
     .map((item) => ({ item, product: productById.get(item.productId) }))
     .filter(
-      (row): row is { item: CreateNegotiationItemPayload; product: Product } =>
+      (row): row is { item: NegotiationItemFormValue; product: Product } =>
         !!row.product,
     )
 
@@ -36,7 +40,7 @@ export function NegotiationItemsEditor({
     rows.map(({ item, product }) => ({
       productId: item.productId,
       quantity: item.quantity,
-      unitPrice: product.price,
+      unitPrice: item.unitPrice ?? product.price,
     })),
   )
 
@@ -99,9 +103,10 @@ export function NegotiationItemsEditor({
           }}
         >
           {rows.map(({ item, product }, index) => {
+            const unitPrice = item.unitPrice ?? product.price
             const subtotal = calculateItemSubtotal({
               quantity: item.quantity,
-              unitPrice: product.price,
+              unitPrice,
             })
             const overStock = item.quantity > product.stock
 
@@ -130,7 +135,7 @@ export function NegotiationItemsEditor({
                       {product.name}
                     </Typography>
                     <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
-                      {product.sku} · {formatCurrency(product.price)}
+                      {product.sku} · {formatCurrency(unitPrice)}
                     </Typography>
                     {overStock && (
                       <Typography sx={{ fontSize: 11, color: 'warning.main', mt: 0.25 }}>

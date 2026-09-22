@@ -143,6 +143,15 @@ export class NegotiationsService {
     }
   }
 
+  // RI3: um Produto não pode aparecer duas vezes no mesmo envio.
+  private assertNoDuplicateProducts(items: CreateNegotiationItemDto[]) {
+    const productIds = items.map((item) => item.productId);
+    if (new Set(productIds).size !== productIds.length) {
+      throw new BadRequestException(ITEM_DUPLICATED);
+    }
+    return productIds;
+  }
+
   // RI2/RI3: valida a lista recebida e copia o preço praticado de cada Produto
   // ativo e não excluído. tx: a mesma transação da escrita dos itens, para que
   // a checagem de status/existência não fique defasada entre a leitura e a
@@ -151,10 +160,7 @@ export class NegotiationsService {
     tx: Prisma.TransactionClient,
     items: CreateNegotiationItemDto[],
   ) {
-    const productIds = items.map((item) => item.productId);
-    if (new Set(productIds).size !== productIds.length) {
-      throw new BadRequestException(ITEM_DUPLICATED);
-    }
+    const productIds = this.assertNoDuplicateProducts(items);
     if (productIds.length === 0) return [];
 
     const products = await tx.product.findMany({
@@ -187,6 +193,73 @@ export class NegotiationsService {
       0,
     );
     return cents / 100;
+  }
+
+  // RI3/RI4/RI9/RI10: compara a lista recebida com os itens não excluídos já
+  // gravados, por Produto. Novo copia o preço na hora; mesma quantidade não é
+  // regravado (preço preservado); quantidade alterada só atualiza a
+  // quantidade; o que saiu da lista é excluído logicamente. Devolve o novo
+  // totalValue quando há algo a recalcular, ou undefined quando a Negociação
+  // nunca teve itens e continua sem eles (RI8: o valor informado fica como
+  // está).
+  private async syncItems(
+    tx: Prisma.TransactionClient,
+    negotiationId: number,
+    items: CreateNegotiationItemDto[],
+  ): Promise<number | undefined> {
+    const productIds = this.assertNoDuplicateProducts(items);
+
+    const current = await tx.negotiationItem.findMany({
+      where: { negotiationId, ...NOT_DELETED },
+      select: { id: true, productId: true, quantity: true, unitPrice: true },
+    });
+    const currentByProduct = new Map(current.map((i) => [i.productId, i]));
+    const incomingProductIds = new Set(productIds);
+
+    const toCreateDtos = items.filter(
+      (item) => !currentByProduct.has(item.productId),
+    );
+    const created = await this.buildItemsData(tx, toCreateDtos);
+
+    const kept = items.filter((item) => currentByProduct.has(item.productId));
+    for (const item of kept) {
+      const existing = currentByProduct.get(item.productId)!;
+      if (existing.quantity !== item.quantity) {
+        await tx.negotiationItem.update({
+          where: { id: existing.id },
+          data: { quantity: item.quantity },
+        });
+      }
+    }
+
+    const removed = current.filter(
+      (item) => !incomingProductIds.has(item.productId),
+    );
+    if (removed.length > 0) {
+      await tx.negotiationItem.updateMany({
+        where: { id: { in: removed.map((item) => item.id) } },
+        data: { deletedAt: new Date() },
+      });
+    }
+
+    if (created.length > 0) {
+      await tx.negotiationItem.createMany({
+        data: created.map((item) => ({ ...item, negotiationId })),
+      });
+    }
+
+    const hadItemsBefore = current.length > 0;
+    const finalCount = kept.length + created.length;
+    if (finalCount === 0 && !hadItemsBefore) return undefined;
+
+    const finalItems = [
+      ...kept.map((item) => ({
+        quantity: item.quantity,
+        unitPrice: currentByProduct.get(item.productId)!.unitPrice,
+      })),
+      ...created,
+    ];
+    return this.sumSubtotals(finalItems);
   }
 
   private async ensureExists(id: number) {
@@ -269,6 +342,8 @@ export class NegotiationsService {
     return this.toDetailResponse(negotiation);
   }
 
+  // RI7: o total é recalculado e gravado na mesma transação da escrita dos
+  // itens — nunca em dois passos separados.
   async replace(id: number, dto: ReplaceNegotiationDto) {
     const current = await this.ensureExists(id);
     this.ensureOpen(current);
@@ -276,14 +351,17 @@ export class NegotiationsService {
       await this.ensureClientEditable(dto.clientId);
     }
 
-    const negotiation = await this.prisma.negotiation.update({
-      where: { id },
-      data: {
-        clientId: dto.clientId,
-        totalValue: dto.totalValue,
-        notes: dto.notes ?? null,
-      },
-      select: negotiationSelect,
+    const negotiation = await this.prisma.$transaction(async (tx) => {
+      const totalValue = await this.syncItems(tx, id, dto.items);
+      return tx.negotiation.update({
+        where: { id },
+        data: {
+          clientId: dto.clientId,
+          notes: dto.notes ?? null,
+          ...(totalValue !== undefined ? { totalValue } : {}),
+        },
+        select: negotiationSelect,
+      });
     });
 
     return this.toResponse(negotiation);

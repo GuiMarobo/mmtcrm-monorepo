@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NegotiationsService } from './negotiations.service';
@@ -416,6 +420,186 @@ describe('NegotiationsService', () => {
       const result = await service.findOne(3);
 
       expect(result.items[0].product.deleted).toBe(true);
+    });
+  });
+
+  describe('replace — editar itens de Negociação Aberta (RI4, RI9, RI10, ticket 04)', () => {
+    beforeEach(() => {
+      prisma.negotiation.update.mockResolvedValue(negotiationRow());
+    });
+
+    it('recusa editar Negociação não-Aberta (ensureOpen)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ status: 'GANHA' }),
+      );
+
+      await expect(
+        service.replace(3, { clientId: 'c1', items: [] }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.negotiation.update).not.toHaveBeenCalled();
+    });
+
+    it('adiciona um item novo copiando o preço do Produto (RI4)', async () => {
+      const price = { toString: () => '100.00' };
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
+      prisma.product.findMany.mockResolvedValue([{ id: 'p1', price }]);
+      prisma.negotiationItem.createMany.mockResolvedValue({ count: 1 });
+
+      await service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', quantity: 2 }],
+      });
+
+      expect(prisma.negotiationItem.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            productId: 'p1',
+            quantity: 2,
+            unitPrice: price,
+            negotiationId: 3,
+          },
+        ],
+      });
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(200);
+    });
+
+    it('mantém o item (mesma quantidade) sem regravar preço nem quantidade', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        {
+          id: 10,
+          productId: 'p1',
+          quantity: 2,
+          unitPrice: { toString: () => '100.00' },
+        },
+      ]);
+
+      await service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', quantity: 2 }],
+      });
+
+      expect(prisma.negotiationItem.update).not.toHaveBeenCalled();
+      expect(prisma.negotiationItem.updateMany).not.toHaveBeenCalled();
+      expect(prisma.product.findMany).not.toHaveBeenCalled();
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(200);
+    });
+
+    it('altera a quantidade de um item preservando o preço praticado', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        {
+          id: 10,
+          productId: 'p1',
+          quantity: 2,
+          unitPrice: { toString: () => '100.00' },
+        },
+      ]);
+
+      await service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', quantity: 5 }],
+      });
+
+      expect(prisma.negotiationItem.update).toHaveBeenCalledWith({
+        where: { id: 10 },
+        data: { quantity: 5 },
+      });
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(500);
+    });
+
+    it('remove um item que saiu da lista por exclusão lógica e refaz a soma', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        {
+          id: 10,
+          productId: 'p1',
+          quantity: 2,
+          unitPrice: { toString: () => '100.00' },
+        },
+        {
+          id: 11,
+          productId: 'p2',
+          quantity: 1,
+          unitPrice: { toString: () => '50.00' },
+        },
+      ]);
+
+      await service.replace(3, {
+        clientId: 'c1',
+        items: [{ productId: 'p1', quantity: 2 }],
+      });
+
+      expect(prisma.negotiationItem.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [11] } },
+        data: { deletedAt: expect.any(Date) as Date },
+      });
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(200);
+    });
+
+    it('remover o último item deixa o total em R$ 0,00 (RI9)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+      prisma.negotiationItem.findMany.mockResolvedValue([
+        {
+          id: 10,
+          productId: 'p1',
+          quantity: 2,
+          unitPrice: { toString: () => '100.00' },
+        },
+      ]);
+
+      await service.replace(3, { clientId: 'c1', items: [] });
+
+      expect(prisma.negotiationItem.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [10] } },
+        data: { deletedAt: expect.any(Date) as Date },
+      });
+      const arg = callArg<{ data: { totalValue: number } }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBe(0);
+    });
+
+    it('Negociação sem itens desde sempre mantém o valor informado (RI8)', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ totalValue: { toString: () => '1500.00' } }),
+      );
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
+
+      await service.replace(3, { clientId: 'c1', items: [] });
+
+      const arg = callArg<{ data: Record<string, unknown> }>(
+        prisma.negotiation.update,
+      );
+      expect(arg.data.totalValue).toBeUndefined();
+    });
+
+    it('recusa Produto repetido no envio (RI3), sem gravar nada', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await expect(
+        service.replace(3, {
+          clientId: 'c1',
+          items: [
+            { productId: 'p1', quantity: 1 },
+            { productId: 'p1', quantity: 2 },
+          ],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.negotiation.update).not.toHaveBeenCalled();
     });
   });
 });

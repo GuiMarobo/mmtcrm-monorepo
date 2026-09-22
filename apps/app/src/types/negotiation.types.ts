@@ -71,8 +71,8 @@ export interface CreateNegotiationPayload {
   notes?: string | null
 }
 
-export interface UpdateNegotiationPayload {
-  clientId?: string
-  totalValue?: number
+export interface ReplaceNegotiationPayload {
+  clientId: string
+  items: CreateNegotiationItemPayload[]
   notes?: string | null
 }

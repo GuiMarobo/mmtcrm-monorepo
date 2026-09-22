@@ -8,23 +8,22 @@ import { useState } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
 import { NegotiationItemsEditor } from './NegotiationItemsEditor'
-import { formatCurrency } from '../../utils/format'
+import type { NegotiationItemFormValue } from './NegotiationItemsEditor'
 import type {
   Client,
-  CreateNegotiationItemPayload,
   CreateNegotiationPayload,
-  Negotiation,
+  NegotiationDetail,
   Product,
-  UpdateNegotiationPayload,
+  ReplaceNegotiationPayload,
 } from '../../types'
 
 interface NegotiationFormModalProps {
-  negotiation: Negotiation | null
+  negotiation: NegotiationDetail | null
   clients: Client[]
   products: Product[]
   onClose: () => void
   onCreate: (payload: CreateNegotiationPayload) => Promise<void>
-  onUpdate: (payload: UpdateNegotiationPayload) => Promise<void>
+  onUpdate: (payload: ReplaceNegotiationPayload) => Promise<void>
 }
 
 export function NegotiationFormModal({
@@ -37,19 +36,18 @@ export function NegotiationFormModal({
 }: NegotiationFormModalProps) {
   const isEdit = !!negotiation
   const [clientId, setClientId] = useState(negotiation?.clientId ?? '')
-  const [items, setItems] = useState<CreateNegotiationItemPayload[]>([])
-  const [totalValue, setTotalValue] = useState(
-    negotiation ? String(negotiation.totalValue) : '',
+  const [items, setItems] = useState<NegotiationItemFormValue[]>(
+    negotiation
+      ? negotiation.items.map((item) => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        }))
+      : [],
   )
   const [notes, setNotes] = useState(negotiation?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-
-  const availableProducts = products.filter((p) => p.status === 'ATIVO')
-
-  const parsedTotal = Number(totalValue.replace(',', '.'))
-  const totalInvalid =
-    isEdit && totalValue.trim() !== '' && (Number.isNaN(parsedTotal) || parsedTotal < 0)
 
   const submit = async () => {
     setError(null)
@@ -58,23 +56,23 @@ export function NegotiationFormModal({
       return
     }
 
+    const payloadItems = items.map(({ productId, quantity }) => ({
+      productId,
+      quantity,
+    }))
+
     setSaving(true)
     try {
       if (isEdit) {
-        if (totalValue.trim() === '' || Number.isNaN(parsedTotal) || parsedTotal < 0) {
-          setError('Informe um valor total válido, igual ou maior que zero.')
-          setSaving(false)
-          return
-        }
         await onUpdate({
           clientId,
-          totalValue: Math.round(parsedTotal * 100) / 100,
+          items: payloadItems,
           notes: notes.trim() || null,
         })
       } else {
         await onCreate({
           clientId,
-          items,
+          items: payloadItems,
           notes: notes.trim() || null,
         })
       }
@@ -132,37 +130,16 @@ export function NegotiationFormModal({
           )}
         />
 
-        {isEdit ? (
-          <TextField
-            label="Valor total"
-            type="number"
-            required
-            value={totalValue}
-            onChange={(e) => setTotalValue(e.target.value)}
-            placeholder="0,00"
-            error={totalInvalid}
-            helperText={
-              totalInvalid
-                ? 'Valor inválido'
-                : totalValue.trim() !== ''
-                  ? formatCurrency(parsedTotal)
-                  : ' '
-            }
-            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
-            fullWidth
+        <Box>
+          <Typography sx={{ fontSize: 12.5, fontWeight: 600, mb: 0.75 }}>
+            Itens da negociação
+          </Typography>
+          <NegotiationItemsEditor
+            products={products}
+            items={items}
+            onChange={setItems}
           />
-        ) : (
-          <Box>
-            <Typography sx={{ fontSize: 12.5, fontWeight: 600, mb: 0.75 }}>
-              Itens da negociação
-            </Typography>
-            <NegotiationItemsEditor
-              products={availableProducts}
-              items={items}
-              onChange={setItems}
-            />
-          </Box>
-        )}
+        </Box>
 
         <TextField
           label="Observações"

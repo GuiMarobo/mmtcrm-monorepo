@@ -23,10 +23,11 @@ import type {
   Client,
   CreateNegotiationPayload,
   Negotiation,
+  NegotiationDetail,
   NegotiationStatus,
   PaymentMethod,
   Product,
-  UpdateNegotiationPayload,
+  ReplaceNegotiationPayload,
 } from '../types'
 
 interface NegociacoesProps {
@@ -46,7 +47,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [view, setView] = useState<NegotiationView>('quadro')
   const [creating, setCreating] = useState(false)
-  const [editing, setEditing] = useState<Negotiation | null>(null)
+  const [editing, setEditing] = useState<NegotiationDetail | null>(null)
   const [converting, setConverting] = useState<Negotiation | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Negotiation | null>(null)
@@ -93,12 +94,24 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     setCreating(false)
   }
 
-  const updateNegotiation = async (payload: UpdateNegotiationPayload) => {
+  const updateNegotiation = async (payload: ReplaceNegotiationPayload) => {
     if (!editing) return
-    const updated = await negotiationsApi.update(editing.id, payload)
+    const updated = await negotiationsApi.replace(editing.id, payload)
     replaceInList(updated)
     toast('Negociação atualizada')
     setEditing(null)
+  }
+
+  const openEdit = async (negotiation: Negotiation) => {
+    try {
+      const detail = await negotiationsApi.findOne(negotiation.id)
+      setEditing(detail)
+    } catch (err) {
+      toast(
+        err instanceof ApiError ? err.message : 'Erro ao carregar a negociação',
+        'error',
+      )
+    }
   }
 
   const requestTransition = (
@@ -220,7 +233,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
             items={list}
             onMove={requestTransition}
             onRefuse={() => toast(TRANSITION_REFUSAL, 'error')}
-            onEdit={setEditing}
+            onEdit={(n) => void openEdit(n)}
             onDelete={setConfirmDelete}
           />
         ))}
@@ -229,7 +242,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
         <NegotiationListView
           items={list}
           loading={loading}
-          onEdit={setEditing}
+          onEdit={(n) => void openEdit(n)}
           onRequestTransition={(n, t) => void requestTransition(n, t)}
           onDelete={setConfirmDelete}
         />
