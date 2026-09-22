@@ -415,6 +415,7 @@ describe('NegotiationsService', () => {
       });
       prisma.negotiation.update.mockResolvedValue({});
       prisma.order.updateMany.mockResolvedValue({});
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
     });
 
     it('vindo de GANHA, marca o Pedido como DESISTENCIA e grava statusChangedAt (RN3/RN13)', async () => {
@@ -482,6 +483,139 @@ describe('NegotiationsService', () => {
       await service.reopen(3, RoleEnum.VENDEDOR, 42);
 
       expect(prisma.negotiation.update).toHaveBeenCalled();
+    });
+
+    describe('devolução de venda (RB4-RB6, ticket 14)', () => {
+      const inbound = (productId: string, quantity: number) => ({
+        productId,
+        type: 'ENTRADA',
+        quantity,
+        orderId: 9,
+        userId: 42,
+      });
+
+      const movements = () =>
+        prisma.stockMovement.create.mock.calls.map(
+          ([arg]: [{ data: Record<string, unknown> }]) => arg.data,
+        ) as unknown;
+
+      beforeEach(() => {
+        prisma.product.updateMany.mockResolvedValue({ count: 1 });
+        prisma.stockMovement.create.mockResolvedValue({});
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          { productId: 'p1', quantity: 2 },
+          { productId: 'p2', quantity: 5 },
+        ]);
+      });
+
+      it('reabrir GANHA devolve uma Entrada por item, ligada ao Pedido e com o autor', async () => {
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
+        );
+
+        await service.reopen(3, RoleEnum.VENDEDOR, 42);
+
+        expect(
+          callArg<{ where: Record<string, unknown> }>(
+            prisma.negotiationItem.findMany,
+          ).where,
+        ).toEqual({ deletedAt: null, negotiationId: 3 });
+        expect(movements()).toEqual([inbound('p1', 2), inbound('p2', 5)]);
+        const increments = prisma.product.updateMany.mock.calls.map(
+          ([arg]: [{ data: unknown }]) => arg.data,
+        ) as unknown;
+        expect(increments).toEqual([
+          { stock: { increment: 2 } },
+          { stock: { increment: 5 } },
+        ]);
+      });
+
+      it('devolve dentro da transação da reabertura', async () => {
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
+        );
+
+        await service.reopen(3, RoleEnum.VENDEDOR, 42);
+
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.stockMovement.create).toHaveBeenCalledTimes(2);
+      });
+
+      it('devolve mesmo que o Produto tenha sido excluído depois da conversão (RB5)', async () => {
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
+        );
+
+        await service.reopen(3, RoleEnum.VENDEDOR, 42);
+
+        const wheres = prisma.product.updateMany.mock.calls.map(
+          ([arg]: [{ where: unknown }]) => arg.where,
+        ) as unknown;
+        expect(wheres).toEqual([{ id: 'p1' }, { id: 'p2' }]);
+      });
+
+      it('ADMIN reabrindo Pedido com Compra Aprovada também devolve (RN11)', async () => {
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
+        );
+
+        await service.reopen(3, RoleEnum.ADMIN, 7);
+
+        expect(movements()).toEqual([
+          { ...inbound('p1', 2), userId: 7 },
+          { ...inbound('p2', 5), userId: 7 },
+        ]);
+      });
+
+      it('VENDEDOR barrado pela RN11 não devolve nada', async () => {
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'GANHA', order: order('COMPRA_APROVADA') }),
+        );
+
+        await expect(
+          service.reopen(3, RoleEnum.VENDEDOR, 42),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+      });
+
+      it('reabrir PERDIDA não gera movimento nenhum (RB6)', async () => {
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'PERDIDA' }),
+        );
+
+        await service.reopen(3, RoleEnum.VENDEDOR, 42);
+
+        expect(prisma.negotiationItem.findMany).not.toHaveBeenCalled();
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+      });
+
+      it('reconverter depois de reabrir baixa de novo', async () => {
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'GANHA', order: order('EM_NEGOCIACAO') }),
+        );
+        await service.reopen(3, RoleEnum.VENDEDOR, 42);
+
+        prisma.stockMovement.create.mockClear();
+        prisma.product.updateMany.mockClear();
+        prisma.negotiation.findFirst.mockResolvedValue(
+          negotiationRow({ status: 'ABERTA', order: order('DESISTENCIA') }),
+        );
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 2),
+          convertItem('p2', 5),
+        ]);
+        prisma.order.upsert.mockResolvedValue({ id: 9 });
+        prisma.client.update.mockResolvedValue({});
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(movements()).toEqual([
+          { ...inbound('p1', 2), type: 'SAIDA' },
+          { ...inbound('p2', 5), type: 'SAIDA' },
+        ]);
+      });
     });
   });
 

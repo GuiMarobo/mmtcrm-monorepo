@@ -460,6 +460,46 @@ describe('ProductsService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.stockMovement.create).not.toHaveBeenCalled();
     });
+
+    it('sem includeDeleted, só alcança Produto não excluído', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.stockMovement.create.mockResolvedValue({ id: 'm4' });
+
+      await service.recordStockMovement(asPrismaService(prisma), {
+        productId: 'p1',
+        type: StockMovementTypeEnum.ENTRADA,
+        quantity: 2,
+      });
+
+      expect(
+        callArg<{ where: Record<string, unknown> }>(prisma.product.updateMany)
+          .where,
+      ).toEqual({ deletedAt: null, id: 'p1' });
+    });
+
+    it('com includeDeleted, devolve ao saldo de Produto excluído (RB5, ticket 14)', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.stockMovement.create.mockResolvedValue({ id: 'm5' });
+
+      await service.recordStockMovement(asPrismaService(prisma), {
+        productId: 'p1',
+        type: StockMovementTypeEnum.ENTRADA,
+        quantity: 2,
+        orderId: 7,
+        includeDeleted: true,
+      });
+
+      const update = callArg<{
+        where: Record<string, unknown>;
+        data: { stock: { increment: number } };
+      }>(prisma.product.updateMany);
+      expect(update.where).toEqual({ id: 'p1' });
+      expect(update.data.stock).toEqual({ increment: 2 });
+      expect(
+        callArg<{ data: Record<string, unknown> }>(prisma.stockMovement.create)
+          .data,
+      ).toMatchObject({ productId: 'p1', type: 'ENTRADA', orderId: 7 });
+    });
   });
 
   describe('update — editar dados do Produto (RP3)', () => {

@@ -710,11 +710,7 @@ export class NegotiationsService {
     return this.findOne(id);
   }
 
-  // userId: autor da devolução de venda gravada na transação de reabertura
-  // (ticket 14 da spec 010). Ainda não usado aqui — este ticket só faz o dado
-  // chegar.
   async reopen(id: number, actorRole: RoleEnum, userId: number) {
-    void userId;
     const negotiation = await this.ensureExists(id);
     this.assertTransition(negotiation.status, 'ABERTA');
 
@@ -740,6 +736,26 @@ export class NegotiationsService {
           where: { ...NOT_DELETED, negotiationId: id },
           data: { status: 'DESISTENCIA', statusChangedAt: new Date() },
         });
+
+        // RB4/RB5 (ADR 0016): devolução de venda — uma Entrada por item não
+        // excluído, espelhando a Saída da conversão (os itens não mudam
+        // enquanto GANHA), ligada ao Pedido e com o autor da reabertura.
+        // Alcança Produto excluído depois da conversão, para o saldo continuar
+        // batendo com os movimentos (ADR 0013). PERDIDA nunca baixou (RB6).
+        const items = await tx.negotiationItem.findMany({
+          where: { ...NOT_DELETED, negotiationId: id },
+          select: { productId: true, quantity: true },
+        });
+        for (const item of items) {
+          await this.products.recordStockMovement(tx, {
+            productId: item.productId,
+            type: StockMovementTypeEnum.ENTRADA,
+            quantity: item.quantity,
+            userId,
+            orderId: negotiation.order?.id,
+            includeDeleted: true,
+          });
+        }
       }
 
       await tx.negotiation.update({
