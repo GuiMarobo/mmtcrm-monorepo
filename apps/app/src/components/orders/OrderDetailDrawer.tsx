@@ -11,12 +11,12 @@ import { DetailField, DetailSection } from '../common/DetailSection'
 import { OrderStatusBadge } from '../common/OrderStatusBadge'
 import { ToneChip } from '../common/ToneChip'
 import { CLIENT_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../../types'
-import { formatCurrency, formatDate } from '../../utils/format'
+import { formatCurrency, formatDate, formatPercent } from '../../utils/format'
 import type { NegotiationItem, Order } from '../../types'
 
 interface OrderDetailDrawerProps {
   order: Order
-  items: NegotiationItem[]
+  items: NegotiationItem[] | null
   approving: boolean
   onApprove: () => void
   onGoToNegotiations: () => void
@@ -26,7 +26,7 @@ interface OrderDetailDrawerProps {
 function discountLabel(item: NegotiationItem) {
   const amount = `-${formatCurrency(item.discountAmount)}`
   return item.discountType === 'PERCENTUAL'
-    ? `Desconto ${item.discountValue.toLocaleString('pt-BR')}% · ${amount}`
+    ? `Desconto ${formatPercent(item.discountValue)} · ${amount}`
     : `Desconto ${amount}`
 }
 
@@ -135,10 +135,16 @@ export function OrderDetailDrawer({
         </DetailSection>
         <Divider />
 
-        {items.length > 0 && (
+        {(items === null || items.length > 0) && (
           <>
             <DetailSection title="Itens">
-              <OrderItemsList items={items} />
+              {items === null ? (
+                <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
+                  Carregando itens…
+                </Typography>
+              ) : (
+                <OrderItemsList items={items} />
+              )}
             </DetailSection>
             <Divider />
           </>

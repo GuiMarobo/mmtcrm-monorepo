@@ -176,4 +176,20 @@ describe('OrderDetailDrawer', () => {
     expect(screen.queryByRole('list', { name: 'Itens' })).not.toBeInTheDocument()
     expect(screen.queryByText('Itens')).not.toBeInTheDocument()
   })
+
+  it('enquanto os itens carregam, avisa em vez de parecer um Pedido sem itens', () => {
+    render(
+      <OrderDetailDrawer
+        order={order()}
+        items={null}
+        approving={false}
+        onApprove={noop}
+        onGoToNegotiations={noop}
+        onClose={noop}
+      />,
+    )
+
+    expect(screen.getByText('Carregando itens…')).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Itens' })).not.toBeInTheDocument()
+  })
 })

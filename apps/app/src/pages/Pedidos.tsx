@@ -20,7 +20,7 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Order | null>(null)
-  const [selectedItems, setSelectedItems] = useState<NegotiationItem[]>([])
+  const [selectedItems, setSelectedItems] = useState<NegotiationItem[] | null>(null)
   const openedId = useRef<number | null>(null)
   const [pendingApprove, setPendingApprove] = useState<Order | null>(null)
   const [approving, setApproving] = useState(false)
@@ -46,11 +46,13 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
   const openDetail = async (order: Order) => {
     openedId.current = order.id
     setSelected(order)
-    setSelectedItems([])
+    setSelectedItems(null)
     try {
       const detail = await ordersApi.findOne(order.id)
       if (openedId.current === order.id) setSelectedItems(detail.items)
     } catch (err) {
+      if (openedId.current !== order.id) return
+      setSelectedItems([])
       toast(
         err instanceof ApiError ? err.message : 'Falha ao carregar os itens do pedido',
         'error',
