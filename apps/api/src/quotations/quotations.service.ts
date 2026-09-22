@@ -92,6 +92,18 @@ type QuotationWithItemsRow = Prisma.QuotationGetPayload<{
   select: typeof quotationWithItemsSelect;
 }>;
 
+// RQ12: o documento não guarda Cliente nem vendedor — lê os dois pela
+// Negociação na hora, e a anonimização da LGPD aparece sem código novo.
+const quotationDetailSelect = {
+  ...quotationWithItemsSelect,
+  negotiation: {
+    select: {
+      client: { select: { id: true, name: true, anonymizedAt: true } },
+      vendedor: { select: { id: true, name: true } },
+    },
+  },
+} satisfies Prisma.QuotationSelect;
+
 @Injectable()
 export class QuotationsService {
   constructor(
@@ -264,6 +276,27 @@ export class QuotationsService {
     });
 
     return this.toResponseWithItems(quotation);
+  }
+
+  // O mesmo papel sempre: itens, preços e taxa do dia da emissão. Vencido
+  // continua consultável e reexportável (RQ10).
+  async findOne(id: number) {
+    const quotation = await this.prisma.quotation.findFirst({
+      where: { id, negotiation: NOT_DELETED },
+      select: quotationDetailSelect,
+    });
+    if (!quotation) throw new NotFoundException('Orçamento não encontrado');
+
+    const { negotiation, ...rest } = quotation;
+    return {
+      ...this.toResponseWithItems(rest),
+      client: {
+        id: negotiation.client.id,
+        name: negotiation.client.name,
+        anonymized: negotiation.client.anonymizedAt !== null,
+      },
+      seller: negotiation.vendedor,
+    };
   }
 
   // RQ9: todos os emitidos valem ao mesmo tempo — a lista é só do mais novo

@@ -64,4 +64,19 @@ export class QuotationsController {
   findByNegotiation(@Param('id', ParseIntPipe) id: number) {
     return this.quotationsService.findByNegotiation(id);
   }
+
+  @Get('quotations/:id')
+  @ApiOperation({
+    summary: 'Detalhar um Orçamento emitido',
+    description:
+      'O que saiu no papel: dados congelados, itens com nome e código do ' +
+      'Produto lidos do catálogo, parcelas derivadas, e Cliente e vendedor ' +
+      'responsável lidos pela negociação. Vencido continua consultável.',
+  })
+  @ApiResponse({ status: 200, description: 'Orçamento emitido' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Orçamento não encontrado' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.quotationsService.findOne(id);
+  }
 }

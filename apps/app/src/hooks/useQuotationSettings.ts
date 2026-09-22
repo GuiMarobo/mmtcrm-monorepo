@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from 'react'
 import { ApiError, settingsApi } from '../api'
-import type { InstallmentRate } from '../types'
+import type { CompanySettings, InstallmentRate } from '../types'
 
 export function useQuotationSettings() {
   const [rates, setRates] = useState<InstallmentRate[] | null>(null)
   const [defaultValidityDays, setDefaultValidityDays] = useState<number | null>(null)
+  const [company, setCompany] = useState<CompanySettings | null>(null)
   const [error, setError] = useState<string | null>(null)
   const latest = useRef(0)
 
@@ -17,6 +18,7 @@ export function useQuotationSettings() {
       if (request !== latest.current) return
       setRates(settings.installmentRates)
       setDefaultValidityDays(settings.company.defaultValidityDays)
+      setCompany(settings.company)
     } catch (err) {
       if (request !== latest.current) return
       setError(
@@ -25,5 +27,5 @@ export function useQuotationSettings() {
     }
   }, [])
 
-  return { rates, defaultValidityDays, error, load }
+  return { rates, defaultValidityDays, company, error, load }
 }

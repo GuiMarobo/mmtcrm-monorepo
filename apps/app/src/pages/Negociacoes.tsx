@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { useNegotiationQuotations } from '../hooks/useNegotiationQuotations'
+import { useQuotationDetail } from '../hooks/useQuotationDetail'
 import { useQuotationSettings } from '../hooks/useQuotationSettings'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
@@ -19,6 +20,7 @@ import {
   canTransition,
   TRANSITION_REFUSAL,
 } from '../components/negotiations/transitions'
+import { QuotationDetailDialog } from '../components/quotations/QuotationDetailDialog'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
@@ -55,6 +57,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [editing, setEditing] = useState<NegotiationDetail | null>(null)
   const quotationSettings = useQuotationSettings()
   const negotiationQuotations = useNegotiationQuotations()
+  const quotationDetail = useQuotationDetail()
   const [converting, setConverting] = useState<Negotiation | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Negotiation | null>(null)
@@ -114,6 +117,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     try {
       const issued = await negotiationQuotations.issue(editing.id, payload)
       toast(`Orçamento ${issued.code} emitido`)
+      void quotationDetail.open(issued.id)
     } catch (err) {
       toast(
         err instanceof ApiError ? err.message : 'Não foi possível emitir o orçamento.',
@@ -277,12 +281,22 @@ export function Negociacoes({ toast }: NegociacoesProps) {
           quotations={negotiationQuotations.quotations}
           quotationsError={negotiationQuotations.error}
           onIssueQuotation={issueQuotation}
+          onOpenQuotation={(quotation) => void quotationDetail.open(quotation.id)}
           onClose={() => {
             setCreating(false)
             setEditing(null)
           }}
           onCreate={createNegotiation}
           onUpdate={updateNegotiation}
+        />
+      )}
+
+      {quotationDetail.openId !== null && (
+        <QuotationDetailDialog
+          quotation={quotationDetail.quotation}
+          company={quotationSettings.company}
+          error={quotationDetail.error}
+          onClose={quotationDetail.close}
         />
       )}
 

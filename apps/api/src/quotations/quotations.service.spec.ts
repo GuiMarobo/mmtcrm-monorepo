@@ -580,6 +580,134 @@ describe('QuotationsService', () => {
     });
   });
 
+  describe('findOne', () => {
+    const detailRow = (overrides: Record<string, unknown> = {}) => ({
+      id: 7,
+      negotiationId: 3,
+      code: 'ORC-7',
+      totalValue: decimal('11350.00'),
+      installments: 12,
+      ratePercent: decimal('0.00'),
+      totalWithInterest: decimal('11350.00'),
+      validUntil: new Date('2026-10-02T00:00:00Z'),
+      createdAt: new Date('2026-09-22T12:00:00Z'),
+      author: { id: 5, name: 'Outra Vendedora' },
+      negotiation: {
+        client: { id: 'c1', name: 'Fulana de Tal', anonymizedAt: null },
+        vendedor: { id: 2, name: 'Vendedora Responsável' },
+      },
+      items: [
+        {
+          id: 100,
+          quantity: 2,
+          unitPrice: decimal('600.00'),
+          discountType: 'PERCENTUAL',
+          discountValue: decimal('10.00'),
+          product: product('p1', 'iPhone 15 Pro'),
+        },
+      ],
+      ...overrides,
+    });
+
+    it('devolve os dados congelados, os itens com nome e código do catálogo e a parcela com resíduo', async () => {
+      prisma.quotation.findFirst.mockResolvedValue(detailRow());
+
+      const result = await service.findOne(7);
+
+      expect(
+        callArg<{ where: Record<string, unknown> }>(prisma.quotation.findFirst)
+          .where,
+      ).toEqual({ id: 7, negotiation: { deletedAt: null } });
+      expect(result).toMatchObject({
+        id: 7,
+        code: 'ORC-7',
+        totalValue: 11350,
+        installments: 12,
+        totalWithInterest: 11350,
+        installmentValue: 945.83,
+        firstInstallmentValue: 945.87,
+        validUntil: '2026-10-02',
+        expired: false,
+        author: { id: 5, name: 'Outra Vendedora' },
+      });
+      expect(result.items).toEqual([
+        {
+          id: 100,
+          product: {
+            id: 'p1',
+            name: 'iPhone 15 Pro',
+            sku: 'P1-SKU',
+            status: 'ATIVO',
+            deleted: false,
+          },
+          quantity: 2,
+          unitPrice: 600,
+          discountType: 'PERCENTUAL',
+          discountValue: 10,
+          discountAmount: 120,
+          subtotal: 1080,
+        },
+      ]);
+    });
+
+    it('lê o Cliente e o vendedor responsável pela Negociação, não pelo autor (RQ12)', async () => {
+      prisma.quotation.findFirst.mockResolvedValue(detailRow());
+
+      const result = await service.findOne(7);
+
+      expect(result.client).toEqual({
+        id: 'c1',
+        name: 'Fulana de Tal',
+        anonymized: false,
+      });
+      expect(result.seller).toEqual({ id: 2, name: 'Vendedora Responsável' });
+    });
+
+    it('Cliente anonimizado pela LGPD aparece anonimizado', async () => {
+      prisma.quotation.findFirst.mockResolvedValue(
+        detailRow({
+          negotiation: {
+            client: {
+              id: 'c1',
+              name: 'Cliente anonimizado',
+              anonymizedAt: new Date('2026-09-20T00:00:00Z'),
+            },
+            vendedor: { id: 2, name: 'Vendedora Responsável' },
+          },
+        }),
+      );
+
+      const result = await service.findOne(7);
+
+      expect(result.client).toEqual({
+        id: 'c1',
+        name: 'Cliente anonimizado',
+        anonymized: true,
+      });
+    });
+
+    it('vencido continua consultável, com expired derivado (RQ10)', async () => {
+      prisma.quotation.findFirst.mockResolvedValue(
+        detailRow({ validUntil: new Date('2026-09-21T00:00:00Z') }),
+      );
+
+      await expect(service.findOne(7)).resolves.toMatchObject({
+        expired: true,
+      });
+    });
+
+    it('404 quando o Orçamento não existe', async () => {
+      prisma.quotation.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne(99)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.findOne(99)).rejects.toThrow(
+        'Orçamento não encontrado',
+      );
+    });
+  });
+
   // RQ3: a autorização é do RolesGuard global, a partir do @Roles do
   // controller — sem restrição de responsável.
   describe('perfis (RQ3)', () => {
@@ -602,7 +730,7 @@ describe('QuotationsService', () => {
       }
     };
 
-    it.each(['issue', 'findByNegotiation'] as const)(
+    it.each(['issue', 'findByNegotiation', 'findOne'] as const)(
       '%s: ADMIN e VENDEDOR passam; ATENDENTE e TECNICO levam 403',
       (handler) => {
         expect(canCall(handler, RoleEnum.ADMIN)).toBe(true);

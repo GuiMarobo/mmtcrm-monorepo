@@ -52,10 +52,14 @@ const renderModal = ({
   negotiation = negotiationDetail(),
   installmentRates = rates({ 10: 5, 12: 10 }),
   installmentRatesError = null,
+  quotations = [],
+  onOpenQuotation = vi.fn(),
 }: {
   negotiation?: NegotiationDetail
   installmentRates?: InstallmentRate[] | null
   installmentRatesError?: string | null
+  quotations?: Quotation[] | null
+  onOpenQuotation?: (quotation: Quotation) => void
 } = {}) =>
   render(
     <NegotiationFormModal
@@ -65,6 +69,8 @@ const renderModal = ({
       products={[]}
       installmentRates={installmentRates}
       installmentRatesError={installmentRatesError}
+      quotations={quotations}
+      onOpenQuotation={onOpenQuotation}
       onClose={vi.fn()}
       onCreate={vi.fn()}
       onUpdate={vi.fn()}
@@ -228,14 +234,19 @@ describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () =>
     expect(screen.getByRole('alert')).toHaveTextContent('Falha ao carregar as taxas.')
   })
 
-  it('Negociação fora de Aberta: aba desabilitada, com o motivo visível (RQ2)', () => {
-    renderModal({ negotiation: negotiationDetail({ status: 'GANHA' }) })
+  it.each(['GANHA', 'PERDIDA'] as const)(
+    'Negociação %s sem emitido: aba desabilitada, com o motivo visível (RQ2)',
+    (status) => {
+      renderModal({ negotiation: negotiationDetail({ status }) })
 
-    expect(screen.getByRole('tab', { name: 'Orçamentos' })).toBeDisabled()
-    expect(screen.getByText('Orçamentos só para negociação em aberto.')).toBeInTheDocument()
-  })
+      expect(screen.getByRole('tab', { name: 'Orçamentos' })).toBeDisabled()
+      expect(
+        screen.getByText('Simular e emitir orçamento só para negociação em aberto.'),
+      ).toBeInTheDocument()
+    },
+  )
 
-  it('Negociação sem itens: aba desabilitada, com o motivo visível (RQ2)', () => {
+  it('Negociação sem itens e sem emitido: aba desabilitada, com o motivo visível (RQ2)', () => {
     renderModal({ negotiation: negotiationDetail({ items: [], totalValue: 0 }) })
 
     expect(screen.getByRole('tab', { name: 'Orçamentos' })).toBeDisabled()
@@ -486,5 +497,107 @@ describe('NegotiationFormModal — emitir Orçamento (spec 011, ticket 03)', () 
         'Só é possível emitir orçamento de uma negociação em aberto',
       ),
     )
+  })
+})
+
+describe('NegotiationFormModal — emitidos depois que a Negociação fecha (spec 011, ticket 04)', () => {
+  it.each(['GANHA', 'PERDIDA'] as const)(
+    'Negociação %s com emitido: a aba abre, lista os emitidos e mostra o motivo, sem simular nem emitir',
+    async (status) => {
+      const user = userEvent.setup()
+      renderModal({
+        negotiation: negotiationDetail({ status }),
+        quotations: [quotation()],
+      })
+
+      const tab = screen.getByRole('tab', { name: 'Orçamentos' })
+      expect(tab).toBeEnabled()
+      await user.click(tab)
+
+      expect(screen.getByRole('table', { name: 'Orçamentos emitidos' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'ORC-7' })).toBeInTheDocument()
+      expect(
+        screen.getByText('Simular e emitir orçamento só para negociação em aberto.'),
+      ).toBeVisible()
+      expect(
+        screen.queryByRole('table', { name: 'Simulação de parcelamento' }),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Emitir/ })).not.toBeInTheDocument()
+    },
+  )
+
+  it('Negociação que perdeu os itens, com emitido: a aba abre com a lista e o motivo', async () => {
+    const user = userEvent.setup()
+    renderModal({
+      negotiation: negotiationDetail({ items: [], totalValue: 0 }),
+      quotations: [quotation()],
+    })
+
+    await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
+
+    expect(screen.getByRole('button', { name: 'ORC-7' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Salve ao menos um item na negociação para simular o parcelamento.'),
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('table', { name: 'Simulação de parcelamento' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('abrir um emitido da lista leva ao detalhe', async () => {
+    const user = userEvent.setup()
+    const onOpenQuotation = vi.fn()
+    const issued = quotation({ id: 9, code: 'ORC-9' })
+    renderModal({
+      negotiation: negotiationDetail({ status: 'GANHA' }),
+      quotations: [issued],
+      onOpenQuotation,
+    })
+
+    await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
+    await user.click(screen.getByRole('button', { name: 'ORC-9' }))
+
+    expect(onOpenQuotation).toHaveBeenCalledWith(issued)
+  })
+
+  it('Negociação Aberta com itens também abre o detalhe de um emitido', async () => {
+    const user = userEvent.setup()
+    const onOpenQuotation = vi.fn()
+    renderModal({ quotations: [quotation()], onOpenQuotation })
+
+    await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
+    await user.click(screen.getByRole('button', { name: 'ORC-7' }))
+
+    expect(onOpenQuotation).toHaveBeenCalledTimes(1)
+  })
+
+  it('Negociação fechada com a lista ainda carregando: a aba abre e avisa que carrega', async () => {
+    const user = userEvent.setup()
+    renderModal({ negotiation: negotiationDetail({ status: 'GANHA' }), quotations: null })
+
+    await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
+
+    expect(screen.getByText('Carregando orçamentos…')).toBeInTheDocument()
+  })
+
+  it('Negociação fechada com falha ao carregar os emitidos: a aba abre e mostra o erro', async () => {
+    const user = userEvent.setup()
+    render(
+      <NegotiationFormModal
+        isAdmin={false}
+        negotiation={negotiationDetail({ status: 'PERDIDA' })}
+        clients={[]}
+        products={[]}
+        quotations={null}
+        quotationsError="Falha ao carregar os orçamentos."
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
+
+    expect(screen.getByText('Falha ao carregar os orçamentos.')).toBeInTheDocument()
   })
 })

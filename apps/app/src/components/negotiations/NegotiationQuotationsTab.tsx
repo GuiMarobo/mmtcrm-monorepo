@@ -2,6 +2,7 @@ import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import InputAdornment from '@mui/material/InputAdornment'
+import Link from '@mui/material/Link'
 import Radio from '@mui/material/Radio'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -15,6 +16,7 @@ import { ApiError } from '../../api'
 import { formatCurrency, formatDate, formatIsoDate, formatPercent } from '../../utils/format'
 import { ratePercentError } from '../../utils/validators'
 import { ToneChip } from '../common/ToneChip'
+import { describeCondition } from '../quotations/quotationCondition'
 import {
   MAX_INSTALLMENTS,
   simulateInstallment,
@@ -30,7 +32,9 @@ interface NegotiationQuotationsTabProps {
   defaultValidityDays: number
   quotations: Quotation[] | null
   quotationsError: string | null
+  blockedReason: string | null
   onIssueQuotation?: (payload: IssueQuotationPayload) => Promise<unknown>
+  onOpenQuotation?: (quotation: Quotation) => void
 }
 
 export function NegotiationQuotationsTab({
@@ -40,12 +44,16 @@ export function NegotiationQuotationsTab({
   defaultValidityDays,
   quotations,
   quotationsError,
+  blockedReason,
   onIssueQuotation,
+  onOpenQuotation,
 }: NegotiationQuotationsTabProps) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <IssuedQuotations quotations={quotations} error={quotationsError} />
-      {installmentRatesError ? (
+      <IssuedQuotations quotations={quotations} error={quotationsError} onOpen={onOpenQuotation} />
+      {blockedReason ? (
+        <Alert severity="info">{blockedReason}</Alert>
+      ) : installmentRatesError ? (
         <Alert severity="error">{installmentRatesError}</Alert>
       ) : !installmentRates ? (
         <Typography sx={{ p: 3, textAlign: 'center', color: 'text.disabled', fontSize: 13 }}>
@@ -65,27 +73,14 @@ export function NegotiationQuotationsTab({
 
 const INSTALLMENT_OPTIONS = Array.from({ length: MAX_INSTALLMENTS }, (_, index) => index + 1)
 
-function describeInstallments({
-  installments,
-  installmentValue,
-  firstInstallment,
-}: {
-  installments: number
-  installmentValue: number
-  firstInstallment: number
-}) {
-  if (firstInstallment === installmentValue) {
-    return `${installments}x de ${formatCurrency(installmentValue)}`
-  }
-  return `1ª de ${formatCurrency(firstInstallment)} + ${installments - 1}x de ${formatCurrency(installmentValue)}`
-}
-
 function IssuedQuotations({
   quotations,
   error,
+  onOpen,
 }: {
   quotations: Quotation[] | null
   error: string | null
+  onOpen?: (quotation: Quotation) => void
 }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -111,11 +106,33 @@ function IssuedQuotations({
           </TableHead>
           <TableBody>
             {quotations.map((quotation) => (
-              <TableRow key={quotation.id}>
-                <TableCell sx={{ fontWeight: 600 }}>{quotation.code}</TableCell>
+              <TableRow
+                key={quotation.id}
+                hover={!!onOpen}
+                onClick={onOpen ? () => onOpen(quotation) : undefined}
+                sx={onOpen ? { cursor: 'pointer' } : undefined}
+              >
+                <TableCell sx={{ fontWeight: 600 }}>
+                  {onOpen ? (
+                    <Link
+                      component="button"
+                      type="button"
+                      underline="hover"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpen(quotation)
+                      }}
+                      sx={{ fontWeight: 600, fontSize: 'inherit' }}
+                    >
+                      {quotation.code}
+                    </Link>
+                  ) : (
+                    quotation.code
+                  )}
+                </TableCell>
                 <TableCell>{formatDate(quotation.createdAt)}</TableCell>
                 <TableCell>
-                  {`${describeInstallments({
+                  {`${describeCondition({
                     installments: quotation.installments,
                     installmentValue: quotation.installmentValue,
                     firstInstallment: quotation.firstInstallmentValue,
@@ -251,7 +268,7 @@ function InstallmentSimulationTable({
                     }}
                   />
                 </TableCell>
-                <TableCell>{simulation ? describeInstallments(simulation) : '—'}</TableCell>
+                <TableCell>{simulation ? describeCondition(simulation) : '—'}</TableCell>
                 <TableCell align="right">
                   {simulation ? (
                     <>

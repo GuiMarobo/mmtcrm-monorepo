@@ -44,6 +44,7 @@ interface NegotiationFormModalProps {
   quotations?: Quotation[] | null
   quotationsError?: string | null
   onIssueQuotation?: (payload: IssueQuotationPayload) => Promise<unknown>
+  onOpenQuotation?: (quotation: Quotation) => void
   onClose: () => void
   onCreate: (payload: CreateNegotiationPayload) => Promise<void>
   onUpdate: (payload: ReplaceNegotiationPayload) => Promise<void>
@@ -60,19 +61,22 @@ export function NegotiationFormModal({
   quotations = null,
   quotationsError = null,
   onIssueQuotation,
+  onOpenQuotation,
   onClose,
   onCreate,
   onUpdate,
 }: NegotiationFormModalProps) {
   const isEdit = !!negotiation
   const [tab, setTab] = useState<NegotiationModalTab>('itens')
-  const quotationsBlockedReason = !negotiation
+  const issueBlockedReason = !negotiation
     ? null
     : negotiation.status !== 'ABERTA'
-      ? 'Orçamentos só para negociação em aberto.'
+      ? 'Simular e emitir orçamento só para negociação em aberto.'
       : negotiation.items.length === 0
         ? 'Salve ao menos um item na negociação para simular o parcelamento.'
         : null
+  const knownWithoutIssued = !quotationsError && !!quotations && quotations.length === 0
+  const quotationsTabDisabled = !!issueBlockedReason && knownWithoutIssued
   const [clientId, setClientId] = useState(negotiation?.clientId ?? '')
   const savedItems: NegotiationItemFormValue[] = negotiation
     ? negotiation.items.map((item) => ({
@@ -176,17 +180,17 @@ export function NegotiationFormModal({
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab value="itens" label="Itens" />
-            <Tab value="orcamentos" label="Orçamentos" disabled={!!quotationsBlockedReason} />
+            <Tab value="orcamentos" label="Orçamentos" disabled={quotationsTabDisabled} />
           </Tabs>
-          {quotationsBlockedReason && (
+          {quotationsTabDisabled && (
             <Typography sx={{ fontSize: 12, color: 'text.disabled', mt: 0.75 }}>
-              {quotationsBlockedReason}
+              {issueBlockedReason}
             </Typography>
           )}
         </Box>
       )}
 
-      {negotiation && !quotationsBlockedReason && (
+      {negotiation && !quotationsTabDisabled && (
         <Box hidden={tab !== 'orcamentos'}>
           <NegotiationQuotationsTab
             items={negotiation.items}
@@ -195,7 +199,9 @@ export function NegotiationFormModal({
             defaultValidityDays={defaultValidityDays}
             quotations={quotations}
             quotationsError={quotationsError}
+            blockedReason={issueBlockedReason}
             onIssueQuotation={onIssueQuotation}
+            onOpenQuotation={onOpenQuotation}
           />
         </Box>
       )}
