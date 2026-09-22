@@ -1,8 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NegotiationFormModal } from './NegotiationFormModal'
-import type { InstallmentRate, NegotiationDetail, NegotiationItem } from '../../types'
+import { ApiError } from '../../api'
+import type {
+  InstallmentRate,
+  NegotiationDetail,
+  NegotiationItem,
+  Quotation,
+} from '../../types'
 
 const item = (overrides: Partial<NegotiationItem> = {}): NegotiationItem => ({
   id: 10,
@@ -69,8 +75,13 @@ const openQuotations = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
 }
 
+const simulationBody = () =>
+  within(screen.getByRole('table', { name: 'Simulação de parcelamento' })).getAllByRole(
+    'rowgroup',
+  )[1]
+
 const row = (installments: number) =>
-  within(screen.getAllByRole('rowgroup')[1]).getAllByRole('row')[installments - 1]
+  within(simulationBody()).getAllByRole('row')[installments - 1]
 
 describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () => {
   it('abre na aba Itens, com a tela de hoje', () => {
@@ -113,8 +124,7 @@ describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () =>
     await openQuotations(user)
 
     expect(screen.getByText(/Total à vista/)).toHaveTextContent(/R\$\s1\.000,00/)
-    const body = screen.getAllByRole('rowgroup')[1]
-    expect(within(body).getAllByRole('row')).toHaveLength(12)
+    expect(within(simulationBody()).getAllByRole('row')).toHaveLength(12)
 
     expect(within(row(1)).getByLabelText('Taxa 1x')).toHaveValue(0)
     expect(within(row(1)).getByText(/1x de R\$\s1\.000,00/)).toBeInTheDocument()
@@ -205,7 +215,9 @@ describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () =>
     await openQuotations(user)
 
     expect(screen.getByText('Carregando taxas…')).toBeInTheDocument()
-    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('table', { name: 'Simulação de parcelamento' }),
+    ).not.toBeInTheDocument()
   })
 
   it('falha ao carregar as taxas vira mensagem', async () => {
@@ -254,5 +266,225 @@ describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () =>
     )
 
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+  })
+})
+
+const quotation = (overrides: Partial<Quotation> = {}): Quotation => ({
+  id: 7,
+  negotiationId: 3,
+  code: 'ORC-7',
+  totalValue: 1000,
+  installments: 10,
+  ratePercent: 5,
+  totalWithInterest: 1050,
+  installmentValue: 105,
+  firstInstallmentValue: 105,
+  validUntil: '2026-10-02',
+  expired: false,
+  createdAt: '2026-09-22T15:00:00Z',
+  author: { id: 2, name: 'Vendedora' },
+  ...overrides,
+})
+
+describe('NegotiationFormModal — emitir Orçamento (spec 011, ticket 03)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 8, 22, 12))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const renderIssuing = ({
+    quotations = [] as Quotation[] | null,
+    quotationsError = null as string | null,
+    onIssueQuotation = vi.fn().mockResolvedValue(quotation()),
+  } = {}) => {
+    render(
+      <NegotiationFormModal
+        isAdmin={false}
+        negotiation={negotiationDetail()}
+        clients={[]}
+        products={[]}
+        installmentRates={rates({ 10: 5 })}
+        installmentRatesError={null}
+        defaultValidityDays={10}
+        quotations={quotations}
+        quotationsError={quotationsError}
+        onIssueQuotation={onIssueQuotation}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    )
+    return { onIssueQuotation }
+  }
+
+  const issuedRows = () =>
+    within(
+      within(screen.getByRole('table', { name: 'Orçamentos emitidos' })).getAllByRole(
+        'rowgroup',
+      )[1],
+    ).getAllByRole('row')
+
+  it('lista os emitidos com código, data, condição, total e validade', async () => {
+    const user = userEvent.setup()
+    renderIssuing({
+      quotations: [
+        quotation({
+          id: 8,
+          code: 'ORC-8',
+          installments: 3,
+          ratePercent: 0,
+          totalWithInterest: 1000,
+          installmentValue: 333.33,
+          firstInstallmentValue: 333.34,
+        }),
+        quotation(),
+      ],
+    })
+    await openQuotations(user)
+
+    const [newest, oldest] = issuedRows()
+    expect(within(newest).getByText('ORC-8')).toBeInTheDocument()
+    expect(
+      within(newest).getByText(/1ª de R\$\s333,34 \+ 2x de R\$\s333,33/),
+    ).toBeInTheDocument()
+    expect(within(oldest).getByText('ORC-7')).toBeInTheDocument()
+    expect(within(oldest).getByText('22/09/2026')).toBeInTheDocument()
+    expect(within(oldest).getByText(/10x de R\$\s105,00 · 5%/)).toBeInTheDocument()
+    expect(within(oldest).getByText(/^R\$\s1\.050,00$/)).toBeInTheDocument()
+    expect(within(oldest).getByText('02/10/2026')).toBeInTheDocument()
+  })
+
+  it('rótulo Vencido só nos emitidos com validade passada (RQ10)', async () => {
+    const user = userEvent.setup()
+    renderIssuing({
+      quotations: [
+        quotation({ id: 8, code: 'ORC-8' }),
+        quotation({ validUntil: '2026-09-20', expired: true }),
+      ],
+    })
+    await openQuotations(user)
+
+    const [valid, expired] = issuedRows()
+    expect(within(valid).queryByText('Vencido')).not.toBeInTheDocument()
+    expect(within(expired).getByText('Vencido')).toBeInTheDocument()
+  })
+
+  it('sem emitidos, avisa que nenhum orçamento foi emitido', async () => {
+    const user = userEvent.setup()
+    renderIssuing()
+    await openQuotations(user)
+
+    expect(screen.getByText('Nenhum orçamento emitido nesta negociação.')).toBeInTheDocument()
+  })
+
+  it('falha ao carregar os emitidos vira mensagem', async () => {
+    const user = userEvent.setup()
+    renderIssuing({ quotations: null, quotationsError: 'Falha ao carregar os orçamentos.' })
+    await openQuotations(user)
+
+    expect(screen.getByText('Falha ao carregar os orçamentos.')).toBeInTheDocument()
+  })
+
+  it('validade vem pré-preenchida com hoje + a validade padrão da loja', async () => {
+    const user = userEvent.setup()
+    renderIssuing()
+    await openQuotations(user)
+
+    expect(screen.getByLabelText('Validade')).toHaveValue('2026-10-02')
+  })
+
+  it('emitir exige escolher uma condição', async () => {
+    const user = userEvent.setup()
+    renderIssuing()
+    await openQuotations(user)
+
+    expect(screen.getByRole('button', { name: 'Emitir orçamento' })).toBeDisabled()
+    await user.click(within(row(10)).getByLabelText('Escolher 10x'))
+    expect(screen.getByRole('button', { name: 'Emitir orçamento' })).toBeEnabled()
+  })
+
+  it('emite a condição escolhida com a taxa da linha e a validade', async () => {
+    const user = userEvent.setup()
+    const { onIssueQuotation } = renderIssuing()
+    await openQuotations(user)
+
+    await user.click(within(row(10)).getByLabelText('Escolher 10x'))
+    await user.click(screen.getByRole('button', { name: 'Emitir orçamento' }))
+
+    expect(onIssueQuotation).toHaveBeenCalledWith({
+      installments: 10,
+      ratePercent: 5,
+      validUntil: '2026-10-02',
+    })
+  })
+
+  it('emite com a taxa editada e a validade esticada', async () => {
+    const user = userEvent.setup()
+    const { onIssueQuotation } = renderIssuing()
+    await openQuotations(user)
+
+    await user.tripleClick(within(row(10)).getByLabelText('Taxa 10x'))
+    await user.keyboard('7.5')
+    await user.click(within(row(10)).getByLabelText('Escolher 10x'))
+    await user.clear(screen.getByLabelText('Validade'))
+    await user.type(screen.getByLabelText('Validade'), '2026-11-30')
+    await user.click(screen.getByRole('button', { name: 'Emitir orçamento' }))
+
+    expect(onIssueQuotation).toHaveBeenCalledWith({
+      installments: 10,
+      ratePercent: 7.5,
+      validUntil: '2026-11-30',
+    })
+  })
+
+  it('validade fora de amanhã a hoje + 90 dias aponta o erro e não emite', async () => {
+    const user = userEvent.setup()
+    const { onIssueQuotation } = renderIssuing()
+    await openQuotations(user)
+
+    await user.click(within(row(10)).getByLabelText('Escolher 10x'))
+    await user.clear(screen.getByLabelText('Validade'))
+    await user.type(screen.getByLabelText('Validade'), '2026-09-22')
+
+    expect(screen.getByText('De 23/09/2026 a 21/12/2026.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Emitir orçamento' })).toBeDisabled()
+    expect(onIssueQuotation).not.toHaveBeenCalled()
+  })
+
+  it('taxa inválida na linha escolhida não emite', async () => {
+    const user = userEvent.setup()
+    renderIssuing()
+    await openQuotations(user)
+
+    await user.click(within(row(10)).getByLabelText('Escolher 10x'))
+    await user.tripleClick(within(row(10)).getByLabelText('Taxa 10x'))
+    await user.keyboard('101')
+
+    expect(screen.getByRole('button', { name: 'Emitir orçamento' })).toBeDisabled()
+  })
+
+  it('recusa do servidor aparece na aba', async () => {
+    const user = userEvent.setup()
+    renderIssuing({
+      onIssueQuotation: vi
+        .fn()
+        .mockRejectedValue(
+          new ApiError(409, 'Só é possível emitir orçamento de uma negociação em aberto'),
+        ),
+    })
+    await openQuotations(user)
+
+    await user.click(within(row(10)).getByLabelText('Escolher 10x'))
+    await user.click(screen.getByRole('button', { name: 'Emitir orçamento' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Só é possível emitir orçamento de uma negociação em aberto',
+      ),
+    )
   })
 })

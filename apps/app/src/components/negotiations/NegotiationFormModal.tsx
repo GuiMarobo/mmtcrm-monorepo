@@ -22,12 +22,16 @@ import type {
   Client,
   CreateNegotiationPayload,
   InstallmentRate,
+  IssueQuotationPayload,
   NegotiationDetail,
   Product,
+  Quotation,
   ReplaceNegotiationPayload,
 } from '../../types'
 
 type NegotiationModalTab = 'itens' | 'orcamentos'
+
+const DEFAULT_VALIDITY_DAYS = 7
 
 interface NegotiationFormModalProps {
   negotiation: NegotiationDetail | null
@@ -36,6 +40,10 @@ interface NegotiationFormModalProps {
   products: Product[]
   installmentRates?: InstallmentRate[] | null
   installmentRatesError?: string | null
+  defaultValidityDays?: number
+  quotations?: Quotation[] | null
+  quotationsError?: string | null
+  onIssueQuotation?: (payload: IssueQuotationPayload) => Promise<unknown>
   onClose: () => void
   onCreate: (payload: CreateNegotiationPayload) => Promise<void>
   onUpdate: (payload: ReplaceNegotiationPayload) => Promise<void>
@@ -48,6 +56,10 @@ export function NegotiationFormModal({
   products,
   installmentRates = null,
   installmentRatesError = null,
+  defaultValidityDays = DEFAULT_VALIDITY_DAYS,
+  quotations = null,
+  quotationsError = null,
+  onIssueQuotation,
   onClose,
   onCreate,
   onUpdate,
@@ -180,6 +192,10 @@ export function NegotiationFormModal({
             items={negotiation.items}
             installmentRates={installmentRates}
             installmentRatesError={installmentRatesError}
+            defaultValidityDays={defaultValidityDays}
+            quotations={quotations}
+            quotationsError={quotationsError}
+            onIssueQuotation={onIssueQuotation}
           />
         </Box>
       )}

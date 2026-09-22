@@ -5,7 +5,8 @@ import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
-import { useInstallmentRates } from '../hooks/useInstallmentRates'
+import { useNegotiationQuotations } from '../hooks/useNegotiationQuotations'
+import { useQuotationSettings } from '../hooks/useQuotationSettings'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
 import { NegotiationBoard } from '../components/negotiations/NegotiationBoard'
@@ -24,6 +25,7 @@ import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
 import type {
   Client,
   CreateNegotiationPayload,
+  IssueQuotationPayload,
   Negotiation,
   NegotiationDetail,
   NegotiationStatus,
@@ -51,7 +53,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [view, setView] = useState<NegotiationView>('quadro')
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<NegotiationDetail | null>(null)
-  const installmentRates = useInstallmentRates()
+  const quotationSettings = useQuotationSettings()
+  const negotiationQuotations = useNegotiationQuotations()
   const [converting, setConverting] = useState<Negotiation | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Negotiation | null>(null)
@@ -106,8 +109,23 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     setEditing(null)
   }
 
+  const issueQuotation = async (payload: IssueQuotationPayload) => {
+    if (!editing) return
+    try {
+      const issued = await negotiationQuotations.issue(editing.id, payload)
+      toast(`Orçamento ${issued.code} emitido`)
+    } catch (err) {
+      toast(
+        err instanceof ApiError ? err.message : 'Não foi possível emitir o orçamento.',
+        'error',
+      )
+      throw err
+    }
+  }
+
   const openEdit = async (negotiation: Negotiation) => {
-    void installmentRates.load()
+    void quotationSettings.load()
+    void negotiationQuotations.load(negotiation.id)
     try {
       const detail = await negotiationsApi.findOne(negotiation.id)
       setEditing(detail)
@@ -253,8 +271,12 @@ export function Negociacoes({ toast }: NegociacoesProps) {
           isAdmin={user?.role === 'ADMIN'}
           clients={clients}
           products={products}
-          installmentRates={installmentRates.rates}
-          installmentRatesError={installmentRates.error}
+          installmentRates={quotationSettings.rates}
+          installmentRatesError={quotationSettings.error}
+          defaultValidityDays={quotationSettings.defaultValidityDays ?? undefined}
+          quotations={negotiationQuotations.quotations}
+          quotationsError={negotiationQuotations.error}
+          onIssueQuotation={issueQuotation}
           onClose={() => {
             setCreating(false)
             setEditing(null)

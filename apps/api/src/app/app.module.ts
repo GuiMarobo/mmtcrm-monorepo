@@ -9,6 +9,7 @@ import { NegotiationsModule } from '../negotiations/negotiations.module';
 import { OrdersModule } from '../orders/orders.module';
 import { ProductsModule } from '../products/products.module';
 import { SettingsModule } from '../settings/settings.module';
+import { QuotationsModule } from '../quotations/quotations.module';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { MustChangePasswordGuard } from 'src/auth/guards/must-change-password.guard';
@@ -22,6 +23,7 @@ import { MustChangePasswordGuard } from 'src/auth/guards/must-change-password.gu
     OrdersModule,
     ProductsModule,
     SettingsModule,
+    QuotationsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -57,6 +57,7 @@ model User {
   negotiations Negotiation[]
   erasuresPerformed DataErasureLog[]
   stockMovements    StockMovement[]
+  quotations        Quotation[]
 
   @@index([email])
   @@index([deletedAt])
@@ -124,6 +125,7 @@ model Negotiation {
   vendedor User?  @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
   order    Order?
   items    NegotiationItem[]
+  quotations Quotation[]
 
   @@index([clientId])
   @@index([deletedAt])
@@ -225,6 +227,7 @@ model Product {
 
   stockMovements   StockMovement[]
   negotiationItems NegotiationItem[]
+  quotationItems   QuotationItem[]
 
   @@index([sku])
   @@index([deletedAt])
@@ -311,4 +314,54 @@ model InstallmentRate {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("installment_rates")
+}
+
+// Orçamento emitido (spec 011 / ADR 0017): a foto de uma simulação entregue ao
+// Cliente. Imutável — sem situação, sem deletedAt, sem rota de edição (RQ8) —
+// e some junto com a Negociação pela FK. Uma Negociação tem zero ou muitos
+// (RQ9), por isso negotiationId não é @unique. Não guarda nome nem CPF do
+// Cliente: o documento lê pela Negociação, e a anonimização LGPD vale sem
+// código novo. Valor da parcela não é guardado: deriva do total com juros.
+model Quotation {
+  id                Int      @id @default(autoincrement())
+  negotiationId     Int      @map("negotiation_id")
+  code              String
+  totalValue        Decimal  @map("total_value") @db.Decimal(12, 2)
+  installments      Int
+  ratePercent       Decimal  @map("rate_percent") @db.Decimal(5, 2)
+  totalWithInterest Decimal  @map("total_with_interest") @db.Decimal(12, 2)
+  validUntil        DateTime @map("valid_until") @db.Date
+  authorId          Int?     @map("author_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  negotiation Negotiation     @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  // SetNull preserva o Orçamento quando o autor é excluído, como StockMovement.userId.
+  author      User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  items       QuotationItem[]
+
+  @@index([negotiationId])
+  @@map("quotations")
+}
+
+// Item do orçamento: espelha o NegotiationItem no momento da emissão. Preço
+// praticado e desconto são copiados, nunca referenciados nem recalculados do
+// catálogo (mesmo princípio da ADR 0015). Nome e código do Produto são lidos
+// do catálogo, como no item da Negociação (RI2).
+model QuotationItem {
+  id            Int          @id @default(autoincrement())
+  quotationId   Int          @map("quotation_id")
+  productId     String       @map("product_id")
+  quantity      Int
+  unitPrice     Decimal      @map("unit_price") @db.Decimal(12, 2)
+  discountType  DiscountType @map("discount_type")
+  discountValue Decimal      @map("discount_value") @db.Decimal(12, 2)
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  // Restrict: apagar o Produto fisicamente não pode tirar linha de um
+  // Orçamento já emitido (RQ8). O catálogo só exclui logicamente.
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([quotationId])
+  @@index([productId])
+  @@map("quotation_items")
 }
