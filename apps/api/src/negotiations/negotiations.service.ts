@@ -9,6 +9,8 @@ import { RoleEnum } from '../users/dto/create-user.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { DiscountType, NegotiationStatus } from '../../generated/prisma/enums';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
+import { StockMovementTypeEnum } from '../products/dto/create-stock-movement.dto';
+import { ProductsService } from '../products/products.service';
 import {
   CreateNegotiationDto,
   PaymentMethodEnum,
@@ -111,7 +113,10 @@ const ALLOWED_TRANSITIONS: Record<NegotiationStatus, NegotiationStatus[]> = {
 
 @Injectable()
 export class NegotiationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly products: ProductsService,
+  ) {}
 
   private toResponse(negotiation: NegotiationRow) {
     const { order, ...rest } = negotiation;
@@ -584,10 +589,7 @@ export class NegotiationsService {
     return this.toResponse(updated);
   }
 
-  // userId: autor da baixa de venda gravada na transação de conversão (ticket
-  // 11 da spec 010). Ainda não usado aqui — este ticket só faz o dado chegar.
   async convert(id: number, paymentMethod: PaymentMethodEnum, userId: number) {
-    void userId;
     const negotiation = await this.ensureExists(id);
     // RN12: converter não passa por `ensureClientEditable` — a anonimização não
     // congela o ciclo. O Cliente vem no próprio select da Negociação.
@@ -604,7 +606,7 @@ export class NegotiationsService {
       // upsert, e nao create: reabrir preserva o pedido como DESISTENCIA, entao
       // reconverter reaproveita a mesma linha em vez de colidir com o @unique
       // (RN4), devolvendo-a para EM_NEGOCIACAO.
-      await tx.order.upsert({
+      const order = await tx.order.upsert({
         where: { negotiationId: id },
         create: {
           negotiationId: id,
@@ -621,7 +623,25 @@ export class NegotiationsService {
           statusChangedAt,
           deletedAt: null,
         },
+        select: { id: true },
       });
+
+      // RB1 / ADR 0016: baixa de venda — uma Saída por item não excluído,
+      // ligada ao Pedido e com o autor da conversão, pelo mesmo caminho do
+      // movimento manual (ADR 0013). Negociação sem itens não mexe no estoque.
+      const items = await tx.negotiationItem.findMany({
+        where: { ...NOT_DELETED, negotiationId: id },
+        select: { productId: true, quantity: true },
+      });
+      for (const item of items) {
+        await this.products.recordStockMovement(tx, {
+          productId: item.productId,
+          type: StockMovementTypeEnum.SAIDA,
+          quantity: item.quantity,
+          userId,
+          orderId: order.id,
+        });
+      }
 
       await tx.negotiation.update({
         where: { id },

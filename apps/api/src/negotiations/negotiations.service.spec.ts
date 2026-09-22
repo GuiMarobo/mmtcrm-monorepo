@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProductsService } from '../products/products.service';
 import { NegotiationsService } from './negotiations.service';
 import { PaymentMethodEnum } from './dto/create-negotiation.dto';
 import {
@@ -46,6 +47,7 @@ describe('NegotiationsService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         NegotiationsService,
+        ProductsService,
         { provide: PrismaService, useValue: asPrismaService(prisma) },
       ],
     }).compile();
@@ -59,9 +61,10 @@ describe('NegotiationsService', () => {
         status: 'LEAD',
         anonymizedAt: null,
       });
-      prisma.order.upsert.mockResolvedValue({});
+      prisma.order.upsert.mockResolvedValue({ id: 7 });
       prisma.negotiation.update.mockResolvedValue({});
       prisma.client.update.mockResolvedValue({});
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
     });
 
     it('cria o Pedido como EM_NEGOCIACAO e grava statusChangedAt (D2/RN1/RN13)', async () => {
@@ -97,6 +100,90 @@ describe('NegotiationsService', () => {
       expect(prisma.client.update).toHaveBeenCalledWith({
         where: { id: 'c1' },
         data: { status: 'ATIVO' },
+      });
+    });
+
+    describe('baixa de venda (RB1, ADR 0016, ticket 11)', () => {
+      beforeEach(() => {
+        prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+        prisma.product.updateMany.mockResolvedValue({ count: 1 });
+        prisma.stockMovement.create.mockResolvedValue({});
+      });
+
+      it('grava uma Saída do item ligada ao Pedido, com autor quem converteu', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          { productId: 'p1', quantity: 2 },
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(
+          callArg<{ where: unknown }>(prisma.negotiationItem.findMany).where,
+        ).toEqual({ deletedAt: null, negotiationId: 3 });
+        expect(prisma.product.updateMany).toHaveBeenCalledWith({
+          where: { deletedAt: null, id: 'p1', stock: { gte: 2 } },
+          data: { stock: { decrement: 2 } },
+        });
+        expect(prisma.stockMovement.create).toHaveBeenCalledTimes(1);
+        expect(prisma.stockMovement.create).toHaveBeenCalledWith({
+          data: {
+            productId: 'p1',
+            type: 'SAIDA',
+            quantity: 2,
+            note: undefined,
+            userId: 42,
+            orderId: 7,
+          },
+        });
+      });
+
+      it('grava uma Saída por item, cada uma com a sua quantidade', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          { productId: 'p1', quantity: 2 },
+          { productId: 'p2', quantity: 1 },
+          { productId: 'p3', quantity: 5 },
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        const movements = prisma.stockMovement.create.mock.calls.map(
+          ([arg]: [{ data: Record<string, unknown> }]) => arg.data,
+        );
+        const saida = (productId: string, quantity: number) =>
+          expect.objectContaining({
+            productId,
+            type: 'SAIDA',
+            quantity,
+            orderId: 7,
+            userId: 42,
+          }) as unknown;
+        expect(movements).toEqual([
+          saida('p1', 2),
+          saida('p2', 1),
+          saida('p3', 5),
+        ]);
+        expect(prisma.product.updateMany).toHaveBeenCalledTimes(3);
+      });
+
+      it('baixa depois de criar o Pedido, dentro da transação da conversão', async () => {
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          { productId: 'p1', quantity: 1 },
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.order.upsert.mock.invocationCallOrder[0]).toBeLessThan(
+          prisma.stockMovement.create.mock.invocationCallOrder[0],
+        );
+      });
+
+      it('Negociação sem itens converte sem gravar movimento nenhum (regressão)', async () => {
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.order.upsert).toHaveBeenCalledTimes(1);
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
       });
     });
   });
@@ -196,9 +283,10 @@ describe('NegotiationsService', () => {
   describe('LGPD não bloqueia o ciclo comercial (RN12)', () => {
     beforeEach(() => {
       prisma.negotiation.update.mockResolvedValue({});
-      prisma.order.upsert.mockResolvedValue({});
+      prisma.order.upsert.mockResolvedValue({ id: 7 });
       prisma.order.updateMany.mockResolvedValue({});
       prisma.client.update.mockResolvedValue({});
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
     });
 
     it('convert não checa o Cliente (nem anonimização)', async () => {
