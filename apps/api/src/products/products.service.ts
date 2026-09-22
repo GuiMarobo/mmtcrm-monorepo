@@ -46,6 +46,10 @@ const productDetailSelect = {
       // SetNull no schema: o autor excluído deixa o movimento com user nulo, e
       // o histórico continua de pé.
       user: { select: { id: true, name: true } },
+      // Spec 010 (histórias 38/39): a baixa e a devolução de venda aparecem
+      // pelo código do Pedido que as gerou. Nulo no movimento manual — e, por
+      // SetNull no schema, também se o Pedido for excluído fisicamente.
+      order: { select: { id: true, code: true } },
     },
     orderBy: { createdAt: 'desc' },
   },

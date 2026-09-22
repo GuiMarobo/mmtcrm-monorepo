@@ -24,6 +24,7 @@ export interface StockMovement {
   note: string | null
   createdAt: string
   user: { id: number; name: string } | null
+  order: { id: number; code: string } | null
 }
 
 export interface ProductDetail extends Product {

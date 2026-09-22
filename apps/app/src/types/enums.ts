@@ -200,6 +200,11 @@ export const STOCK_MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {
   SAIDA: 'Saída',
 }
 
+export const SALE_MOVEMENT_LABELS: Record<StockMovementType, string> = {
+  ENTRADA: 'Devolução',
+  SAIDA: 'Venda',
+}
+
 export const STOCK_MOVEMENT_TYPE_OPTIONS: {
   value: StockMovementType
   label: string

@@ -25,6 +25,7 @@ const movement = (overrides: Partial<StockMovement> = {}): StockMovement => ({
   note: 'Carga inicial de estoque',
   createdAt: '2026-09-11T12:00:00Z',
   user: { id: 42, name: 'Ana Admin' },
+  order: null,
   ...overrides,
 })
 
@@ -86,6 +87,46 @@ describe('ProductDetailDrawer', () => {
     expect(rows[1]).toHaveTextContent('Entrada')
     expect(rows[1]).toHaveTextContent('Ana Admin')
     expect(rows[1]).toHaveTextContent('Carga inicial de estoque')
+  })
+
+  it('identifica baixa e devolução de venda pelo código do Pedido, com o autor (spec 010, histórias 38/39)', () => {
+    setup({
+      movements: [
+        movement({
+          id: 'm3',
+          type: 'ENTRADA',
+          quantity: 2,
+          note: null,
+          user: { id: 1, name: 'Ana Admin' },
+          order: { id: 12, code: 'PED-12' },
+        }),
+        movement({
+          id: 'm2',
+          type: 'SAIDA',
+          quantity: 2,
+          note: null,
+          user: { id: 7, name: 'Bruno Vendedor' },
+          order: { id: 12, code: 'PED-12' },
+        }),
+      ],
+    })
+
+    const rows = screen.getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('Entrada')
+    expect(rows[0]).toHaveTextContent('Devolução PED-12')
+    expect(rows[0]).toHaveTextContent('Ana Admin')
+    expect(rows[1]).toHaveTextContent('Saída')
+    expect(rows[1]).toHaveTextContent('Venda PED-12')
+    expect(rows[1]).toHaveTextContent('Bruno Vendedor')
+  })
+
+  it('movimento manual continua sem referência a Pedido', () => {
+    setup({ movements: [movement({ type: 'SAIDA', note: 'Ajuste' })] })
+
+    const row = screen.getByRole('listitem')
+    expect(row).toHaveTextContent('Saída')
+    expect(row).toHaveTextContent('Ajuste')
+    expect(row).not.toHaveTextContent(/Venda|Devolução|PED-/)
   })
 
   it('preserva o movimento cujo autor foi excluído', () => {
