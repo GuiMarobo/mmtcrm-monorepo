@@ -16,7 +16,7 @@ export interface ItemCalculation {
   subtotal: number
 }
 
-const toCents = (value: number) => Math.round(value * 100)
+export const toCents = (value: number) => Math.round(value * 100)
 
 function calculateItemCents(item: PricedItem) {
   const lineCents = toCents(item.unitPrice) * item.quantity

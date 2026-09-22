@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
+import { useInstallmentRates } from '../hooks/useInstallmentRates'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
 import { NegotiationBoard } from '../components/negotiations/NegotiationBoard'
@@ -50,6 +51,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [view, setView] = useState<NegotiationView>('quadro')
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<NegotiationDetail | null>(null)
+  const installmentRates = useInstallmentRates()
   const [converting, setConverting] = useState<Negotiation | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Negotiation | null>(null)
@@ -105,6 +107,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   }
 
   const openEdit = async (negotiation: Negotiation) => {
+    void installmentRates.load()
     try {
       const detail = await negotiationsApi.findOne(negotiation.id)
       setEditing(detail)
@@ -250,6 +253,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
           isAdmin={user?.role === 'ADMIN'}
           clients={clients}
           products={products}
+          installmentRates={installmentRates.rates}
+          installmentRatesError={installmentRates.error}
           onClose={() => {
             setCreating(false)
             setEditing(null)
