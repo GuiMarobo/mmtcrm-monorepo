@@ -8,9 +8,9 @@ const ROUTES = Object.keys(ROUTE_ROLES) as Route[]
 
 const EXPECTED_ROUTES: Route[] = [
   'clientes',
+  'configuracoes',
   'dashboard',
   'negociacoes',
-  'orcamentos',
   'pedidos',
   'produtos',
   'usados',
@@ -37,6 +37,14 @@ describe('ROUTE_ROLES', () => {
 
   it('reflete arquitetura.md §5: usuários é exclusivo do ADMIN', () => {
     expect(ROUTE_ROLES.usuarios).toEqual(['ADMIN'])
+  })
+
+  it('reflete a spec 011 (RS1): configurações é exclusiva do ADMIN', () => {
+    expect(ROUTE_ROLES.configuracoes).toEqual(['ADMIN'])
+  })
+
+  it('não tem mais a rota orcamentos: o Orçamento vive dentro da Negociação (ADR 0017)', () => {
+    expect(ROUTES).not.toContain('orcamentos')
   })
 
   it('reflete arquitetura.md §5: clientes é a única tela do ATENDENTE', () => {

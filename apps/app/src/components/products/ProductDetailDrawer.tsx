@@ -24,6 +24,7 @@ import type { BadgeTone } from '../../theme/tones'
 import type { Product, StockMovement, StockMovementType } from '../../types'
 import {
   PRODUCT_CATEGORY_LABELS,
+  SALE_MOVEMENT_LABELS,
   STOCK_MOVEMENT_TYPE_LABELS,
 } from '../../types'
 
@@ -68,6 +69,11 @@ function MovementRow({ movement }: { movement: StockMovement }) {
         <Typography sx={{ fontSize: 13.5, fontWeight: 700 }}>
           {movement.quantity}
         </Typography>
+        {movement.order && (
+          <Typography sx={{ fontSize: 13 }}>
+            {`${SALE_MOVEMENT_LABELS[movement.type]} ${movement.order.code}`}
+          </Typography>
+        )}
         <Typography
           sx={{ flex: 1, fontSize: 12.5, color: 'text.secondary', textAlign: 'right' }}
         >

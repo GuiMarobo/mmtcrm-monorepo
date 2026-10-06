@@ -4,6 +4,10 @@ import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
+import { useAuth } from '../contexts/AuthContext'
+import { useNegotiationQuotations } from '../hooks/useNegotiationQuotations'
+import { useQuotationDetail } from '../hooks/useQuotationDetail'
+import { useQuotationSettings } from '../hooks/useQuotationSettings'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
 import { NegotiationBoard } from '../components/negotiations/NegotiationBoard'
@@ -16,17 +20,20 @@ import {
   canTransition,
   TRANSITION_REFUSAL,
 } from '../components/negotiations/transitions'
+import { QuotationDetailDialog } from '../components/quotations/QuotationDetailDialog'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
 import type {
   Client,
   CreateNegotiationPayload,
+  IssueQuotationPayload,
   Negotiation,
+  NegotiationDetail,
   NegotiationStatus,
   PaymentMethod,
   Product,
-  UpdateNegotiationPayload,
+  ReplaceNegotiationPayload,
 } from '../types'
 
 interface NegociacoesProps {
@@ -39,6 +46,7 @@ interface PendingTransition {
 }
 
 export function Negociacoes({ toast }: NegociacoesProps) {
+  const { user } = useAuth()
   const [list, setList] = useState<Negotiation[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -46,7 +54,10 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [view, setView] = useState<NegotiationView>('quadro')
   const [creating, setCreating] = useState(false)
-  const [editing, setEditing] = useState<Negotiation | null>(null)
+  const [editing, setEditing] = useState<NegotiationDetail | null>(null)
+  const quotationSettings = useQuotationSettings()
+  const negotiationQuotations = useNegotiationQuotations()
+  const quotationDetail = useQuotationDetail()
   const [converting, setConverting] = useState<Negotiation | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Negotiation | null>(null)
@@ -93,12 +104,41 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     setCreating(false)
   }
 
-  const updateNegotiation = async (payload: UpdateNegotiationPayload) => {
+  const updateNegotiation = async (payload: ReplaceNegotiationPayload) => {
     if (!editing) return
-    const updated = await negotiationsApi.update(editing.id, payload)
+    const updated = await negotiationsApi.replace(editing.id, payload)
     replaceInList(updated)
     toast('Negociação atualizada')
     setEditing(null)
+  }
+
+  const issueQuotation = async (payload: IssueQuotationPayload) => {
+    if (!editing) return
+    try {
+      const issued = await negotiationQuotations.issue(editing.id, payload)
+      toast(`Orçamento ${issued.code} emitido`)
+      void quotationDetail.open(issued.id)
+    } catch (err) {
+      toast(
+        err instanceof ApiError ? err.message : 'Não foi possível emitir o orçamento.',
+        'error',
+      )
+      throw err
+    }
+  }
+
+  const openEdit = async (negotiation: Negotiation) => {
+    void quotationSettings.load()
+    void negotiationQuotations.load(negotiation.id)
+    try {
+      const detail = await negotiationsApi.findOne(negotiation.id)
+      setEditing(detail)
+    } catch (err) {
+      toast(
+        err instanceof ApiError ? err.message : 'Erro ao carregar a negociação',
+        'error',
+      )
+    }
   }
 
   const requestTransition = (
@@ -126,12 +166,6 @@ export function Negociacoes({ toast }: NegociacoesProps) {
       toast(`Negociação ganha · pedido ${updated.order?.code ?? ''} gerado`)
       setConverting(null)
       settle(true)
-    } catch (err) {
-      toast(
-        err instanceof ApiError ? err.message : 'Erro ao converter em pedido',
-        'error',
-      )
-      settle(false)
     } finally {
       setBusy(false)
     }
@@ -220,7 +254,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
             items={list}
             onMove={requestTransition}
             onRefuse={() => toast(TRANSITION_REFUSAL, 'error')}
-            onEdit={setEditing}
+            onEdit={(n) => void openEdit(n)}
             onDelete={setConfirmDelete}
           />
         ))}
@@ -229,7 +263,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
         <NegotiationListView
           items={list}
           loading={loading}
-          onEdit={setEditing}
+          onEdit={(n) => void openEdit(n)}
           onRequestTransition={(n, t) => void requestTransition(n, t)}
           onDelete={setConfirmDelete}
         />
@@ -238,8 +272,16 @@ export function Negociacoes({ toast }: NegociacoesProps) {
       {(creating || editing) && (
         <NegotiationFormModal
           negotiation={editing}
+          isAdmin={user?.role === 'ADMIN'}
           clients={clients}
           products={products}
+          installmentRates={quotationSettings.rates}
+          installmentRatesError={quotationSettings.error}
+          defaultValidityDays={quotationSettings.defaultValidityDays ?? undefined}
+          quotations={negotiationQuotations.quotations}
+          quotationsError={negotiationQuotations.error}
+          onIssueQuotation={issueQuotation}
+          onOpenQuotation={(quotation) => void quotationDetail.open(quotation.id)}
           onClose={() => {
             setCreating(false)
             setEditing(null)
@@ -249,11 +291,20 @@ export function Negociacoes({ toast }: NegociacoesProps) {
         />
       )}
 
+      {quotationDetail.openId !== null && (
+        <QuotationDetailDialog
+          quotation={quotationDetail.quotation}
+          company={quotationSettings.company}
+          error={quotationDetail.error}
+          onClose={quotationDetail.close}
+        />
+      )}
+
       {converting && (
         <ConvertToOrderModal
           negotiation={converting}
           loading={busy}
-          onConfirm={(pm) => void applyConvert(pm)}
+          onConfirm={applyConvert}
           onCancel={() => {
             setConverting(null)
             settle(false)

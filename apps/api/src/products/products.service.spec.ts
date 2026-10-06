@@ -290,6 +290,61 @@ describe('ProductsService', () => {
 
       expect(result.stockMovements[0].user).toBeNull();
     });
+
+    it('pede o Pedido vinculado a cada movimento (id e código)', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow(),
+        stockMovements: [],
+      });
+
+      await service.findOne('p1');
+
+      const arg = callArg<{
+        select: { stockMovements: { select: { order: unknown } } };
+      }>(prisma.product.findFirst);
+      expect(arg.select.stockMovements.select.order).toEqual({
+        select: { id: true, code: true },
+      });
+    });
+
+    it('baixa e devolução de venda trazem o código do Pedido e o autor (spec 010, histórias 38/39)', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        ...productRow({ stock: 8 }),
+        stockMovements: [
+          movementRow({
+            id: 'm3',
+            type: 'ENTRADA',
+            quantity: 2,
+            note: null,
+            user: { id: 1, name: 'Ana Admin' },
+            order: { id: 12, code: 'PED-12' },
+          }),
+          movementRow({
+            id: 'm2',
+            type: 'SAIDA',
+            quantity: 2,
+            note: null,
+            user: { id: 7, name: 'Bruno Vendedor' },
+            order: { id: 12, code: 'PED-12' },
+          }),
+          movementRow({ order: null }),
+        ],
+      });
+
+      const result = await service.findOne('p1');
+
+      expect(result.stockMovements[0]).toMatchObject({
+        type: 'ENTRADA',
+        order: { id: 12, code: 'PED-12' },
+        user: { id: 1, name: 'Ana Admin' },
+      });
+      expect(result.stockMovements[1]).toMatchObject({
+        type: 'SAIDA',
+        order: { id: 12, code: 'PED-12' },
+        user: { id: 7, name: 'Bruno Vendedor' },
+      });
+      expect(result.stockMovements[2].order).toBeNull();
+    });
   });
 
   describe('moveStock — movimentar estoque (RP5)', () => {
@@ -459,6 +514,46 @@ describe('ProductsService', () => {
         }),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('sem includeDeleted, só alcança Produto não excluído', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.stockMovement.create.mockResolvedValue({ id: 'm4' });
+
+      await service.recordStockMovement(asPrismaService(prisma), {
+        productId: 'p1',
+        type: StockMovementTypeEnum.ENTRADA,
+        quantity: 2,
+      });
+
+      expect(
+        callArg<{ where: Record<string, unknown> }>(prisma.product.updateMany)
+          .where,
+      ).toEqual({ deletedAt: null, id: 'p1' });
+    });
+
+    it('com includeDeleted, devolve ao saldo de Produto excluído (RB5, ticket 14)', async () => {
+      prisma.product.updateMany.mockResolvedValue({ count: 1 });
+      prisma.stockMovement.create.mockResolvedValue({ id: 'm5' });
+
+      await service.recordStockMovement(asPrismaService(prisma), {
+        productId: 'p1',
+        type: StockMovementTypeEnum.ENTRADA,
+        quantity: 2,
+        orderId: 7,
+        includeDeleted: true,
+      });
+
+      const update = callArg<{
+        where: Record<string, unknown>;
+        data: { stock: { increment: number } };
+      }>(prisma.product.updateMany);
+      expect(update.where).toEqual({ id: 'p1' });
+      expect(update.data.stock).toEqual({ increment: 2 });
+      expect(
+        callArg<{ data: Record<string, unknown> }>(prisma.stockMovement.create)
+          .data,
+      ).toMatchObject({ productId: 'p1', type: 'ENTRADA', orderId: 7 });
     });
   });
 

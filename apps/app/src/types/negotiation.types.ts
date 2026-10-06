@@ -1,5 +1,6 @@
 import type {
   ClientStatus,
+  DiscountType,
   NegotiationStatus,
   OrderStatus,
   PaymentMethod,
@@ -53,16 +54,22 @@ export interface NegotiationItem {
   product: NegotiationItemProduct
   quantity: number
   unitPrice: number
+  discountType: DiscountType
+  discountValue: number
+  discountAmount: number
   subtotal: number
 }
 
 export interface NegotiationDetail extends Negotiation {
   items: NegotiationItem[]
+  informedValue: number | null
 }
 
 export interface CreateNegotiationItemPayload {
   productId: string
   quantity: number
+  discountType?: DiscountType
+  discountValue?: number
 }
 
 export interface CreateNegotiationPayload {
@@ -71,8 +78,8 @@ export interface CreateNegotiationPayload {
   notes?: string | null
 }
 
-export interface UpdateNegotiationPayload {
-  clientId?: string
-  totalValue?: number
+export interface ReplaceNegotiationPayload {
+  clientId: string
+  items: CreateNegotiationItemPayload[]
   notes?: string | null
 }

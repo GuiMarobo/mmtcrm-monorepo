@@ -1,4 +1,5 @@
 import type { ClientStatus, OrderStatus, PaymentMethod } from './enums'
+import type { NegotiationItem } from './negotiation.types'
 
 export interface OrderClient {
   id: string
@@ -22,4 +23,8 @@ export interface Order {
   notes: string | null
   client: OrderClient | null
   vendedor: OrderVendedor | null
+}
+
+export interface OrderDetail extends Order {
+  items: NegotiationItem[]
 }

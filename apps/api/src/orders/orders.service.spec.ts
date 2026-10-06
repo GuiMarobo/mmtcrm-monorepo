@@ -21,6 +21,7 @@ const orderRow = (overrides: Record<string, unknown> = {}) => ({
     notes: null,
     client: { id: 'c1', name: 'Fulana', status: 'ATIVO' },
     vendedor: { id: 2, name: 'Vendedora' },
+    items: [],
   },
   ...overrides,
 });
@@ -213,6 +214,110 @@ describe('OrdersService leitura', () => {
         client: { id: 'c1', name: 'Fulana' },
         vendedor: { id: 2, name: 'Vendedora' },
       });
+    });
+
+    it('inclui os itens da Negociação de origem, no shape do detalhe da Negociação (RB7)', async () => {
+      prisma.order.findFirst.mockResolvedValue(
+        orderRow({
+          negotiation: {
+            ...orderRow().negotiation,
+            items: [
+              {
+                id: 11,
+                quantity: 3,
+                unitPrice: { toString: () => '100.00' },
+                discountType: 'PERCENTUAL',
+                discountValue: { toString: () => '10' },
+                product: {
+                  id: 'p1',
+                  name: 'Painel',
+                  sku: 'PNL-1',
+                  status: 'ATIVO',
+                  deletedAt: null,
+                },
+              },
+              {
+                id: 12,
+                quantity: 2,
+                unitPrice: { toString: () => '50.00' },
+                discountType: 'VALOR',
+                discountValue: { toString: () => '0' },
+                product: {
+                  id: 'p2',
+                  name: 'Cabo',
+                  sku: 'CAB-2',
+                  status: 'DESCONTINUADO',
+                  deletedAt: new Date('2026-03-01T00:00:00Z'),
+                },
+              },
+            ],
+          },
+        }),
+      );
+
+      const result = await service.findOne(7);
+
+      expect(result.items).toEqual([
+        {
+          id: 11,
+          product: {
+            id: 'p1',
+            name: 'Painel',
+            sku: 'PNL-1',
+            status: 'ATIVO',
+            deleted: false,
+          },
+          quantity: 3,
+          unitPrice: 100,
+          discountType: 'PERCENTUAL',
+          discountValue: 10,
+          discountAmount: 30,
+          subtotal: 270,
+        },
+        {
+          id: 12,
+          product: {
+            id: 'p2',
+            name: 'Cabo',
+            sku: 'CAB-2',
+            status: 'DESCONTINUADO',
+            deleted: true,
+          },
+          quantity: 2,
+          unitPrice: 50,
+          discountType: 'VALOR',
+          discountValue: 0,
+          discountAmount: 0,
+          subtotal: 100,
+        },
+      ]);
+      expect(result).not.toHaveProperty('negotiation');
+    });
+
+    it('lê os itens não excluídos da Negociação, em ordem de inclusão', async () => {
+      prisma.order.findFirst.mockResolvedValue(orderRow());
+
+      await service.findOne(7);
+
+      const { select } = callArg<{
+        select: {
+          negotiation: {
+            select: { items: { where: unknown; orderBy: unknown } };
+          };
+        };
+      }>(prisma.order.findFirst);
+      expect(select.negotiation.select.items.where).toEqual({
+        deletedAt: null,
+      });
+      expect(select.negotiation.select.items.orderBy).toEqual({ id: 'asc' });
+    });
+
+    it('Negociação sem itens (antiga ou importada) devolve lista vazia', async () => {
+      prisma.order.findFirst.mockResolvedValue(orderRow());
+
+      const result = await service.findOne(7);
+
+      expect(result.items).toEqual([]);
     });
 
     it('404 quando inexistente ou excluído', async () => {

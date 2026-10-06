@@ -9,20 +9,84 @@ import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
 import { DetailField, DetailSection } from '../common/DetailSection'
 import { OrderStatusBadge } from '../common/OrderStatusBadge'
+import { ToneChip } from '../common/ToneChip'
 import { CLIENT_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../../types'
-import { formatCurrency, formatDate } from '../../utils/format'
-import type { Order } from '../../types'
+import { formatCurrency, formatDate, formatPercent } from '../../utils/format'
+import type { NegotiationItem, Order } from '../../types'
 
 interface OrderDetailDrawerProps {
   order: Order
+  items: NegotiationItem[] | null
   approving: boolean
   onApprove: () => void
   onGoToNegotiations: () => void
   onClose: () => void
 }
 
+function discountLabel(item: NegotiationItem) {
+  const amount = `-${formatCurrency(item.discountAmount)}`
+  return item.discountType === 'PERCENTUAL'
+    ? `Desconto ${formatPercent(item.discountValue)} · ${amount}`
+    : `Desconto ${amount}`
+}
+
+function OrderItemsList({ items }: { items: NegotiationItem[] }) {
+  return (
+    <Box
+      component="ul"
+      aria-label="Itens"
+      sx={{
+        listStyle: 'none',
+        m: 0,
+        p: 0,
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1.5,
+        overflow: 'hidden',
+      }}
+    >
+      {items.map((item, index) => (
+        <Box component="li" key={item.id}>
+          {index > 0 && <Divider />}
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 1.5, py: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                <Typography
+                  sx={{
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    color: item.product.deleted ? 'text.disabled' : undefined,
+                  }}
+                >
+                  {item.product.name}
+                </Typography>
+                {item.product.deleted && <ToneChip tone="red">Excluído do catálogo</ToneChip>}
+              </Box>
+              <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                {item.product.sku} · {item.quantity} × {formatCurrency(item.unitPrice)}
+              </Typography>
+              {item.discountAmount > 0 && (
+                <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }}>
+                  {discountLabel(item)}
+                </Typography>
+              )}
+            </Box>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {formatCurrency(item.subtotal)}
+            </Typography>
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  )
+}
+
 export function OrderDetailDrawer({
   order,
+  items,
   approving,
   onApprove,
   onGoToNegotiations,
@@ -70,6 +134,21 @@ export function OrderDetailDrawer({
           <DetailField label="Situação desde">{formatDate(order.statusChangedAt)}</DetailField>
         </DetailSection>
         <Divider />
+
+        {(items === null || items.length > 0) && (
+          <>
+            <DetailSection title="Itens">
+              {items === null ? (
+                <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
+                  Carregando itens…
+                </Typography>
+              ) : (
+                <OrderItemsList items={items} />
+              )}
+            </DetailSection>
+            <Divider />
+          </>
+        )}
 
         <DetailSection title="Cliente">
           <DetailField label="Nome">{order.client?.name ?? '-'}</DetailField>

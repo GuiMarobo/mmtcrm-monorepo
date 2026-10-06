@@ -38,13 +38,17 @@ export class NegotiationsController {
     status: 400,
     description: 'Item de Produto inativo/excluído ou repetido na lista',
   })
+  @ApiResponse({
+    status: 403,
+    description: 'VENDEDOR com item acima de 15% de desconto (RI6)',
+  })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   @ApiResponse({ status: 409, description: 'Cliente anonimizado (LGPD)' })
   create(
     @Body() dto: CreateNegotiationDto,
-    @Req() req: { user: { id: number } },
+    @Req() req: { user: { id: number; role: RoleEnum } },
   ) {
-    return this.negotiationsService.create(dto, req.user.id);
+    return this.negotiationsService.create(dto, req.user.id, req.user.role);
   }
 
   @Get()
@@ -61,7 +65,23 @@ export class NegotiationsController {
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Substituir os dados da negociação' })
+  @ApiOperation({
+    summary: 'Substituir os dados e os itens da negociação (spec 010)',
+    description:
+      'Só é permitido em Negociação Aberta. Recebe a lista completa de ' +
+      'itens: item novo copia o preço na hora, item mantido preserva o ' +
+      'preço praticado, item que saiu da lista é excluído logicamente. O ' +
+      'total é recalculado e gravado na mesma transação.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Item de Produto inativo/excluído ou repetido na lista',
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'VENDEDOR incluindo ou alterando item acima de 15% de desconto (RI6)',
+  })
   @ApiResponse({
     status: 404,
     description: 'Negociação ou cliente não encontrado',
@@ -73,8 +93,9 @@ export class NegotiationsController {
   replace(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ReplaceNegotiationDto,
+    @Req() req: { user: { role: RoleEnum } },
   ) {
-    return this.negotiationsService.replace(id, dto);
+    return this.negotiationsService.replace(id, dto, req.user.role);
   }
 
   @Patch(':id')
@@ -128,7 +149,11 @@ export class NegotiationsController {
   })
   @ApiResponse({ status: 201, description: 'Negociação ganha e pedido gerado' })
   @ApiResponse({ status: 404, description: 'Negociação não encontrada' })
-  @ApiResponse({ status: 409, description: 'Transição não permitida' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Transição não permitida, saldo insuficiente de algum Produto dos itens, item de Produto excluído, ou Negociação que teve todos os itens removidos',
+  })
   convert(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ConvertNegotiationDto,

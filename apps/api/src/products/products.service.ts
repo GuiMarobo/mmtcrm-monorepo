@@ -46,6 +46,10 @@ const productDetailSelect = {
       // SetNull no schema: o autor excluído deixa o movimento com user nulo, e
       // o histórico continua de pé.
       user: { select: { id: true, name: true } },
+      // Spec 010 (histórias 38/39): a baixa e a devolução de venda aparecem
+      // pelo código do Pedido que as gerou. Nulo no movimento manual — e, por
+      // SetNull no schema, também se o Pedido for excluído fisicamente.
+      order: { select: { id: true, code: true } },
     },
     orderBy: { createdAt: 'desc' },
   },
@@ -192,7 +196,9 @@ export class ProductsService {
   // simultâneas não conseguem passar ambas por uma checagem lida antes.
   // Nenhuma linha afetada significa Produto inexistente/excluído (404) ou
   // saldo insuficiente (409); o throw desfaz a transação do chamador, então
-  // nada é gravado.
+  // nada é gravado. `includeDeleted` alcança Produto excluído: a devolução de
+  // venda (RB5 da spec 010) precisa manter o saldo batendo com os movimentos
+  // mesmo depois que o Produto sai do catálogo.
   async recordStockMovement(
     tx: Prisma.TransactionClient,
     params: {
@@ -202,14 +208,17 @@ export class ProductsService {
       note?: string;
       userId?: number;
       orderId?: number;
+      includeDeleted?: boolean;
     },
   ) {
-    const { productId, type, quantity, note, userId, orderId } = params;
+    const { productId, type, quantity, note, userId, orderId, includeDeleted } =
+      params;
     const isOut = type === StockMovementTypeEnum.SAIDA;
+    const scope = includeDeleted ? {} : NOT_DELETED;
 
     const { count } = await tx.product.updateMany({
       where: {
-        ...NOT_DELETED,
+        ...scope,
         id: productId,
         ...(isOut && { stock: { gte: quantity } }),
       },
@@ -220,7 +229,7 @@ export class ProductsService {
 
     if (count === 0) {
       const product = await tx.product.findFirst({
-        where: { ...NOT_DELETED, id: productId },
+        where: { ...scope, id: productId },
         select: { stock: true },
       });
       if (!product) throw new NotFoundException(NOT_FOUND);
