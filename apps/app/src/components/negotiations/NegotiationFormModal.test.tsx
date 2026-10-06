@@ -505,3 +505,87 @@ describe('NegotiationFormModal — alçada de desconto (RI6, ticket 09)', () => 
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
   })
 })
+
+describe('NegotiationFormModal — aba Troca (spec 007, ticket 01)', () => {
+  const tradeIn = () => ({
+    devices: [
+      {
+        id: 9,
+        negotiationId: 3,
+        model: 'iPhone 12 128 GB',
+        serialNumber: 'F2LXK0ABCD',
+        imei: null,
+        evaluationStatus: 'AGUARDANDO' as const,
+        condition: null,
+        estimatedValue: null,
+        report: null,
+        icloudUnlocked: null,
+        evaluatedAt: null,
+        evaluator: null,
+        createdAt: '2026-10-05T12:00:00Z',
+        createdBy: { id: 2, name: 'Vendedora' },
+      },
+    ],
+    error: null,
+    onCreate: vi.fn(),
+    onUpdate: vi.fn(),
+    onRemove: vi.fn(),
+  })
+
+  const renderWithTradeIn = (negotiation: NegotiationDetail) =>
+    render(
+      <NegotiationFormModal
+        isAdmin={false}
+        negotiation={negotiation}
+        clients={[client()]}
+        products={[product()]}
+        tradeIn={tradeIn()}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+  it('a aba Troca fica ao lado de Itens e Orçamentos e lista os aparelhos', async () => {
+    const user = userEvent.setup()
+    renderWithTradeIn(negotiationDetail())
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Itens',
+      'Orçamentos',
+      'Troca',
+    ])
+    await user.click(screen.getByRole('tab', { name: 'Troca' }))
+
+    expect(screen.getByText('iPhone 12 128 GB')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Cadastrar aparelho' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Salvar alterações' })).not.toBeInTheDocument()
+  })
+
+  it('Negociação Ganha: a aba Troca é só consulta', async () => {
+    const user = userEvent.setup()
+    renderWithTradeIn(negotiationDetail({ status: 'GANHA' }))
+
+    await user.click(screen.getByRole('tab', { name: 'Troca' }))
+
+    expect(screen.getByText('iPhone 12 128 GB')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Cadastrar aparelho' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Editar/ })).not.toBeInTheDocument()
+  })
+
+  it('sem negociação (cadastro novo) não há abas', () => {
+    render(
+      <NegotiationFormModal
+        isAdmin={false}
+        negotiation={null}
+        clients={[client()]}
+        products={[product()]}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByRole('tab', { name: 'Troca' })).not.toBeInTheDocument()
+  })
+})

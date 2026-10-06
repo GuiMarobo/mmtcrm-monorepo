@@ -29,6 +29,7 @@ export interface MockPrisma {
   installmentRate: Model;
   quotation: Model;
   quotationItem: Model;
+  usedDevice: Model;
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
 }
@@ -49,6 +50,7 @@ export function createMockPrisma(): MockPrisma {
     installmentRate: model(),
     quotation: model(),
     quotationItem: model(),
+    usedDevice: model(),
     $queryRaw: jest.fn(),
   } as unknown as MockPrisma;
 

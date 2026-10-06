@@ -12,6 +12,7 @@ import { formatCurrency } from '../../utils/format'
 import { FormDialog } from '../common/FormDialog'
 import { NegotiationItemsEditor } from './NegotiationItemsEditor'
 import { NegotiationQuotationsTab } from './NegotiationQuotationsTab'
+import { NegotiationTradeInTab, type NegotiationTradeIn } from './NegotiationTradeInTab'
 import {
   SELLER_DISCOUNT_LIMIT_PERCENT,
   findItemOverSellerLimit,
@@ -29,7 +30,7 @@ import type {
   ReplaceNegotiationPayload,
 } from '../../types'
 
-type NegotiationModalTab = 'itens' | 'orcamentos'
+type NegotiationModalTab = 'itens' | 'orcamentos' | 'troca'
 
 const DEFAULT_VALIDITY_DAYS = 7
 
@@ -45,6 +46,7 @@ interface NegotiationFormModalProps {
   quotationsError?: string | null
   onIssueQuotation?: (payload: IssueQuotationPayload) => Promise<unknown>
   onOpenQuotation?: (quotation: Quotation) => void
+  tradeIn?: NegotiationTradeIn
   onClose: () => void
   onCreate: (payload: CreateNegotiationPayload) => Promise<void>
   onUpdate: (payload: ReplaceNegotiationPayload) => Promise<void>
@@ -62,6 +64,7 @@ export function NegotiationFormModal({
   quotationsError = null,
   onIssueQuotation,
   onOpenQuotation,
+  tradeIn,
   onClose,
   onCreate,
   onUpdate,
@@ -181,6 +184,7 @@ export function NegotiationFormModal({
           >
             <Tab value="itens" label="Itens" />
             <Tab value="orcamentos" label="Orçamentos" disabled={quotationsTabDisabled} />
+            {tradeIn && <Tab value="troca" label="Troca" />}
           </Tabs>
           {quotationsTabDisabled && (
             <Typography sx={{ fontSize: 12, color: 'text.disabled', mt: 0.75 }}>
@@ -203,6 +207,12 @@ export function NegotiationFormModal({
             onIssueQuotation={onIssueQuotation}
             onOpenQuotation={onOpenQuotation}
           />
+        </Box>
+      )}
+
+      {negotiation && tradeIn && (
+        <Box hidden={tab !== 'troca'}>
+          <NegotiationTradeInTab {...tradeIn} readOnly={negotiation.status !== 'ABERTA'} />
         </Box>
       )}
 

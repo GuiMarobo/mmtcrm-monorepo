@@ -1966,4 +1966,22 @@ describe('NegotiationsService', () => {
       });
     });
   });
+
+  describe('remove — exclusão lógica em cascata (RD14, spec 007)', () => {
+    it('exclui logicamente o Pedido e os aparelhos da Negociação, com a mesma marca, na mesma transação', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await service.remove(3);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const devices = callArg<{ where: unknown; data: { deletedAt: Date } }>(
+        prisma.usedDevice.updateMany,
+      );
+      expect(devices.where).toEqual({ deletedAt: null, negotiationId: 3 });
+      const negotiation = callArg<{ data: { deletedAt: Date } }>(
+        prisma.negotiation.update,
+      );
+      expect(devices.data.deletedAt).toBe(negotiation.data.deletedAt);
+    });
+  });
 });

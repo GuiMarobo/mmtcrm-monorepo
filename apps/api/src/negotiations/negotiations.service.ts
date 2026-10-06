@@ -573,6 +573,11 @@ export class NegotiationsService {
         where: { ...NOT_DELETED, negotiationId: id },
         data: { deletedAt },
       });
+      // RD14: os aparelhos na troca saem junto, com a mesma marca.
+      await tx.usedDevice.updateMany({
+        where: { ...NOT_DELETED, negotiationId: id },
+        data: { deletedAt },
+      });
       await tx.negotiation.update({ where: { id }, data: { deletedAt } });
     });
 
