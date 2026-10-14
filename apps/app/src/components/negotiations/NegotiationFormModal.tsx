@@ -13,6 +13,8 @@ import { FormDialog } from '../common/FormDialog'
 import { NegotiationItemsEditor } from './NegotiationItemsEditor'
 import { NegotiationQuotationsTab } from './NegotiationQuotationsTab'
 import { NegotiationTradeInTab, type NegotiationTradeIn } from './NegotiationTradeInTab'
+import { quotationBlockedReason } from './amountDue'
+import { sumCashTotal } from './installmentSimulation'
 import {
   SELLER_DISCOUNT_LIMIT_PERCENT,
   findItemOverSellerLimit,
@@ -71,13 +73,18 @@ export function NegotiationFormModal({
 }: NegotiationFormModalProps) {
   const isEdit = !!negotiation
   const [tab, setTab] = useState<NegotiationModalTab>('itens')
+  const loadedTradeIns = tradeIn ? tradeIn.devices : []
   const issueBlockedReason = !negotiation
     ? null
     : negotiation.status !== 'ABERTA'
       ? 'Simular e emitir orçamento só para negociação em aberto.'
       : negotiation.items.length === 0
         ? 'Salve ao menos um item na negociação para simular o parcelamento.'
-        : null
+        : tradeIn?.error
+          ? `${tradeIn.error} Sem os aparelhos na troca, não é possível simular nem emitir o orçamento.`
+          : !loadedTradeIns
+            ? 'Carregando os aparelhos na troca…'
+            : quotationBlockedReason(sumCashTotal(negotiation.items), loadedTradeIns)
   const knownWithoutIssued = !quotationsError && !!quotations && quotations.length === 0
   const quotationsTabDisabled = !!issueBlockedReason && knownWithoutIssued
   const [clientId, setClientId] = useState(negotiation?.clientId ?? '')
@@ -198,6 +205,7 @@ export function NegotiationFormModal({
         <Box hidden={tab !== 'orcamentos'}>
           <NegotiationQuotationsTab
             items={negotiation.items}
+            tradeIns={loadedTradeIns ?? []}
             installmentRates={installmentRates}
             installmentRatesError={installmentRatesError}
             defaultValidityDays={defaultValidityDays}

@@ -8,6 +8,7 @@ import type {
   NegotiationDetail,
   NegotiationItem,
   Quotation,
+  UsedDevice,
 } from '../../types'
 
 const item = (overrides: Partial<NegotiationItem> = {}): NegotiationItem => ({
@@ -56,12 +57,14 @@ const renderModal = ({
   installmentRatesError = null,
   quotations = [],
   onOpenQuotation = vi.fn(),
+  tradeInDevices,
 }: {
   negotiation?: NegotiationDetail
   installmentRates?: InstallmentRate[] | null
   installmentRatesError?: string | null
   quotations?: Quotation[] | null
   onOpenQuotation?: (quotation: Quotation) => void
+  tradeInDevices?: UsedDevice[] | null
 } = {}) =>
   render(
     <NegotiationFormModal
@@ -73,6 +76,17 @@ const renderModal = ({
       installmentRatesError={installmentRatesError}
       quotations={quotations}
       onOpenQuotation={onOpenQuotation}
+      tradeIn={
+        tradeInDevices === undefined
+          ? undefined
+          : {
+              devices: tradeInDevices,
+              error: null,
+              onCreate: vi.fn(),
+              onUpdate: vi.fn(),
+              onRemove: vi.fn(),
+            }
+      }
       onClose={vi.fn()}
       onCreate={vi.fn()}
       onUpdate={vi.fn()}
@@ -601,5 +615,129 @@ describe('NegotiationFormModal — emitidos depois que a Negociação fecha (spe
     await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
 
     expect(screen.getByText('Falha ao carregar os orçamentos.')).toBeInTheDocument()
+  })
+})
+
+const usedDevice = (overrides: Partial<UsedDevice> = {}): UsedDevice => ({
+  id: 40,
+  negotiationId: 3,
+  model: 'iPhone 12 128 GB',
+  serialNumber: 'F2LXK0ABCD',
+  imei: null,
+  evaluationStatus: 'AVALIADO',
+  condition: 'BOM',
+  estimatedValue: 400,
+  report: null,
+  icloudUnlocked: true,
+  evaluatedAt: '2026-10-05T13:00:00Z',
+  evaluator: { id: 4, name: 'Técnico' },
+  createdAt: '2026-10-05T12:00:00Z',
+  createdBy: { id: 2, name: 'Vendedora' },
+  ...overrides,
+})
+
+const pendingDevice = () =>
+  usedDevice({
+    id: 41,
+    model: 'Apple Watch S6',
+    serialNumber: 'GY7ABC',
+    evaluationStatus: 'AGUARDANDO',
+    condition: null,
+    estimatedValue: null,
+    icloudUnlocked: null,
+    evaluatedAt: null,
+    evaluator: null,
+  })
+
+const simulationPanel = () =>
+  within(screen.getByRole('table', { name: 'Simulação de parcelamento' }).parentElement!)
+
+describe('NegotiationFormModal — Orçamento sobre o Saldo a pagar (spec 007, ticket 04)', () => {
+  it('simula sobre o Saldo a pagar: só o avaliado abate, o recusado não', async () => {
+    const user = userEvent.setup()
+    renderModal({
+      tradeInDevices: [
+        usedDevice(),
+        usedDevice({
+          id: 42,
+          evaluationStatus: 'RECUSADO',
+          condition: null,
+          estimatedValue: null,
+          report: 'iCloud bloqueado',
+        }),
+      ],
+    })
+
+    await openQuotations(user)
+
+    const panel = simulationPanel()
+    expect(panel.getByText(/Total à vista/)).toHaveTextContent(/R\$\s1\.000,00/)
+    expect(panel.getByText(/Total das trocas/)).toHaveTextContent(/-R\$\s400,00/)
+    expect(panel.getByText(/Saldo a pagar:/)).toHaveTextContent(/R\$\s600,00/)
+    expect(panel.getByText(/sobre o saldo a pagar/)).toBeInTheDocument()
+    expect(within(row(1)).getByText(/1x de R\$\s600,00/)).toBeInTheDocument()
+    expect(within(row(10)).getByText(/10x de R\$\s63,00/)).toBeInTheDocument()
+    expect(within(row(10)).getByText(/^R\$\s630,00$/)).toBeInTheDocument()
+    expect(within(row(10)).getByText(/\+R\$\s30,00/)).toBeInTheDocument()
+  })
+
+  it('sem aparelhos, não mostra as linhas de troca e simula sobre o total à vista', async () => {
+    const user = userEvent.setup()
+    renderModal({ tradeInDevices: [] })
+
+    await openQuotations(user)
+
+    expect(simulationPanel().queryByText(/Total das trocas/)).not.toBeInTheDocument()
+    expect(within(row(1)).getByText(/1x de R\$\s1\.000,00/)).toBeInTheDocument()
+  })
+
+  it('aparelho aguardando avaliação bloqueia simular e emitir, com o motivo visível', () => {
+    renderModal({ tradeInDevices: [usedDevice(), pendingDevice()] })
+
+    expect(screen.getByRole('tab', { name: 'Orçamentos' })).toBeDisabled()
+    expect(
+      screen.getByText(/Apple Watch S6 \(série GY7ABC\) ainda aguarda avaliação/),
+    ).toBeInTheDocument()
+  })
+
+  it('Saldo a pagar negativo bloqueia simular e emitir, com o motivo visível', () => {
+    renderModal({ tradeInDevices: [usedDevice({ estimatedValue: 1000.01 })] })
+
+    expect(screen.getByRole('tab', { name: 'Orçamentos' })).toBeDisabled()
+    expect(screen.getByText(/Saldo a pagar negativo/)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['aguardando', [pendingDevice()], /ainda aguarda avaliação/],
+    ['saldo negativo', [usedDevice({ estimatedValue: 1200 })], /Saldo a pagar negativo/],
+  ])(
+    'bloqueada por %s, a lista dos emitidos continua acessível, sem simular nem emitir',
+    async (_, devices, reason) => {
+      const user = userEvent.setup()
+      const onOpenQuotation = vi.fn()
+      renderModal({ tradeInDevices: devices, quotations: [quotation()], onOpenQuotation })
+
+      await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
+
+      expect(screen.getByText(reason)).toBeVisible()
+      expect(
+        screen.queryByRole('table', { name: 'Simulação de parcelamento' }),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Emitir/ })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'ORC-7' }))
+      expect(onOpenQuotation).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('enquanto os aparelhos carregam, não simula', async () => {
+    const user = userEvent.setup()
+    renderModal({ tradeInDevices: null, quotations: [quotation()] })
+
+    await user.click(screen.getByRole('tab', { name: 'Orçamentos' }))
+
+    expect(screen.getByText('Carregando os aparelhos na troca…')).toBeVisible()
+    expect(
+      screen.queryByRole('table', { name: 'Simulação de parcelamento' }),
+    ).not.toBeInTheDocument()
   })
 })

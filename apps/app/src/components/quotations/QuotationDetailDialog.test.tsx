@@ -43,6 +43,9 @@ const quotation = (overrides: Partial<QuotationDetail> = {}): QuotationDetail =>
       subtotal: 550,
     }),
   ],
+  tradeIns: [],
+  tradeInTotal: 0,
+  amountDue: 11350,
   client: { id: 'c1', name: 'Fulana de Tal', anonymized: false },
   seller: { id: 2, name: 'Vendedora Responsável' },
   ...overrides,
@@ -218,5 +221,67 @@ describe('QuotationDetailDialog', () => {
     renderDetail()
 
     expect(screen.queryByText(/Dados da loja indisponíveis/)).not.toBeInTheDocument()
+  })
+})
+
+describe('QuotationDetailDialog — aparelhos na troca (spec 007, ticket 04)', () => {
+  const withTradeIns = () =>
+    quotation({
+      tradeIns: [
+        {
+          id: 200,
+          usedDeviceId: 40,
+          model: 'iPhone 12 128 GB',
+          serialNumber: 'F2LXK0ABCD',
+          tradeInValue: 1500,
+        },
+        {
+          id: 201,
+          usedDeviceId: null,
+          model: 'Apple Watch S6',
+          serialNumber: 'GY7ABC',
+          tradeInValue: 500,
+        },
+      ],
+      tradeInTotal: 2000,
+      amountDue: 9350,
+      installments: 10,
+      totalWithInterest: 9350,
+      installmentValue: 935,
+      firstInstallmentValue: 935,
+    })
+
+  it('mostra cada aparelho na troca linha a linha, com modelo, série e valor', () => {
+    renderDetail({ detail: withTradeIns() })
+
+    const rows = within(
+      within(screen.getByRole('table', { name: 'Aparelhos na troca' })).getAllByRole(
+        'rowgroup',
+      )[1],
+    ).getAllByRole('row')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent('iPhone 12 128 GB')
+    expect(rows[0]).toHaveTextContent('F2LXK0ABCD')
+    expect(rows[0]).toHaveTextContent('R$ 1.500,00')
+    expect(rows[1]).toHaveTextContent('Apple Watch S6')
+    expect(rows[1]).toHaveTextContent('R$ 500,00')
+  })
+
+  it('mostra total à vista, total das trocas, saldo e a condição sobre o saldo', () => {
+    renderDetail({ detail: withTradeIns() })
+
+    expect(screen.getByText('Total à vista').nextSibling).toHaveTextContent('R$ 11.350,00')
+    expect(screen.getByText('Total das trocas').nextSibling).toHaveTextContent('-R$ 2.000,00')
+    expect(screen.getByText('Saldo a pagar').nextSibling).toHaveTextContent('R$ 9.350,00')
+    expect(screen.getByText('10x de R$ 935,00')).toBeInTheDocument()
+    expect(screen.getByText(/Cartão de crédito sobre o saldo/)).toBeInTheDocument()
+  })
+
+  it('sem trocas, o documento fica como na spec 011', () => {
+    renderDetail()
+
+    expect(screen.queryByRole('table', { name: 'Aparelhos na troca' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Total das trocas')).not.toBeInTheDocument()
+    expect(screen.queryByText('Saldo a pagar')).not.toBeInTheDocument()
   })
 })

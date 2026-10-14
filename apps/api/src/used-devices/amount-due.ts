@@ -2,7 +2,7 @@ import { EvaluationStatus } from '../../generated/prisma/enums';
 
 // Aceita number ou Prisma.Decimal (lido do banco): os dois viram número por
 // Number().
-type Numeric = number | { toString(): string };
+export type Numeric = number | { toString(): string };
 
 export interface TradeInInput {
   evaluationStatus: EvaluationStatus;
@@ -31,8 +31,21 @@ export function amountDue(
   totalValue: Numeric,
   devices: TradeInInput[],
 ): AmountDue {
-  const tradeInTotalCents = devices.reduce(
-    (total, device) => total + tradeInValueCents(device),
+  return balance(totalValue, devices.map(tradeInValueCents));
+}
+
+// RD12: o Orçamento emitido guarda só os avaliados, com o valor de troca já
+// copiado — o saldo dele sai dessas linhas congeladas, pela mesma conta.
+export function frozenAmountDue(
+  totalValue: Numeric,
+  tradeInValues: Numeric[],
+): AmountDue {
+  return balance(totalValue, tradeInValues.map(toCents));
+}
+
+function balance(totalValue: Numeric, tradeInCents: number[]): AmountDue {
+  const tradeInTotalCents = tradeInCents.reduce(
+    (total, cents) => total + cents,
     0,
   );
   return {

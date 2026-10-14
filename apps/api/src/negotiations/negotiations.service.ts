@@ -30,6 +30,11 @@ import {
   toItemResponse,
 } from './negotiation-item-response';
 import { amountDue } from '../used-devices/amount-due';
+import {
+  assertAmountDueNotNegative,
+  assertNoPendingTradeIn,
+  findTradeIns,
+} from '../used-devices/trade-in-guard';
 
 const insufficientStockForConversion = (productName: string, stock: number) =>
   `Saldo insuficiente do Produto ${productName}: há ${stock} unidade(s) disponível(is)`;
@@ -615,25 +620,8 @@ export class NegotiationsService {
     tx: Prisma.TransactionClient,
     id: number,
   ) {
-    const devices = await tx.usedDevice.findMany({
-      where: { ...NOT_DELETED, negotiationId: id },
-      select: {
-        model: true,
-        serialNumber: true,
-        evaluationStatus: true,
-        estimatedValue: true,
-      },
-      orderBy: { id: 'asc' },
-    });
-
-    const pending = devices.find(
-      (device) => device.evaluationStatus === 'AGUARDANDO',
-    );
-    if (pending) {
-      throw new ConflictException(
-        `O aparelho ${pending.model} (série ${pending.serialNumber}) ainda aguarda avaliação; espere a avaliação ou remova-o da troca antes de converter`,
-      );
-    }
+    const devices = await findTradeIns(tx, id);
+    assertNoPendingTradeIn(devices, 'converter');
 
     // O total é relido pela transação: uma edição de itens concorrente não
     // deixa passar um saldo que ficou negativo.
@@ -642,11 +630,7 @@ export class NegotiationsService {
       select: { totalValue: true },
     });
     if (!current) throw new NotFoundException('Negociação não encontrada');
-    if (amountDue(current.totalValue, devices).amountDueCents < 0) {
-      throw new ConflictException(
-        'Saldo a pagar negativo: a troca vale mais que a compra. Ajuste os itens ou os aparelhos antes de converter',
-      );
-    }
+    assertAmountDueNotNegative(current.totalValue, devices, 'converter');
   }
 
   async convert(id: number, paymentMethod: PaymentMethodEnum, userId: number) {

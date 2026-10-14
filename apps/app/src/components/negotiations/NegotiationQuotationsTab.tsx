@@ -17,16 +17,18 @@ import { formatCurrency, formatDate, formatIsoDate, formatPercent } from '../../
 import { ratePercentError } from '../../utils/validators'
 import { ToneChip } from '../common/ToneChip'
 import { describeCondition } from '../quotations/quotationCondition'
+import { summarizeAmountDue, type AmountDueSummary } from './amountDue'
 import {
   MAX_INSTALLMENTS,
   simulateInstallment,
   sumCashTotal,
 } from './installmentSimulation'
 import { MAX_VALIDITY_AHEAD_DAYS, validUntilError, validityDateFrom } from './quotationValidity'
-import type { InstallmentRate, IssueQuotationPayload, Quotation } from '../../types'
+import type { InstallmentRate, IssueQuotationPayload, Quotation, UsedDevice } from '../../types'
 
 interface NegotiationQuotationsTabProps {
   items: { subtotal: number }[]
+  tradeIns: UsedDevice[]
   installmentRates: InstallmentRate[] | null
   installmentRatesError: string | null
   defaultValidityDays: number
@@ -39,6 +41,7 @@ interface NegotiationQuotationsTabProps {
 
 export function NegotiationQuotationsTab({
   items,
+  tradeIns,
   installmentRates,
   installmentRatesError,
   defaultValidityDays,
@@ -61,7 +64,7 @@ export function NegotiationQuotationsTab({
         </Typography>
       ) : (
         <InstallmentSimulationTable
-          cashTotal={sumCashTotal(items)}
+          summary={summarizeAmountDue(sumCashTotal(items), tradeIns)}
           rates={installmentRates}
           defaultValidityDays={defaultValidityDays}
           onIssue={onIssueQuotation}
@@ -155,12 +158,12 @@ function IssuedQuotations({
 }
 
 function InstallmentSimulationTable({
-  cashTotal,
+  summary,
   rates,
   defaultValidityDays,
   onIssue,
 }: {
-  cashTotal: number
+  summary: AmountDueSummary
   rates: InstallmentRate[]
   defaultValidityDays: number
   onIssue?: (payload: IssueQuotationPayload) => Promise<unknown>
@@ -177,6 +180,7 @@ function InstallmentSimulationTable({
   const [issuing, setIssuing] = useState(false)
   const [issueError, setIssueError] = useState<string | null>(null)
 
+  const withTradeIn = summary.tradeInTotal > 0
   const today = new Date()
   const validUntilProblem = validUntilError(validUntil, today)
   const selectedRateProblem = selected === null ? null : ratePercentError(values[selected - 1])
@@ -204,14 +208,29 @@ function InstallmentSimulationTable({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}>
-        <Typography sx={{ fontSize: 13.5 }}>
-          Total à vista:{' '}
-          <Box component="strong" sx={{ fontWeight: 700 }}>
-            {formatCurrency(cashTotal)}
-          </Box>
-        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+          <Typography sx={{ fontSize: 13.5 }}>
+            Total à vista:{' '}
+            <Box component="strong" sx={{ fontWeight: 700 }}>
+              {formatCurrency(summary.totalValue)}
+            </Box>
+          </Typography>
+          {withTradeIn && (
+            <>
+              <Typography sx={{ fontSize: 13.5 }}>
+                Total das trocas: {formatCurrency(-summary.tradeInTotal)}
+              </Typography>
+              <Typography sx={{ fontSize: 13.5 }}>
+                Saldo a pagar:{' '}
+                <Box component="strong" sx={{ fontWeight: 700 }}>
+                  {formatCurrency(summary.amountDue)}
+                </Box>
+              </Typography>
+            </>
+          )}
+        </Box>
         <Typography sx={{ fontSize: 12, color: 'text.disabled', textAlign: 'right' }}>
-          Cartão de crédito · sobre os itens salvos · simular não grava nada
+          {`Cartão de crédito · sobre ${withTradeIn ? 'o saldo a pagar' : 'os itens salvos'} · simular não grava nada`}
         </Typography>
       </Box>
 
@@ -230,7 +249,7 @@ function InstallmentSimulationTable({
             const error = ratePercentError(values[index])
             const simulation = error
               ? null
-              : simulateInstallment(cashTotal, installments, Number(values[index]))
+              : simulateInstallment(summary.amountDue, installments, Number(values[index]))
             return (
               <TableRow key={installments} selected={selected === installments}>
                 {onIssue && (

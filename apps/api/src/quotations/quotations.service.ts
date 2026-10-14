@@ -18,6 +18,12 @@ import {
   negotiationItemsSelect,
   toItemResponse,
 } from '../negotiations/negotiation-item-response';
+import { frozenAmountDue } from '../used-devices/amount-due';
+import {
+  assertAmountDueNotNegative,
+  assertNoPendingTradeIn,
+  findTradeIns,
+} from '../used-devices/trade-in-guard';
 import { IssueQuotationDto } from './dto/issue-quotation.dto';
 import {
   splitInstallments,
@@ -79,11 +85,22 @@ type QuotationRow = Prisma.QuotationGetPayload<{
 }>;
 
 // Os itens congelados têm o mesmo formato do item da Negociação: nome e código
-// do Produto lidos do catálogo (RI2), preço e desconto como gravados.
+// do Produto lidos do catálogo (RI2), preço e desconto como gravados. As
+// trocas são só o que foi copiado na emissão (RD12).
 const quotationWithItemsSelect = {
   ...quotationSelect,
   items: {
     select: negotiationItemsSelect.select,
+    orderBy: { id: 'asc' },
+  },
+  tradeIns: {
+    select: {
+      id: true,
+      usedDeviceId: true,
+      model: true,
+      serialNumber: true,
+      tradeInValue: true,
+    },
     orderBy: { id: 'asc' },
   },
 } satisfies Prisma.QuotationSelect;
@@ -137,9 +154,24 @@ export class QuotationsService {
     };
   }
 
+  // O saldo sai do total à vista e das trocas congeladas, nunca dos aparelhos
+  // atuais: reavaliar depois não muda o papel (RD12 / ADR 0017).
   private toResponseWithItems(quotation: QuotationWithItemsRow) {
-    const { items, ...rest } = quotation;
-    return { ...this.toResponse(rest), items: items.map(toItemResponse) };
+    const { items, tradeIns, ...rest } = quotation;
+    const { tradeInTotalCents, amountDueCents } = frozenAmountDue(
+      rest.totalValue,
+      tradeIns.map((tradeIn) => tradeIn.tradeInValue),
+    );
+    return {
+      ...this.toResponse(rest),
+      tradeInTotal: fromCents(tradeInTotalCents),
+      amountDue: fromCents(amountDueCents),
+      items: items.map(toItemResponse),
+      tradeIns: tradeIns.map((tradeIn) => ({
+        ...tradeIn,
+        tradeInValue: Number(tradeIn.tradeInValue),
+      })),
+    };
   }
 
   private async ensureNegotiationExists(
@@ -152,6 +184,30 @@ export class QuotationsService {
     });
     if (!negotiation) throw new NotFoundException('Negociação não encontrada');
     return negotiation;
+  }
+
+  // RD12: o papel não pode omitir a troca que o Cliente espera — nenhum
+  // aparelho aguardando avaliação e o Saldo a pagar não negativo. Devolve os
+  // avaliados, que são os que a emissão congela; recusado fica de fora.
+  private async resolveTradeInsForIssue(
+    tx: Prisma.TransactionClient,
+    negotiationId: number,
+    cashCents: number,
+  ) {
+    const devices = await findTradeIns(tx, negotiationId);
+    assertNoPendingTradeIn(devices, 'emitir o orçamento');
+    const { amountDueCents } = assertAmountDueNotNegative(
+      fromCents(cashCents),
+      devices,
+      'emitir o orçamento',
+    );
+
+    const evaluatedDevices = devices.flatMap((device) =>
+      device.evaluationStatus === 'AVALIADO' && device.estimatedValue !== null
+        ? [{ ...device, estimatedValue: device.estimatedValue }]
+        : [],
+    );
+    return { amountDueCents, evaluatedDevices };
   }
 
   // RQ5: faixas conferidas antes de ler qualquer coisa.
@@ -208,7 +264,7 @@ export class QuotationsService {
       addDays(storeToday(), settings.company.defaultValidityDays);
 
     // RQ11: só lê a Negociação e grava o Orçamento — não muda situação, não
-    // toca Pedido nem estoque, não trava a edição dos itens.
+    // toca Pedido, estoque nem aparelhos, não trava a edição dos itens.
     const quotation = await this.prisma.$transaction(async (tx) => {
       const negotiation = await this.ensureNegotiationExists(negotiationId, tx);
       if (negotiation.status !== 'ABERTA') {
@@ -238,8 +294,12 @@ export class QuotationsService {
         (total, item) => total + priceItem(item).subtotalCents,
         0,
       );
+      const { amountDueCents, evaluatedDevices } =
+        await this.resolveTradeInsForIssue(tx, negotiationId, cashCents);
+      // O total à vista continua sendo o dos itens; o parcelamento é sobre o
+      // Saldo a pagar (spec 007).
       const totalCents = totalWithInterestCents(
-        cashCents,
+        amountDueCents,
         toCents(ratePercent),
       );
 
@@ -262,6 +322,14 @@ export class QuotationsService {
               unitPrice: item.unitPrice,
               discountType: item.discountType,
               discountValue: item.discountValue,
+            })),
+          },
+          tradeIns: {
+            create: evaluatedDevices.map((device) => ({
+              usedDeviceId: device.id,
+              model: device.model,
+              serialNumber: device.serialNumber,
+              tradeInValue: device.estimatedValue,
             })),
           },
         },

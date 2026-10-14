@@ -341,6 +341,7 @@ model Quotation {
   // SetNull preserva o Orçamento quando o autor é excluído, como StockMovement.userId.
   author      User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
   items       QuotationItem[]
+  tradeIns    QuotationTradeIn[]
 
   @@index([negotiationId])
   @@map("quotations")
@@ -367,6 +368,27 @@ model QuotationItem {
   @@index([quotationId])
   @@index([productId])
   @@map("quotation_items")
+}
+
+// Aparelho na troca do orçamento (spec 007, RD12): espelha o aparelho AVALIADO
+// no momento da emissão, como QuotationItem espelha o item. Modelo, série e
+// valor de troca são copiados: reavaliar ou remover o aparelho depois não muda
+// o papel emitido (ADR 0017). A referência ao aparelho de origem é só
+// rastreabilidade — SetNull, e o Orçamento nunca depende dela. Sem deletedAt.
+model QuotationTradeIn {
+  id           Int     @id @default(autoincrement())
+  quotationId  Int     @map("quotation_id")
+  usedDeviceId Int?    @map("used_device_id")
+  model        String
+  serialNumber String  @map("serial_number")
+  tradeInValue Decimal @map("trade_in_value") @db.Decimal(12, 2)
+
+  quotation  Quotation   @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  usedDevice UsedDevice? @relation(fields: [usedDeviceId], references: [id], onDelete: SetNull)
+
+  @@index([quotationId])
+  @@index([usedDeviceId])
+  @@map("quotation_trade_ins")
 }
 
 // Resultado da Avaliação do aparelho usado (spec 007). Nasce AGUARDANDO; avaliar
@@ -414,6 +436,7 @@ model UsedDevice {
   // SetNull preserva o aparelho quando o usuário é excluído, como StockMovement.userId.
   evaluator   User?       @relation("UsedDeviceEvaluator", fields: [evaluatorId], references: [id], onDelete: SetNull)
   createdBy   User?       @relation("UsedDeviceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  quotationTradeIns QuotationTradeIn[]
 
   @@index([negotiationId])
   @@index([serialNumber])

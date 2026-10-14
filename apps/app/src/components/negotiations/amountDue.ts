@@ -26,16 +26,31 @@ export function summarizeAmountDue(totalValue: number, devices: TradeInDevice[])
   }
 }
 
+function tradeInBlockedReason(
+  totalValue: number,
+  devices: TradeInDevice[],
+  action: string,
+): string | null {
+  const pending = devices.find((device) => device.evaluationStatus === 'AGUARDANDO')
+  if (pending) {
+    return `O aparelho ${pending.model} (série ${pending.serialNumber}) ainda aguarda avaliação; espere a avaliação ou remova-o da troca antes de ${action}.`
+  }
+  if (summarizeAmountDue(totalValue, devices).negative) {
+    return `Saldo a pagar negativo: a troca vale mais que a compra. Ajuste os itens ou os aparelhos antes de ${action}.`
+  }
+  return null
+}
+
 export function conversionBlockedReason(
   totalValue: number,
   devices: TradeInDevice[],
 ): string | null {
-  const pending = devices.find((device) => device.evaluationStatus === 'AGUARDANDO')
-  if (pending) {
-    return `O aparelho ${pending.model} (série ${pending.serialNumber}) ainda aguarda avaliação; espere a avaliação ou remova-o da troca antes de converter.`
-  }
-  if (summarizeAmountDue(totalValue, devices).negative) {
-    return 'Saldo a pagar negativo: a troca vale mais que a compra. Ajuste os itens ou os aparelhos antes de converter.'
-  }
-  return null
+  return tradeInBlockedReason(totalValue, devices, 'converter')
+}
+
+export function quotationBlockedReason(
+  totalValue: number,
+  devices: TradeInDevice[],
+): string | null {
+  return tradeInBlockedReason(totalValue, devices, 'simular ou emitir o orçamento')
 }

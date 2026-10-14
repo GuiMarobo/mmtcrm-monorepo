@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { conversionBlockedReason, summarizeAmountDue } from './amountDue'
+import { conversionBlockedReason, quotationBlockedReason, summarizeAmountDue } from './amountDue'
 import type { UsedDevice } from '../../types'
 
 const device = (overrides: Partial<UsedDevice>): UsedDevice => ({
@@ -89,5 +89,34 @@ describe('conversionBlockedReason', () => {
 
   it('sem aparelhos não bloqueia', () => {
     expect(conversionBlockedReason(1500, [])).toBeNull()
+  })
+})
+
+describe('quotationBlockedReason', () => {
+  it('aparelho aguardando bloqueia a emissão, nomeando modelo e série', () => {
+    const reason = quotationBlockedReason(3000, [
+      device({ id: 2, model: 'iPhone 13 Pro', serialNumber: 'G7ABC' }),
+    ])
+
+    expect(reason).toMatch(/iPhone 13 Pro \(série G7ABC\) ainda aguarda avaliação/)
+    expect(reason).toMatch(/antes de simular ou emitir o orçamento/)
+  })
+
+  it('saldo negativo bloqueia a emissão', () => {
+    const reason = quotationBlockedReason(1500, [
+      device({ evaluationStatus: 'AVALIADO', estimatedValue: 1500.01 }),
+    ])
+
+    expect(reason).toMatch(/Saldo a pagar negativo/)
+    expect(reason).toMatch(/antes de simular ou emitir o orçamento/)
+  })
+
+  it('recusado e saldo zerado não bloqueiam', () => {
+    expect(
+      quotationBlockedReason(1500, [
+        device({ id: 1, evaluationStatus: 'RECUSADO', report: 'iCloud' }),
+        device({ id: 2, evaluationStatus: 'AVALIADO', estimatedValue: 1500 }),
+      ]),
+    ).toBeNull()
   })
 })
