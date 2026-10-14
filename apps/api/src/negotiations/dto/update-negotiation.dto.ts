@@ -1,10 +1,9 @@
 import {
-  IsNumber,
+  IsEmpty,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
-  Min,
 } from 'class-validator';
 
 // Dto proprio, sem PartialType(CreateNegotiationDto): PATCH continua sem
@@ -15,10 +14,14 @@ export class UpdateNegotiationDto {
   @IsOptional()
   clientId?: string;
 
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @IsOptional()
-  totalValue?: number;
+  // Recusado de forma explicita em vez de sumir pelo whitelist: com itens o
+  // total e a soma dos subtotais, e sem itens o valor informado nao e mais
+  // digitado (ADR 0015). Aceitar aqui quebraria totalValue == Σ subtotais.
+  @IsEmpty({
+    message:
+      'totalValue não é editável: o valor da Negociação vem da soma dos itens',
+  })
+  totalValue?: never;
 
   @IsString()
   @IsOptional()

@@ -799,7 +799,7 @@ describe('NegotiationsService', () => {
     it('editar a Negociação sem trocar o Cliente não o checa', async () => {
       prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
 
-      await service.updatePartial(3, { totalValue: 2000 });
+      await service.updatePartial(3, { notes: 'Retira na loja' });
 
       expect(prisma.client.findFirst).not.toHaveBeenCalled();
     });
