@@ -6,9 +6,11 @@ import {
 import { Prisma } from '../../generated/prisma/client';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import {
+  fromCents,
   negotiationItemsSelect,
   toItemResponse,
 } from '../negotiations/negotiation-item-response';
+import { amountDue, tradeInValueCents } from '../used-devices/amount-due';
 
 // O Pedido só é lido com o Cliente e o Vendedor (via Negociação de origem), a
 // forma de pagamento, o valor e a situação — spec 005 §4/§5.
@@ -34,12 +36,26 @@ type OrderRow = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
 // Spec 010 história 40 / RB7: o detalhe traz os itens vendidos, que são os da
 // Negociação de origem — o Pedido não tem tabela própria. A lista (fila de
 // cobrança) continua enxuta e não os traz.
+// Spec 007 história 45: os aparelhos na troca também são lidos da Negociação,
+// sem cópia — a trava da Negociação ganha mantém o valor enquanto o Pedido
+// existe, e reabrir e reconverter mostra a troca nova.
 const orderDetailSelect = {
   ...orderSelect,
   negotiation: {
     select: {
       ...orderSelect.negotiation.select,
       items: negotiationItemsSelect,
+      usedDevices: {
+        where: NOT_DELETED,
+        select: {
+          id: true,
+          model: true,
+          serialNumber: true,
+          evaluationStatus: true,
+          estimatedValue: true,
+        },
+        orderBy: { id: 'asc' },
+      },
     },
   },
 } satisfies Prisma.OrderSelect;
@@ -73,14 +89,27 @@ export class OrdersService {
     };
   }
 
+  // O valor do Pedido continua o da venda; o Saldo a pagar é derivado (ADR
+  // 0018). Recusado conta zero e fica fora da lista.
   private toDetailResponse(order: OrderDetailRow) {
     const {
-      negotiation: { items, ...negotiation },
+      negotiation: { items, usedDevices, ...negotiation },
       ...rest
     } = order;
+    const balance = amountDue(order.totalValue, usedDevices);
     return {
       ...this.toResponse({ ...rest, negotiation }),
       items: items.map(toItemResponse),
+      tradeIns: usedDevices
+        .filter((device) => device.evaluationStatus === 'AVALIADO')
+        .map((device) => ({
+          id: device.id,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          tradeInValue: fromCents(tradeInValueCents(device)),
+        })),
+      tradeInTotal: fromCents(balance.tradeInTotalCents),
+      amountDue: fromCents(balance.amountDueCents),
     };
   }
 

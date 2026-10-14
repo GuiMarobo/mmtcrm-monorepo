@@ -16,7 +16,15 @@ const tradeInCents = (device: TradeInDevice) =>
     : 0
 
 export function summarizeAmountDue(totalValue: number, devices: TradeInDevice[]): AmountDueSummary {
-  const tradeInTotalCents = devices.reduce((total, device) => total + tradeInCents(device), 0)
+  return balance(totalValue, devices.map(tradeInCents))
+}
+
+export function summarizeTradeIns(totalValue: number, tradeInValues: number[]): AmountDueSummary {
+  return balance(totalValue, tradeInValues.map(toCents))
+}
+
+function balance(totalValue: number, tradeInCentsList: number[]): AmountDueSummary {
+  const tradeInTotalCents = tradeInCentsList.reduce((total, cents) => total + cents, 0)
   const amountDueCents = toCents(totalValue) - tradeInTotalCents
   return {
     totalValue,

@@ -3,9 +3,15 @@ import Typography from '@mui/material/Typography'
 import { formatCurrency } from '../../utils/format'
 import type { AmountDueSummary } from './amountDue'
 
-export function AmountDueLines({ summary }: { summary: AmountDueSummary }) {
+export function AmountDueLines({
+  summary,
+  totalLabel = 'Total da negociação',
+}: {
+  summary: AmountDueSummary
+  totalLabel?: string
+}) {
   const rows: [string, number][] = [
-    ['Total da negociação', summary.totalValue],
+    [totalLabel, summary.totalValue],
     ['Total das trocas', summary.tradeInTotal],
     ['Saldo a pagar', summary.amountDue],
   ]

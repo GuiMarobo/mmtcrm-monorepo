@@ -10,13 +10,16 @@ import Typography from '@mui/material/Typography'
 import { DetailField, DetailSection } from '../common/DetailSection'
 import { OrderStatusBadge } from '../common/OrderStatusBadge'
 import { ToneChip } from '../common/ToneChip'
+import { AmountDueLines } from '../negotiations/AmountDueLines'
+import { summarizeTradeIns } from '../negotiations/amountDue'
 import { CLIENT_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../../types'
 import { formatCurrency, formatDate, formatPercent } from '../../utils/format'
-import type { NegotiationItem, Order } from '../../types'
+import type { NegotiationItem, Order, OrderTradeIn } from '../../types'
 
 interface OrderDetailDrawerProps {
   order: Order
   items: NegotiationItem[] | null
+  tradeIns: OrderTradeIn[] | null
   approving: boolean
   onApprove: () => void
   onGoToNegotiations: () => void
@@ -84,15 +87,52 @@ function OrderItemsList({ items }: { items: NegotiationItem[] }) {
   )
 }
 
+function TradeInList({ tradeIns }: { tradeIns: OrderTradeIn[] }) {
+  return (
+    <Box
+      component="ul"
+      aria-label="Aparelhos na troca"
+      sx={{
+        listStyle: 'none',
+        m: 0,
+        p: 0,
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1.5,
+        overflow: 'hidden',
+      }}
+    >
+      {tradeIns.map((tradeIn, index) => (
+        <Box component="li" key={tradeIn.id}>
+          {index > 0 && <Divider />}
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 1.5, py: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontSize: 13.5, fontWeight: 600 }}>{tradeIn.model}</Typography>
+              <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                Série {tradeIn.serialNumber}
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {formatCurrency(tradeIn.tradeInValue)}
+            </Typography>
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  )
+}
+
 export function OrderDetailDrawer({
   order,
   items,
+  tradeIns,
   approving,
   onApprove,
   onGoToNegotiations,
   onClose,
 }: OrderDetailDrawerProps) {
   const awaitingPayment = order.status === 'EM_NEGOCIACAO'
+  const tradeInFailed = items !== null && tradeIns === null
 
   return (
     <Drawer
@@ -150,6 +190,33 @@ export function OrderDetailDrawer({
           </>
         )}
 
+        {tradeInFailed && (
+          <Box sx={{ px: 3, pt: 3 }}>
+            <Alert severity="warning" sx={{ fontSize: 13 }}>
+              Não foi possível carregar a troca: sem ela não dá para saber o Saldo a pagar.
+              Feche e abra o pedido de novo antes de aprovar.
+            </Alert>
+          </Box>
+        )}
+
+        {tradeIns !== null && tradeIns.length > 0 && (
+          <>
+            <DetailSection title="Troca">
+              <TradeInList tradeIns={tradeIns} />
+              <Box sx={{ mt: 1.5 }}>
+                <AmountDueLines
+                  totalLabel="Total do pedido"
+                  summary={summarizeTradeIns(
+                    order.totalValue,
+                    tradeIns.map((tradeIn) => tradeIn.tradeInValue),
+                  )}
+                />
+              </Box>
+            </DetailSection>
+            <Divider />
+          </>
+        )}
+
         <DetailSection title="Cliente">
           <DetailField label="Nome">{order.client?.name ?? '-'}</DetailField>
           <DetailField label="Situação">
@@ -195,7 +262,7 @@ export function OrderDetailDrawer({
           <Button
             variant="contained"
             fullWidth
-            disabled={approving}
+            disabled={approving || tradeIns === null}
             onClick={onApprove}
           >
             {approving ? 'Aprovando…' : 'Aprovar Compra'}

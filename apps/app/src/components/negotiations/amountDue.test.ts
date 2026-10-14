@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { conversionBlockedReason, quotationBlockedReason, summarizeAmountDue } from './amountDue'
+import {
+  conversionBlockedReason,
+  quotationBlockedReason,
+  summarizeAmountDue,
+  summarizeTradeIns,
+} from './amountDue'
 import type { UsedDevice } from '../../types'
 
 const device = (overrides: Partial<UsedDevice>): UsedDevice => ({
@@ -60,6 +65,30 @@ describe('summarizeAmountDue', () => {
       amountDue: 1500,
       negative: false,
     })
+  })
+})
+
+describe('summarizeTradeIns', () => {
+  it('soma os valores de troca já definidos e desconta do total, em centavos', () => {
+    expect(summarizeTradeIns(1500, [1200.1, 99.9])).toEqual({
+      totalValue: 1500,
+      tradeInTotal: 1300,
+      amountDue: 200,
+      negative: false,
+    })
+  })
+
+  it('sem trocas o saldo é o total', () => {
+    expect(summarizeTradeIns(1500, [])).toEqual({
+      totalValue: 1500,
+      tradeInTotal: 0,
+      amountDue: 1500,
+      negative: false,
+    })
+  })
+
+  it('o saldo pode ficar negativo', () => {
+    expect(summarizeTradeIns(100, [100.01]).negative).toBe(true)
   })
 })
 
