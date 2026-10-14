@@ -7,18 +7,30 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RoleEnum } from '../users/dto/create-user.dto';
 import { CreateUsedDeviceDto } from './dto/create-used-device.dto';
 import { UpdateUsedDeviceDto } from './dto/update-used-device.dto';
+import { EvaluateUsedDeviceDto } from './dto/evaluate-used-device.dto';
+import { RefuseUsedDeviceDto } from './dto/refuse-used-device.dto';
+import {
+  ListUsedDevicesQueryDto,
+  UsedDeviceQueueFilter,
+} from './dto/list-used-devices-query.dto';
 import { UsedDevicesService } from './used-devices.service';
 
-// Lado do Vendedor (spec 007): o aparelho nasce e é mantido dentro da
-// Negociação, por ADMIN e VENDEDOR. O lado do Técnico (fila e avaliação) tem
-// perfis próprios, por isso o @Roles fica em cada rota.
+// Spec 007: o lado do Vendedor (o aparelho nasce e é mantido dentro da
+// Negociação) é de ADMIN e VENDEDOR; o lado do Técnico (fila e avaliação), de
+// ADMIN e TECNICO. Por isso o @Roles fica em cada rota.
 @ApiBearerAuth()
 @Controller()
 export class UsedDevicesController {
@@ -102,5 +114,82 @@ export class UsedDevicesController {
   @ApiResponse({ status: 409, description: 'Negociação não está em aberto' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usedDevicesService.remove(id);
+  }
+
+  @Get('used-devices')
+  @Roles(RoleEnum.ADMIN, RoleEnum.TECNICO)
+  @ApiOperation({
+    summary: 'Fila de avaliação',
+    description:
+      'Padrão (AGUARDANDO): aparelhos aguardando avaliação de negociações em ' +
+      'aberto, do mais antigo para o mais novo. AVALIADO, RECUSADO e TODOS ' +
+      'incluem negociações fechadas, o mais recente primeiro. Cada linha traz ' +
+      'Cliente, Vendedor e situação da negociação, sem itens nem valores.',
+  })
+  @ApiQuery({ name: 'status', required: false, enum: UsedDeviceQueueFilter })
+  @ApiResponse({ status: 200, description: 'Aparelhos da fila' })
+  @ApiResponse({ status: 400, description: 'Filtro inválido' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  findQueue(@Query() query: ListUsedDevicesQueryDto) {
+    return this.usedDevicesService.findQueue(query);
+  }
+
+  @Get('used-devices/:id')
+  @Roles(RoleEnum.ADMIN, RoleEnum.TECNICO)
+  @ApiOperation({
+    summary: 'Detalhar o aparelho, com o histórico da série',
+    description:
+      '"serialHistory" lista os outros aparelhos não excluídos com a mesma ' +
+      'série: data, resultado, condição e valor.',
+  })
+  @ApiResponse({ status: 200, description: 'Aparelho' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Aparelho não encontrado' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.usedDevicesService.findOne(id);
+  }
+
+  @Post('used-devices/:id/evaluate')
+  @Roles(RoleEnum.ADMIN, RoleEnum.TECNICO)
+  @ApiOperation({
+    summary: 'Avaliar o aparelho',
+    description:
+      'Exige iCloud liberado e valor estimado maior que zero. O valor ' +
+      'estimado é o valor de troca. Reavaliar sobrescreve a avaliação anterior.',
+  })
+  @ApiResponse({ status: 201, description: 'Aparelho avaliado' })
+  @ApiResponse({
+    status: 400,
+    description: 'Condição inválida, valor não positivo ou iCloud não liberado',
+  })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Aparelho não encontrado' })
+  @ApiResponse({ status: 409, description: 'Negociação não está em aberto' })
+  evaluate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: EvaluateUsedDeviceDto,
+    @Req() req: { user: { id: number } },
+  ) {
+    return this.usedDevicesService.evaluate(id, dto, req.user.id);
+  }
+
+  @Post('used-devices/:id/refuse')
+  @Roles(RoleEnum.ADMIN, RoleEnum.TECNICO)
+  @ApiOperation({
+    summary: 'Recusar o aparelho',
+    description:
+      'O laudo é o motivo e é obrigatório. Limpa condição e valor estimado.',
+  })
+  @ApiResponse({ status: 201, description: 'Aparelho recusado' })
+  @ApiResponse({ status: 400, description: 'Laudo vazio' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  @ApiResponse({ status: 404, description: 'Aparelho não encontrado' })
+  @ApiResponse({ status: 409, description: 'Negociação não está em aberto' })
+  refuse(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RefuseUsedDeviceDto,
+    @Req() req: { user: { id: number } },
+  ) {
+    return this.usedDevicesService.refuse(id, dto, req.user.id);
   }
 }

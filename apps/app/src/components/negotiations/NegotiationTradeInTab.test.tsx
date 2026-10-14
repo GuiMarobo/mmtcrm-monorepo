@@ -77,6 +77,45 @@ describe('NegotiationTradeInTab', () => {
     expect(within(rows[2]).getByText('—')).toBeInTheDocument()
   })
 
+  it('mostra condição, valor de troca, laudo, avaliador e data dos avaliados', () => {
+    renderTab({
+      devices: [
+        device({
+          evaluationStatus: 'AVALIADO',
+          condition: 'BOM',
+          estimatedValue: 2000,
+          report: 'Bateria 87%',
+          icloudUnlocked: true,
+          evaluatedAt: '2026-10-05T15:00:00Z',
+          evaluator: { id: 5, name: 'Técnico A' },
+        }),
+      ],
+    })
+
+    const row = screen.getAllByRole('row')[1]
+    expect(within(row).getByText(/Bom/)).toBeInTheDocument()
+    expect(within(row).getByText(/R\$\s?2\.000,00/)).toBeInTheDocument()
+    expect(within(row).getByText('Bateria 87%')).toBeInTheDocument()
+    expect(within(row).getByText(/Técnico A em 05\/10\/2026/)).toBeInTheDocument()
+  })
+
+  it('mostra o motivo dos recusados, sem valor', () => {
+    renderTab({
+      devices: [
+        device({
+          evaluationStatus: 'RECUSADO',
+          report: 'iCloud bloqueado',
+          evaluatedAt: '2026-10-05T15:00:00Z',
+          evaluator: { id: 5, name: 'Técnico A' },
+        }),
+      ],
+    })
+
+    const row = screen.getAllByRole('row')[1]
+    expect(within(row).getByText(/Motivo: iCloud bloqueado/)).toBeInTheDocument()
+    expect(within(row).queryByText(/R\$/)).not.toBeInTheDocument()
+  })
+
   it('edita só o aparelho aguardando avaliação, e remove qualquer um', () => {
     renderTab({ devices: threeDevices() })
 

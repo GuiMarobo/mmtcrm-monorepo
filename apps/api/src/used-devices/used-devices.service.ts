@@ -8,6 +8,12 @@ import { Prisma } from '../../generated/prisma/client';
 import { NOT_DELETED, PrismaService } from '../prisma/prisma.service';
 import { CreateUsedDeviceDto } from './dto/create-used-device.dto';
 import { UpdateUsedDeviceDto } from './dto/update-used-device.dto';
+import { EvaluateUsedDeviceDto } from './dto/evaluate-used-device.dto';
+import { RefuseUsedDeviceDto } from './dto/refuse-used-device.dto';
+import {
+  ListUsedDevicesQueryDto,
+  UsedDeviceQueueFilter,
+} from './dto/list-used-devices-query.dto';
 
 // RD3: a série é comparada e gravada como o sku — sem espaços nas pontas e em
 // maiúsculas —, para que "f2lx " e "F2LX" contem como o mesmo aparelho.
@@ -62,6 +68,68 @@ const toResponse = (device: UsedDeviceRow) => ({
   createdBy: device.createdBy,
 });
 
+// RD16: o lado do Técnico lê da Negociação só o Cliente, o Vendedor e a
+// situação — nunca os itens nem os valores.
+const queueDeviceSelect = {
+  ...usedDeviceSelect,
+  negotiation: {
+    select: {
+      id: true,
+      status: true,
+      client: { select: { id: true, name: true } },
+      vendedor: { select: { id: true, name: true } },
+    },
+  },
+} satisfies Prisma.UsedDeviceSelect;
+
+type QueueDeviceRow = Prisma.UsedDeviceGetPayload<{
+  select: typeof queueDeviceSelect;
+}>;
+
+const toQueueResponse = ({ negotiation, ...device }: QueueDeviceRow) => ({
+  ...toResponse(device),
+  negotiation,
+});
+
+const serialHistorySelect = {
+  id: true,
+  createdAt: true,
+  evaluatedAt: true,
+  evaluationStatus: true,
+  condition: true,
+  estimatedValue: true,
+} satisfies Prisma.UsedDeviceSelect;
+
+// RD15: o padrão é a fila de trabalho — pendentes de Negociações Abertas, na
+// ordem de chegada. Os demais filtros são consulta, o mais recente primeiro,
+// e mostram também os aparelhos de Negociações fechadas.
+const queueWhere = (
+  status: UsedDeviceQueueFilter,
+): Prisma.UsedDeviceWhereInput => {
+  if (status === UsedDeviceQueueFilter.AGUARDANDO) {
+    return {
+      ...LIVE_DEVICE,
+      evaluationStatus: 'AGUARDANDO',
+      negotiation: { ...LIVE_DEVICE.negotiation, status: 'ABERTA' },
+    };
+  }
+  if (status === UsedDeviceQueueFilter.TODOS) return LIVE_DEVICE;
+  return { ...LIVE_DEVICE, evaluationStatus: status };
+};
+
+const OLDEST_FIRST = [
+  { createdAt: 'asc' },
+  { id: 'asc' },
+] satisfies Prisma.UsedDeviceOrderByWithRelationInput[];
+
+const NEWEST_FIRST = [
+  { createdAt: 'desc' },
+  { id: 'desc' },
+] satisfies Prisma.UsedDeviceOrderByWithRelationInput[];
+
+const optionalText = (value: string | null | undefined) =>
+  value?.trim() || null;
+
 const requiredText = (value: string, field: string) => {
   const trimmed = value.trim();
   if (!trimmed) throw new BadRequestException(`Informe ${field} do aparelho`);
@@ -81,12 +149,11 @@ const normalizeImei = (imei: string | null | undefined) => {
 
 // RD1/RD4/RD5: o aparelho só nasce e só muda com a Negociação Aberta. Ganha
 // ou Perdida, reabre-se a Negociação, como nos itens.
-const ensureOpen = (status: string) => {
-  if (status !== 'ABERTA') {
-    throw new ConflictException(
-      'Só é possível alterar os aparelhos na troca de uma negociação em aberto',
-    );
-  }
+const ensureOpen = (
+  status: string,
+  message = 'Só é possível alterar os aparelhos na troca de uma negociação em aberto',
+) => {
+  if (status !== 'ABERTA') throw new ConflictException(message);
 };
 
 @Injectable()
@@ -206,5 +273,114 @@ export class UsedDevicesService {
       });
     });
     return toResponse(removed);
+  }
+
+  async findQueue(query: ListUsedDevicesQueryDto) {
+    const status = query.status ?? UsedDeviceQueueFilter.AGUARDANDO;
+    const devices = await this.prisma.usedDevice.findMany({
+      where: queueWhere(status),
+      select: queueDeviceSelect,
+      orderBy:
+        status === UsedDeviceQueueFilter.AGUARDANDO
+          ? OLDEST_FIRST
+          : NEWEST_FIRST,
+    });
+    return { devices: devices.map(toQueueResponse) };
+  }
+
+  // O histórico da série são os outros aparelhos não excluídos com a mesma
+  // série normalizada, para o Técnico avaliar sabendo que o aparelho voltou.
+  async findOne(id: number) {
+    const device = await this.prisma.usedDevice.findFirst({
+      where: { id, ...LIVE_DEVICE },
+      select: queueDeviceSelect,
+    });
+    if (!device) throw new NotFoundException('Aparelho não encontrado');
+
+    const history = await this.prisma.usedDevice.findMany({
+      where: {
+        ...LIVE_DEVICE,
+        serialNumber: device.serialNumber,
+        id: { not: id },
+      },
+      select: serialHistorySelect,
+      orderBy: NEWEST_FIRST,
+    });
+
+    return {
+      ...toQueueResponse(device),
+      serialHistory: history.map((entry) => ({
+        ...entry,
+        estimatedValue:
+          entry.estimatedValue === null ? null : Number(entry.estimatedValue),
+      })),
+    };
+  }
+
+  // RD6/RD8: o valor estimado é o Valor de troca (RD10). Reavaliar sobrescreve
+  // tudo, inclusive um aparelho recusado, e passa a responder quem avaliou por
+  // último.
+  async evaluate(id: number, dto: EvaluateUsedDeviceDto, evaluatorId: number) {
+    if (dto.icloudUnlocked !== true) {
+      throw new BadRequestException(
+        'Confirme que o iCloud está liberado. Com o iCloud bloqueado, recuse o aparelho',
+      );
+    }
+    if (!(dto.estimatedValue > 0)) {
+      throw new BadRequestException(
+        'O valor estimado deve ser maior que zero. Aparelho sem valor é recusado',
+      );
+    }
+
+    return this.recordEvaluation(id, {
+      evaluationStatus: 'AVALIADO',
+      condition: dto.condition,
+      estimatedValue: dto.estimatedValue,
+      report: optionalText(dto.report),
+      icloudUnlocked: true,
+      evaluatedAt: new Date(),
+      evaluatorId,
+    });
+  }
+
+  // RD7/RD8: o laudo é o motivo. A recusa limpa o que a avaliação gravou, para
+  // que um valor antigo não sobreviva num aparelho que não entra no saldo.
+  async refuse(id: number, dto: RefuseUsedDeviceDto, evaluatorId: number) {
+    const report = optionalText(dto.report);
+    if (!report) {
+      throw new BadRequestException('Informe no laudo o motivo da recusa');
+    }
+
+    return this.recordEvaluation(id, {
+      evaluationStatus: 'RECUSADO',
+      condition: null,
+      estimatedValue: null,
+      report,
+      icloudUnlocked: null,
+      evaluatedAt: new Date(),
+      evaluatorId,
+    });
+  }
+
+  // A conferência da situação e a escrita ficam na mesma transação, para que
+  // uma conversão entre as duas não deixe passar a avaliação.
+  private async recordEvaluation(
+    id: number,
+    data: Prisma.UsedDeviceUncheckedUpdateInput,
+  ) {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const device = await this.ensureExists(id, tx);
+      // RD9: avaliar e recusar só com a Negociação Aberta.
+      ensureOpen(
+        device.negotiation.status,
+        'Só é possível avaliar aparelhos de uma negociação em aberto. Reabra a negociação para alterar a avaliação',
+      );
+      return tx.usedDevice.update({
+        where: { id },
+        data,
+        select: usedDeviceSelect,
+      });
+    });
+    return toResponse(updated);
   }
 }

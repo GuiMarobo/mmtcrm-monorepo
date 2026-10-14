@@ -2,9 +2,14 @@ import { http } from './http'
 import type {
   CreatedUsedDevice,
   CreateUsedDevicePayload,
+  EvaluateUsedDevicePayload,
   NegotiationUsedDevices,
+  RefuseUsedDevicePayload,
   UpdateUsedDevicePayload,
   UsedDevice,
+  UsedDeviceDetail,
+  UsedDeviceQueue,
+  UsedDeviceQueueFilter,
 } from '../types'
 
 export const usedDevicesApi = {
@@ -22,5 +27,21 @@ export const usedDevicesApi = {
 
   remove(id: number): Promise<UsedDevice> {
     return http.delete<UsedDevice>(`/used-devices/${id}`)
+  },
+
+  listQueue(status: UsedDeviceQueueFilter): Promise<UsedDeviceQueue> {
+    return http.get<UsedDeviceQueue>(`/used-devices?status=${status}`)
+  },
+
+  findOne(id: number): Promise<UsedDeviceDetail> {
+    return http.get<UsedDeviceDetail>(`/used-devices/${id}`)
+  },
+
+  evaluate(id: number, payload: EvaluateUsedDevicePayload): Promise<UsedDevice> {
+    return http.post<UsedDevice>(`/used-devices/${id}/evaluate`, payload)
+  },
+
+  refuse(id: number, payload: RefuseUsedDevicePayload): Promise<UsedDevice> {
+    return http.post<UsedDevice>(`/used-devices/${id}/refuse`, payload)
   },
 }

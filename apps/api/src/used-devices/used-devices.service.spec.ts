@@ -15,6 +15,13 @@ import { UsedDevicesService } from './used-devices.service';
 import { CreateUsedDeviceDto } from './dto/create-used-device.dto';
 import { UpdateUsedDeviceDto } from './dto/update-used-device.dto';
 import {
+  DeviceConditionEnum,
+  EvaluateUsedDeviceDto,
+} from './dto/evaluate-used-device.dto';
+import { ListUsedDevicesQueryDto } from './dto/list-used-devices-query.dto';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import {
   asPrismaService,
   callArg,
   createMockPrisma,
@@ -62,6 +69,25 @@ type UpdateArg = {
   where: { id: number };
   data: Record<string, unknown>;
 };
+
+type FindManyArg = {
+  where: Record<string, unknown>;
+  select: { negotiation: { select: Record<string, unknown> } };
+  orderBy: unknown;
+};
+
+// Aparelho como a fila o lê: com o Cliente, o Vendedor e a situação da
+// Negociação, e nada dos itens nem dos valores dela (RD16).
+const queueRow = (overrides: Record<string, unknown> = {}) =>
+  deviceRow({
+    negotiation: {
+      id: 3,
+      status: 'ABERTA',
+      client: { id: 'c-1', name: 'Ana Cliente' },
+      vendedor: { id: 2, name: 'Vendedora' },
+    },
+    ...overrides,
+  });
 
 describe('UsedDevicesService', () => {
   let service: UsedDevicesService;
@@ -375,6 +401,350 @@ describe('UsedDevicesService', () => {
     });
   });
 
+  describe('findQueue (RD15, RD16)', () => {
+    const queue = (status?: string) =>
+      service.findQueue({ status } as ListUsedDevicesQueryDto);
+
+    it('padrão: só aguardando de Negociações Abertas, do mais antigo para o mais novo', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([queueRow()]);
+
+      await queue();
+
+      const arg = callArg<FindManyArg>(prisma.usedDevice.findMany);
+      expect(arg.where).toEqual({
+        deletedAt: null,
+        evaluationStatus: 'AGUARDANDO',
+        negotiation: { deletedAt: null, status: 'ABERTA' },
+      });
+      expect(arg.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
+    });
+
+    it('AGUARDANDO explícito é o mesmo filtro padrão', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([]);
+
+      await queue('AGUARDANDO');
+
+      expect(callArg<FindManyArg>(prisma.usedDevice.findMany).where).toEqual({
+        deletedAt: null,
+        evaluationStatus: 'AGUARDANDO',
+        negotiation: { deletedAt: null, status: 'ABERTA' },
+      });
+    });
+
+    it.each(['AVALIADO', 'RECUSADO'])(
+      '%s: o resultado pedido, de qualquer situação da Negociação, o mais recente primeiro',
+      async (status) => {
+        prisma.usedDevice.findMany.mockResolvedValue([]);
+
+        await queue(status);
+
+        const arg = callArg<FindManyArg>(prisma.usedDevice.findMany);
+        expect(arg.where).toEqual({
+          deletedAt: null,
+          evaluationStatus: status,
+          negotiation: { deletedAt: null },
+        });
+        expect(arg.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+      },
+    );
+
+    it('TODOS: qualquer resultado e qualquer situação da Negociação', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([]);
+
+      await queue('TODOS');
+
+      expect(callArg<FindManyArg>(prisma.usedDevice.findMany).where).toEqual({
+        deletedAt: null,
+        negotiation: { deletedAt: null },
+      });
+    });
+
+    it('cada linha traz Cliente, Vendedor e situação da Negociação, e nenhum item ou valor dela', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([
+        queueRow({
+          evaluationStatus: 'AVALIADO',
+          condition: 'BOM',
+          estimatedValue: { toString: () => '2000.00' },
+        }),
+      ]);
+
+      const { devices } = await queue('TODOS');
+
+      const negotiationSelect = callArg<FindManyArg>(prisma.usedDevice.findMany)
+        .select.negotiation.select;
+      expect(Object.keys(negotiationSelect).sort()).toEqual([
+        'client',
+        'id',
+        'status',
+        'vendedor',
+      ]);
+      expect(devices[0]).toMatchObject({
+        id: 9,
+        model: 'iPhone 12 128 GB',
+        estimatedValue: 2000,
+        negotiation: {
+          id: 3,
+          status: 'ABERTA',
+          client: { id: 'c-1', name: 'Ana Cliente' },
+          vendedor: { id: 2, name: 'Vendedora' },
+        },
+      });
+      expect(devices[0].negotiation).not.toHaveProperty('totalValue');
+      expect(devices[0].negotiation).not.toHaveProperty('items');
+    });
+
+    it('filtro fora da lista é recusado pela validação do DTO', async () => {
+      const errors = await validate(
+        plainToInstance(ListUsedDevicesQueryDto, { status: 'QUALQUER' }),
+      );
+
+      expect(errors).toHaveLength(1);
+    });
+  });
+
+  describe('findOne (histórico da série)', () => {
+    it('traz o aparelho com a Negociação resumida e os outros aparelhos não excluídos da mesma série', async () => {
+      prisma.usedDevice.findFirst.mockResolvedValue(queueRow());
+      prisma.usedDevice.findMany.mockResolvedValue([
+        {
+          id: 4,
+          createdAt: new Date('2025-03-01T12:00:00Z'),
+          evaluatedAt: new Date('2025-03-02T12:00:00Z'),
+          evaluationStatus: 'AVALIADO',
+          condition: 'REGULAR',
+          estimatedValue: { toString: () => '1500.00' },
+        },
+        {
+          id: 6,
+          createdAt: new Date('2025-08-01T12:00:00Z'),
+          evaluatedAt: new Date('2025-08-01T15:00:00Z'),
+          evaluationStatus: 'RECUSADO',
+          condition: null,
+          estimatedValue: null,
+        },
+      ]);
+
+      const device = await service.findOne(9);
+
+      expect(
+        callArg<{ where: unknown }>(prisma.usedDevice.findFirst).where,
+      ).toEqual({ id: 9, deletedAt: null, negotiation: { deletedAt: null } });
+      const historyArg = callArg<{ where: unknown; orderBy: unknown }>(
+        prisma.usedDevice.findMany,
+      );
+      expect(historyArg.where).toEqual({
+        deletedAt: null,
+        negotiation: { deletedAt: null },
+        serialNumber: 'F2LXK0ABCD',
+        id: { not: 9 },
+      });
+      expect(historyArg.orderBy).toEqual([
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ]);
+      expect(device).toMatchObject({
+        id: 9,
+        negotiation: { id: 3, status: 'ABERTA' },
+      });
+      expect(device.negotiation).not.toHaveProperty('totalValue');
+      expect(device.serialHistory).toEqual([
+        {
+          id: 4,
+          createdAt: new Date('2025-03-01T12:00:00Z'),
+          evaluatedAt: new Date('2025-03-02T12:00:00Z'),
+          evaluationStatus: 'AVALIADO',
+          condition: 'REGULAR',
+          estimatedValue: 1500,
+        },
+        {
+          id: 6,
+          createdAt: new Date('2025-08-01T12:00:00Z'),
+          evaluatedAt: new Date('2025-08-01T15:00:00Z'),
+          evaluationStatus: 'RECUSADO',
+          condition: null,
+          estimatedValue: null,
+        },
+      ]);
+    });
+
+    it('aparelho inexistente: 404', async () => {
+      prisma.usedDevice.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne(9)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('evaluate (RD6, RD8, RD9)', () => {
+    const evaluate = (
+      dto: Partial<EvaluateUsedDeviceDto> = {},
+      evaluatorId = 5,
+    ) =>
+      service.evaluate(
+        9,
+        {
+          condition: 'BOM',
+          estimatedValue: 2000,
+          report: '  Bateria 87%  ',
+          icloudUnlocked: true,
+          ...dto,
+        } as EvaluateUsedDeviceDto,
+        evaluatorId,
+      );
+
+    it('grava a avaliação com o avaliador e a data, e o laudo sem espaços nas pontas', async () => {
+      const device = await evaluate();
+
+      const arg = callArg<UpdateArg>(prisma.usedDevice.update);
+      expect(arg.where).toEqual({ id: 9 });
+      expect(arg.data).toEqual({
+        evaluationStatus: 'AVALIADO',
+        condition: 'BOM',
+        estimatedValue: 2000,
+        report: 'Bateria 87%',
+        icloudUnlocked: true,
+        evaluatedAt: expect.any(Date) as Date,
+        evaluatorId: 5,
+      });
+      expect(device).toMatchObject({ evaluationStatus: 'AVALIADO' });
+    });
+
+    it('laudo é opcional: ausente ou em branco grava nulo', async () => {
+      await evaluate({ report: undefined });
+      await evaluate({ report: '   ' });
+
+      expect(callArg<UpdateArg>(prisma.usedDevice.update, 0).data.report).toBe(
+        null,
+      );
+      expect(callArg<UpdateArg>(prisma.usedDevice.update, 1).data.report).toBe(
+        null,
+      );
+    });
+
+    it.each([
+      ['ausente', undefined],
+      ['falso', false],
+    ])(
+      'iCloud %s: 400 orientando a recusar, sem gravar',
+      async (_case, icloudUnlocked) => {
+        await expect(
+          evaluate({ icloudUnlocked: icloudUnlocked as boolean }),
+        ).rejects.toThrow(/recus/i);
+        await expect(
+          evaluate({ icloudUnlocked: icloudUnlocked as boolean }),
+        ).rejects.toThrow(BadRequestException);
+        expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([0, -10])('valor %s: 400, sem gravar', async (estimatedValue) => {
+      await expect(evaluate({ estimatedValue })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+    });
+
+    it('condição fora da lista é recusada pela validação do DTO', async () => {
+      const errors = await validate(
+        plainToInstance(EvaluateUsedDeviceDto, {
+          condition: 'NOVO',
+          estimatedValue: 2000,
+          icloudUnlocked: true,
+        }),
+      );
+
+      expect(errors.map((error) => error.property)).toEqual(['condition']);
+    });
+
+    it.each(['AVALIADO', 'RECUSADO'])(
+      'reavaliar um aparelho %s sobrescreve e grava o novo avaliador',
+      async (evaluationStatus) => {
+        prisma.usedDevice.findFirst.mockResolvedValue(
+          deviceRow({
+            evaluationStatus,
+            evaluator: { id: 5, name: 'Técnico A' },
+          }),
+        );
+
+        await evaluate(
+          { estimatedValue: 1800, condition: DeviceConditionEnum.REGULAR },
+          7,
+        );
+
+        expect(callArg<UpdateArg>(prisma.usedDevice.update).data).toMatchObject(
+          {
+            evaluationStatus: 'AVALIADO',
+            condition: 'REGULAR',
+            estimatedValue: 1800,
+            evaluatorId: 7,
+          },
+        );
+      },
+    );
+
+    it.each(['GANHA', 'PERDIDA'])(
+      'Negociação %s: 409, sem gravar',
+      async (status) => {
+        prisma.usedDevice.findFirst.mockResolvedValue(
+          deviceRow({ negotiation: { status } }),
+        );
+
+        await expect(evaluate()).rejects.toThrow(ConflictException);
+        expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('aparelho inexistente: 404', async () => {
+      prisma.usedDevice.findFirst.mockResolvedValue(null);
+
+      await expect(evaluate()).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('refuse (RD7, RD8, RD9)', () => {
+    const refuse = (report: string, evaluatorId = 5) =>
+      service.refuse(9, { report }, evaluatorId);
+
+    it('grava a recusa com o motivo, o avaliador e a data, e limpa condição e valor', async () => {
+      prisma.usedDevice.findFirst.mockResolvedValue(
+        deviceRow({ evaluationStatus: 'AVALIADO', condition: 'BOM' }),
+      );
+
+      const device = await refuse('  iCloud bloqueado  ');
+
+      const arg = callArg<UpdateArg>(prisma.usedDevice.update);
+      expect(arg.where).toEqual({ id: 9 });
+      expect(arg.data).toEqual({
+        evaluationStatus: 'RECUSADO',
+        condition: null,
+        estimatedValue: null,
+        report: 'iCloud bloqueado',
+        icloudUnlocked: null,
+        evaluatedAt: expect.any(Date) as Date,
+        evaluatorId: 5,
+      });
+      expect(device).toMatchObject({ evaluationStatus: 'RECUSADO' });
+    });
+
+    it.each(['', '   '])('laudo "%s": 400, sem gravar', async (report) => {
+      await expect(refuse(report)).rejects.toThrow(BadRequestException);
+      expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+    });
+
+    it.each(['GANHA', 'PERDIDA'])(
+      'Negociação %s: 409, sem gravar',
+      async (status) => {
+        prisma.usedDevice.findFirst.mockResolvedValue(
+          deviceRow({ negotiation: { status } }),
+        );
+
+        await expect(refuse('iCloud bloqueado')).rejects.toThrow(
+          ConflictException,
+        );
+        expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   // A autorização é do RolesGuard global, a partir do @Roles do controller.
   describe('perfis', () => {
     const guard = new RolesGuard(new Reflector());
@@ -403,6 +773,16 @@ describe('UsedDevicesService', () => {
         expect(canCall(handler, RoleEnum.VENDEDOR)).toBe(true);
         expect(canCall(handler, RoleEnum.ATENDENTE)).toBe(false);
         expect(canCall(handler, RoleEnum.TECNICO)).toBe(false);
+      },
+    );
+
+    it.each(['findQueue', 'findOne', 'evaluate', 'refuse'] as const)(
+      '%s: ADMIN e TECNICO passam; VENDEDOR e ATENDENTE levam 403',
+      (handler) => {
+        expect(canCall(handler, RoleEnum.ADMIN)).toBe(true);
+        expect(canCall(handler, RoleEnum.TECNICO)).toBe(true);
+        expect(canCall(handler, RoleEnum.VENDEDOR)).toBe(false);
+        expect(canCall(handler, RoleEnum.ATENDENTE)).toBe(false);
       },
     );
   });

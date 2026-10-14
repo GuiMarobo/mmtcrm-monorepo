@@ -14,25 +14,18 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
-import { EVALUATION_STATUS_LABELS } from '../../types'
+import { DEVICE_CONDITION_LABELS } from '../../types'
+import { formatCurrency, formatDate } from '../../utils/format'
 import { imeiError } from '../../utils/validators'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { FormDialog } from '../common/FormDialog'
-import { ToneChip } from '../common/ToneChip'
-import type { BadgeTone } from '../../theme/tones'
+import { EvaluationStatusChip } from '../usedDevices/EvaluationStatusChip'
 import type {
   CreatedUsedDevice,
   CreateUsedDevicePayload,
-  EvaluationStatus,
   UpdateUsedDevicePayload,
   UsedDevice,
 } from '../../types'
-
-const EVALUATION_STATUS_TONES: Record<EvaluationStatus, BadgeTone> = {
-  AGUARDANDO: 'amber',
-  AVALIADO: 'green',
-  RECUSADO: 'red',
-}
 
 export interface NegotiationTradeIn {
   devices: UsedDevice[] | null
@@ -109,6 +102,7 @@ export function NegotiationTradeInTab({
               <TableCell>Série</TableCell>
               <TableCell>IMEI</TableCell>
               <TableCell>Situação</TableCell>
+              <TableCell>Avaliação</TableCell>
               {!readOnly && <TableCell />}
             </TableRow>
           </TableHead>
@@ -119,9 +113,10 @@ export function NegotiationTradeInTab({
                 <TableCell>{device.serialNumber}</TableCell>
                 <TableCell>{device.imei ?? '—'}</TableCell>
                 <TableCell>
-                  <ToneChip tone={EVALUATION_STATUS_TONES[device.evaluationStatus]}>
-                    {EVALUATION_STATUS_LABELS[device.evaluationStatus]}
-                  </ToneChip>
+                  <EvaluationStatusChip status={device.evaluationStatus} />
+                </TableCell>
+                <TableCell>
+                  <EvaluationSummary device={device} />
                 </TableCell>
                 {!readOnly && (
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
@@ -169,6 +164,33 @@ export function NegotiationTradeInTab({
           onCancel={() => setRemoving(null)}
         />
       )}
+    </Box>
+  )
+}
+
+const detailSx = { fontSize: 12, color: 'text.secondary' }
+
+function EvaluationSummary({ device }: { device: UsedDevice }) {
+  if (device.evaluationStatus === 'AGUARDANDO') return <>—</>
+
+  const evaluatedBy = device.evaluatedAt
+    ? `${device.evaluator ? `${device.evaluator.name} em ` : ''}${formatDate(device.evaluatedAt)}`
+    : null
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+      {device.evaluationStatus === 'AVALIADO' ? (
+        <>
+          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+            {device.condition ? `${DEVICE_CONDITION_LABELS[device.condition]} · ` : ''}
+            {device.estimatedValue === null ? '—' : formatCurrency(device.estimatedValue)}
+          </Typography>
+          {device.report && <Typography sx={detailSx}>{device.report}</Typography>}
+        </>
+      ) : (
+        <Typography sx={{ fontSize: 13 }}>Motivo: {device.report ?? '—'}</Typography>
+      )}
+      {evaluatedBy && <Typography sx={detailSx}>{evaluatedBy}</Typography>}
     </Box>
   )
 }
