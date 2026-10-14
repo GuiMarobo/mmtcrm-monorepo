@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { SetMetadata } from '@nestjs/common';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import type { AuthenticatedUser } from '../strategies/jwt.strategy';
 
 export const SKIP_MUST_CHANGE_PASSWORD_KEY = 'skipMustChangePassword';
 export const SkipMustChangePassword = () =>
@@ -29,7 +30,9 @@ export class MustChangePasswordGuard implements CanActivate {
     );
     if (skip) return true;
 
-    const user = context.switchToHttp().getRequest().user;
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user?: AuthenticatedUser }>();
     if (user?.mustChangePassword) {
       throw new ForbiddenException(
         'Senha temporária - altere sua senha para continuar.',
