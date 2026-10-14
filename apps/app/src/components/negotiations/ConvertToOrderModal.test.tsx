@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConvertToOrderModal } from './ConvertToOrderModal'
 import { ApiError } from '../../api'
-import type { Negotiation } from '../../types'
+import type { Negotiation, UsedDevice } from '../../types'
 
 const negotiation: Negotiation = {
   id: 3,
@@ -27,11 +27,34 @@ const DELETED_PRODUCT =
 const ALL_ITEMS_REMOVED =
   'A Negociação teve todos os itens removidos; adicione ao menos um item antes de converter'
 
-const setup = (onConfirm = vi.fn().mockResolvedValue(undefined)) => {
+const device = (overrides: Partial<UsedDevice>): UsedDevice => ({
+  id: 9,
+  negotiationId: 3,
+  model: 'iPhone 12 128 GB',
+  serialNumber: 'F2LXK0ABCD',
+  imei: null,
+  evaluationStatus: 'AGUARDANDO',
+  condition: null,
+  estimatedValue: null,
+  report: null,
+  icloudUnlocked: null,
+  evaluatedAt: null,
+  evaluator: null,
+  createdAt: '2026-10-05T12:00:00Z',
+  createdBy: null,
+  ...overrides,
+})
+
+const setup = (
+  onConfirm = vi.fn().mockResolvedValue(undefined),
+  { tradeIns = [], tradeInsError = null }: { tradeIns?: UsedDevice[] | null; tradeInsError?: string | null } = {},
+) => {
   const onCancel = vi.fn()
   render(
     <ConvertToOrderModal
       negotiation={negotiation}
+      tradeIns={tradeIns}
+      tradeInsError={tradeInsError}
       loading={false}
       onConfirm={onConfirm}
       onCancel={onCancel}
@@ -90,5 +113,75 @@ describe('ConvertToOrderModal', () => {
     await user.click(screen.getByRole('button', { name: 'Converter em pedido' }))
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  describe('aparelhos na troca (RD11)', () => {
+    const amountDueLine = () => screen.getByText('Saldo a pagar').nextSibling
+
+    it('mostra o Saldo a pagar com o total das trocas avaliadas', () => {
+      setup(undefined, {
+        tradeIns: [
+          device({ id: 1, evaluationStatus: 'AVALIADO', estimatedValue: 400 }),
+          device({ id: 2, evaluationStatus: 'RECUSADO', report: 'iCloud' }),
+        ],
+      })
+
+      expect(screen.getByText('Total das trocas').nextSibling).toHaveTextContent('400,00')
+      expect(amountDueLine()).toHaveTextContent('1.100,00')
+    })
+
+    it('com aparelho aguardando, mostra o motivo e não deixa converter', async () => {
+      const user = userEvent.setup()
+      const { onConfirm } = setup(undefined, {
+        tradeIns: [device({ model: 'iPhone 13 Pro', serialNumber: 'G7ABC' })],
+      })
+
+      expect(screen.getByText(/iPhone 13 Pro \(série G7ABC\) ainda aguarda avaliação/)).toBeInTheDocument()
+      await user.click(screen.getByLabelText(/Forma de pagamento/))
+      await user.click(screen.getByRole('option', { name: 'PIX' }))
+      expect(screen.getByRole('button', { name: 'Converter em pedido' })).toBeDisabled()
+      expect(onConfirm).not.toHaveBeenCalled()
+    })
+
+    it('com Saldo a pagar negativo, mostra o motivo e não deixa converter', async () => {
+      const user = userEvent.setup()
+      setup(undefined, {
+        tradeIns: [device({ evaluationStatus: 'AVALIADO', estimatedValue: 1600 })],
+      })
+
+      expect(amountDueLine()).toHaveTextContent('-R$')
+      expect(screen.getByText(/Saldo a pagar negativo/)).toBeInTheDocument()
+      await user.click(screen.getByLabelText(/Forma de pagamento/))
+      await user.click(screen.getByRole('option', { name: 'PIX' }))
+      expect(screen.getByRole('button', { name: 'Converter em pedido' })).toBeDisabled()
+    })
+
+    it('aparelho recusado não bloqueia', async () => {
+      const user = userEvent.setup()
+      const { onConfirm } = setup(undefined, {
+        tradeIns: [device({ evaluationStatus: 'RECUSADO', report: 'Tela trincada' })],
+      })
+
+      await choosePixAndConfirm(user)
+
+      expect(onConfirm).toHaveBeenCalledWith('PIX')
+    })
+
+    it('enquanto carrega os aparelhos, não deixa converter', () => {
+      setup(undefined, { tradeIns: null })
+
+      expect(screen.getByText(/Carregando aparelhos na troca/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Converter em pedido' })).toBeDisabled()
+    })
+
+    it('se a troca não carregar, avisa e deixa o backend decidir', async () => {
+      const user = userEvent.setup()
+      const { onConfirm } = setup(undefined, { tradeIns: null, tradeInsError: 'Falha' })
+
+      expect(screen.getByText(/Não foi possível carregar a troca/)).toBeInTheDocument()
+      await choosePixAndConfirm(user)
+
+      expect(onConfirm).toHaveBeenCalledWith('PIX')
+    })
   })
 })

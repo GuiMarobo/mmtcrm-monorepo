@@ -20,6 +20,8 @@ import { imeiError } from '../../utils/validators'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { FormDialog } from '../common/FormDialog'
 import { EvaluationStatusChip } from '../usedDevices/EvaluationStatusChip'
+import { AmountDueLines } from './AmountDueLines'
+import { summarizeAmountDue } from './amountDue'
 import type {
   CreatedUsedDevice,
   CreateUsedDevicePayload,
@@ -36,6 +38,7 @@ export interface NegotiationTradeIn {
 }
 
 interface NegotiationTradeInTabProps extends NegotiationTradeIn {
+  totalValue: number
   readOnly: boolean
 }
 
@@ -43,6 +46,7 @@ type FormTarget = { mode: 'create' } | { mode: 'edit'; device: UsedDevice }
 
 export function NegotiationTradeInTab({
   devices,
+  totalValue,
   error,
   readOnly,
   onCreate,
@@ -144,6 +148,8 @@ export function NegotiationTradeInTab({
         </Table>
       )}
 
+      {!error && devices && <AmountDueFooter totalValue={totalValue} devices={devices} />}
+
       {formTarget && (
         <UsedDeviceFormDialog
           device={formTarget.mode === 'edit' ? formTarget.device : null}
@@ -169,6 +175,26 @@ export function NegotiationTradeInTab({
 }
 
 const detailSx = { fontSize: 12, color: 'text.secondary' }
+
+function AmountDueFooter({ totalValue, devices }: { totalValue: number; devices: UsedDevice[] }) {
+  const summary = summarizeAmountDue(totalValue, devices)
+
+  return (
+    <Box
+      component="section"
+      aria-label="Saldo a pagar"
+      sx={{ display: 'flex', flexDirection: 'column', gap: 1, borderTop: 1, borderColor: 'divider', pt: 1.5 }}
+    >
+      <AmountDueLines summary={summary} />
+      {summary.negative && (
+        <Alert severity="warning">
+          A troca vale mais que a compra: o Saldo a pagar está negativo. A negociação pode seguir em
+          aberto, mas só converte em pedido com o saldo zerado ou positivo.
+        </Alert>
+      )}
+    </Box>
+  )
+}
 
 function EvaluationSummary({ device }: { device: UsedDevice }) {
   if (device.evaluationStatus === 'AGUARDANDO') return <>—</>

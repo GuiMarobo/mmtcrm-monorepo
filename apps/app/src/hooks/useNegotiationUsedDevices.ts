@@ -69,5 +69,5 @@ export function useNegotiationUsedDevices(toast: Toast) {
       ),
   })
 
-  return { load, tradeInFor }
+  return { devices, error, load, tradeInFor }
 }

@@ -35,7 +35,23 @@ const negotiationRow = (overrides: Record<string, unknown> = {}) => ({
   order: null,
   items: [],
   _count: { items: 0 },
+  usedDevices: [],
   ...overrides,
+});
+
+// Aparelho na troca como `convert` e o detalhe o leem: a situação e o valor
+// para o saldo, modelo e série para a mensagem de recusa (RD11).
+const tradeIn = (
+  evaluationStatus: 'AGUARDANDO' | 'AVALIADO' | 'RECUSADO',
+  estimatedValue: string | null = null,
+  device: { model?: string; serialNumber?: string } = {},
+) => ({
+  model: 'iPhone 12 128 GB',
+  serialNumber: 'F2LXK0ABCD',
+  evaluationStatus,
+  estimatedValue:
+    estimatedValue === null ? null : { toString: () => estimatedValue },
+  ...device,
 });
 
 // Item como `convert` o lê: quantidade e o Produto com nome, saldo (RB2) e
@@ -75,6 +91,7 @@ describe('NegotiationsService', () => {
       ],
     }).compile();
     service = moduleRef.get(NegotiationsService);
+    prisma.usedDevice.findMany.mockResolvedValue([]);
   });
 
   describe('convert', () => {
@@ -393,6 +410,127 @@ describe('NegotiationsService', () => {
         await service.convert(3, PaymentMethodEnum.PIX, 42);
 
         expect(prisma.negotiationItem.count).not.toHaveBeenCalled();
+      });
+    });
+    describe('aparelhos na troca (RD11, spec 007)', () => {
+      beforeEach(() => {
+        prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+        prisma.negotiationItem.findMany.mockResolvedValue([
+          convertItem('p1', 1),
+        ]);
+        prisma.product.updateMany.mockResolvedValue({ count: 1 });
+        prisma.stockMovement.create.mockResolvedValue({});
+      });
+
+      const expectNothingWritten = () => {
+        expect(prisma.order.upsert).not.toHaveBeenCalled();
+        expect(prisma.product.updateMany).not.toHaveBeenCalled();
+        expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+        expect(prisma.negotiation.update).not.toHaveBeenCalled();
+        expect(prisma.client.update).not.toHaveBeenCalled();
+      };
+
+      it('lê os aparelhos não excluídos da Negociação dentro da transação', async () => {
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(
+          callArg<{ where: unknown }>(prisma.usedDevice.findMany).where,
+        ).toEqual({ deletedAt: null, negotiationId: 3 });
+      });
+
+      it('recusa com 409, nomeando modelo e série, quando há aparelho aguardando avaliação', async () => {
+        prisma.usedDevice.findMany.mockResolvedValue([
+          tradeIn('AVALIADO', '500.00'),
+          tradeIn('AGUARDANDO', null, {
+            model: 'iPhone 13 Pro',
+            serialNumber: 'G7ABC',
+          }),
+        ]);
+
+        const attempt = service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow(
+          /iPhone 13 Pro \(série G7ABC\) ainda aguarda avaliação/,
+        );
+        expectNothingWritten();
+      });
+
+      it('recusa com 409 o Saldo a pagar negativo, sem gravar baixa de venda', async () => {
+        prisma.usedDevice.findMany.mockResolvedValue([
+          tradeIn('AVALIADO', '1000.00'),
+          tradeIn('AVALIADO', '500.01'),
+        ]);
+
+        const attempt = service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toThrow(/Saldo a pagar negativo/);
+        expectNothingWritten();
+      });
+
+      it('confere o saldo com o total relido dentro da transação', async () => {
+        prisma.negotiation.findFirst
+          .mockResolvedValueOnce(negotiationRow())
+          .mockResolvedValueOnce(
+            negotiationRow({ totalValue: { toString: () => '1000.00' } }),
+          );
+        prisma.usedDevice.findMany.mockResolvedValue([
+          tradeIn('AVALIADO', '1200.00'),
+        ]);
+
+        await expect(
+          service.convert(3, PaymentMethodEnum.PIX, 42),
+        ).rejects.toThrow(/Saldo a pagar negativo/);
+        expectNothingWritten();
+      });
+
+      it('Saldo a pagar zerado converte normalmente', async () => {
+        prisma.usedDevice.findMany.mockResolvedValue([
+          tradeIn('AVALIADO', '1500.00'),
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.stockMovement.create).toHaveBeenCalledTimes(1);
+        expect(prisma.negotiation.update).toHaveBeenCalled();
+      });
+
+      it('aparelho recusado não bloqueia nem conta no saldo', async () => {
+        prisma.usedDevice.findMany.mockResolvedValue([
+          tradeIn('RECUSADO'),
+          tradeIn('AVALIADO', '400.00'),
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.stockMovement.create).toHaveBeenCalledTimes(1);
+        expect(prisma.negotiation.update).toHaveBeenCalled();
+      });
+
+      it('o Pedido guarda o total à vista da Negociação, não o saldo (ADR 0018)', async () => {
+        prisma.usedDevice.findMany.mockResolvedValue([
+          tradeIn('AVALIADO', '400.00'),
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        const arg = callArg<{
+          create: { totalValue: { toString(): string } };
+        }>(prisma.order.upsert);
+        expect(String(arg.create.totalValue)).toBe('1500.00');
+      });
+
+      it('não altera os aparelhos ao converter', async () => {
+        prisma.usedDevice.findMany.mockResolvedValue([
+          tradeIn('AVALIADO', '400.00'),
+        ]);
+
+        await service.convert(3, PaymentMethodEnum.PIX, 42);
+
+        expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+        expect(prisma.usedDevice.updateMany).not.toHaveBeenCalled();
       });
     });
   });
@@ -1982,6 +2120,92 @@ describe('NegotiationsService', () => {
         prisma.negotiation.update,
       );
       expect(devices.data.deletedAt).toBe(negotiation.data.deletedAt);
+    });
+  });
+
+  describe('aparelhos na troca ao reabrir e cancelar (RD13, spec 007)', () => {
+    beforeEach(() => {
+      prisma.negotiation.update.mockResolvedValue(negotiationRow());
+      prisma.order.updateMany.mockResolvedValue({});
+      prisma.negotiationItem.findMany.mockResolvedValue([]);
+    });
+
+    const expectDevicesUntouched = () => {
+      expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+      expect(prisma.usedDevice.updateMany).not.toHaveBeenCalled();
+    };
+
+    it('reabrir uma Negociação ganha não toca nos aparelhos', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({
+          status: 'GANHA',
+          usedDevices: [tradeIn('AVALIADO', '400.00')],
+        }),
+      );
+
+      await service.reopen(3, RoleEnum.ADMIN, 42);
+
+      expectDevicesUntouched();
+    });
+
+    it('cancelar não toca nos aparelhos', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await service.cancel(3);
+
+      expectDevicesUntouched();
+    });
+  });
+
+  describe('findOne — Saldo a pagar (spec 007)', () => {
+    it('lê só os aparelhos não excluídos', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      await service.findOne(3);
+
+      const arg = callArg<{
+        select: { usedDevices: { where: unknown } };
+      }>(prisma.negotiation.findFirst);
+      expect(arg.select.usedDevices.where).toEqual({ deletedAt: null });
+    });
+
+    it('soma só os avaliados no total das trocas e abate do total, sem mudá-lo', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({
+          usedDevices: [
+            tradeIn('AVALIADO', '400.10'),
+            tradeIn('AGUARDANDO'),
+            tradeIn('RECUSADO'),
+            tradeIn('AVALIADO', '99.95'),
+          ],
+        }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.totalValue).toBe(1500);
+      expect(result.tradeInTotal).toBe(500.05);
+      expect(result.amountDue).toBe(999.95);
+      expect(result).not.toHaveProperty('usedDevices');
+    });
+
+    it('o saldo pode ficar negativo', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(
+        negotiationRow({ usedDevices: [tradeIn('AVALIADO', '1600.00')] }),
+      );
+
+      const result = await service.findOne(3);
+
+      expect(result.amountDue).toBe(-100);
+    });
+
+    it('sem aparelhos, o saldo é o total', async () => {
+      prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
+
+      const result = await service.findOne(3);
+
+      expect(result.tradeInTotal).toBe(0);
+      expect(result.amountDue).toBe(1500);
     });
   });
 });

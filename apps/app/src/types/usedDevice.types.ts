@@ -28,6 +28,8 @@ export interface CreatedUsedDevice extends UsedDevice {
 
 export interface NegotiationUsedDevices {
   devices: UsedDevice[]
+  tradeInTotal: number
+  amountDue: number
 }
 
 export interface CreateUsedDevicePayload {

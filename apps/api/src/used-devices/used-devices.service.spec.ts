@@ -31,6 +31,7 @@ import {
 const negotiationRow = (overrides: Record<string, unknown> = {}) => ({
   id: 3,
   status: 'ABERTA',
+  totalValue: { toString: () => '3000.00' },
   ...overrides,
 });
 
@@ -263,6 +264,44 @@ describe('UsedDevicesService', () => {
       const { devices } = await service.findByNegotiation(3);
 
       expect(devices[0].estimatedValue).toBe(2000);
+    });
+
+    it('traz o total das trocas e o Saldo a pagar, só com os avaliados', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([
+        deviceRow({
+          evaluationStatus: 'AVALIADO',
+          condition: 'BOM',
+          estimatedValue: { toString: () => '1200.50' },
+        }),
+        deviceRow({ id: 10 }),
+        deviceRow({ id: 11, evaluationStatus: 'RECUSADO', report: 'Tela' }),
+      ]);
+
+      const result = await service.findByNegotiation(3);
+
+      expect(result.tradeInTotal).toBe(1200.5);
+      expect(result.amountDue).toBe(1799.5);
+    });
+
+    it('o Saldo a pagar pode ficar negativo', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([
+        deviceRow({
+          evaluationStatus: 'AVALIADO',
+          estimatedValue: { toString: () => '3000.01' },
+        }),
+      ]);
+
+      const result = await service.findByNegotiation(3);
+
+      expect(result.amountDue).toBe(-0.01);
+    });
+
+    it('sem aparelhos, o saldo é o total da Negociação', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([]);
+
+      const result = await service.findByNegotiation(3);
+
+      expect(result).toEqual({ devices: [], tradeInTotal: 0, amountDue: 3000 });
     });
 
     it('Negociação inexistente: 404', async () => {

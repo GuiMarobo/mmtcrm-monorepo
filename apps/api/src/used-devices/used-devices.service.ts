@@ -14,6 +14,8 @@ import {
   ListUsedDevicesQueryDto,
   UsedDeviceQueueFilter,
 } from './dto/list-used-devices-query.dto';
+import { fromCents } from '../negotiations/negotiation-item-response';
+import { amountDue } from './amount-due';
 
 // RD3: a série é comparada e gravada como o sku — sem espaços nas pontas e em
 // maiúsculas —, para que "f2lx " e "F2LX" contem como o mesmo aparelho.
@@ -166,7 +168,7 @@ export class UsedDevicesService {
   ) {
     const negotiation = await client.negotiation.findFirst({
       where: { ...NOT_DELETED, id },
-      select: { id: true, status: true },
+      select: { id: true, status: true, totalValue: true },
     });
     if (!negotiation) throw new NotFoundException('Negociação não encontrada');
     return negotiation;
@@ -215,9 +217,10 @@ export class UsedDevicesService {
     });
   }
 
-  // Lista da aba Troca: todos os não excluídos, na ordem do cadastro.
+  // Lista da aba Troca: todos os não excluídos, na ordem do cadastro, com o
+  // Saldo a pagar para o rodapé.
   async findByNegotiation(negotiationId: number) {
-    await this.ensureNegotiationExists(negotiationId);
+    const negotiation = await this.ensureNegotiationExists(negotiationId);
 
     const devices = await this.prisma.usedDevice.findMany({
       where: { ...NOT_DELETED, negotiationId },
@@ -225,7 +228,12 @@ export class UsedDevicesService {
       orderBy: { id: 'asc' },
     });
 
-    return { devices: devices.map(toResponse) };
+    const balance = amountDue(negotiation.totalValue, devices);
+    return {
+      devices: devices.map(toResponse),
+      tradeInTotal: fromCents(balance.tradeInTotalCents),
+      amountDue: fromCents(balance.amountDueCents),
+    };
   }
 
   // RD4: depois da avaliação, modelo e série ficam presos ao aparelho que o

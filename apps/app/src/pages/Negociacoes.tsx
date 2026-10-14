@@ -155,8 +155,10 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     }
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve
-      if (target === 'GANHA') setConverting(negotiation)
-      else setPending({ negotiation, target })
+      if (target === 'GANHA') {
+        void usedDevices.load(negotiation.id)
+        setConverting(negotiation)
+      } else setPending({ negotiation, target })
     })
   }
 
@@ -307,6 +309,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
       {converting && (
         <ConvertToOrderModal
           negotiation={converting}
+          tradeIns={usedDevices.devices}
+          tradeInsError={usedDevices.error}
           loading={busy}
           onConfirm={applyConvert}
           onCancel={() => {

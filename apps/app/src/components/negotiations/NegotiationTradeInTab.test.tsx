@@ -31,6 +31,7 @@ const created = (overrides: Partial<CreatedUsedDevice> = {}): CreatedUsedDevice 
 
 const renderTab = ({
   devices = [device()],
+  totalValue = 3000,
   error = null,
   readOnly = false,
   onCreate = vi.fn().mockResolvedValue(created()),
@@ -38,6 +39,7 @@ const renderTab = ({
   onRemove = vi.fn().mockResolvedValue(device()),
 }: {
   devices?: UsedDevice[] | null
+  totalValue?: number
   error?: string | null
   readOnly?: boolean
   onCreate?: ReturnType<typeof vi.fn>
@@ -47,6 +49,7 @@ const renderTab = ({
   render(
     <NegotiationTradeInTab
       devices={devices}
+      totalValue={totalValue}
       error={error}
       readOnly={readOnly}
       onCreate={onCreate}
@@ -251,6 +254,7 @@ describe('NegotiationTradeInTab', () => {
     const { unmount } = render(
       <NegotiationTradeInTab
         devices={null}
+        totalValue={3000}
         error={null}
         readOnly={false}
         onCreate={vi.fn()}
@@ -269,5 +273,47 @@ describe('NegotiationTradeInTab', () => {
     renderTab({ devices: null, error: 'Falha ao carregar os aparelhos.' })
 
     expect(screen.getByText('Falha ao carregar os aparelhos.')).toBeInTheDocument()
+  })
+
+  describe('rodapé do Saldo a pagar', () => {
+    const footer = () => within(screen.getByRole('region', { name: 'Saldo a pagar' }))
+
+    it('mostra o total, o total das trocas só dos avaliados e o saldo', () => {
+      renderTab({
+        totalValue: 3000,
+        devices: [
+          device({ id: 1, evaluationStatus: 'AVALIADO', condition: 'BOM', estimatedValue: 1200 }),
+          device({ id: 2 }),
+          device({ id: 3, evaluationStatus: 'RECUSADO', report: 'Tela' }),
+        ],
+      })
+
+      expect(footer().getByText('Total da negociação').nextSibling).toHaveTextContent('3.000,00')
+      expect(footer().getByText('Total das trocas').nextSibling).toHaveTextContent('1.200,00')
+      expect(footer().getByText('Saldo a pagar').nextSibling).toHaveTextContent('1.800,00')
+      expect(screen.queryByText(/troca vale mais que a compra/)).not.toBeInTheDocument()
+    })
+
+    it('alerta, sem bloquear, quando a troca passa do total', () => {
+      renderTab({
+        totalValue: 1500,
+        devices: [device({ evaluationStatus: 'AVALIADO', condition: 'BOM', estimatedValue: 1600 })],
+      })
+
+      expect(footer().getByText('Saldo a pagar').nextSibling).toHaveTextContent('-R$')
+      expect(screen.getByText(/troca vale mais que a compra/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Cadastrar aparelho' })).toBeEnabled()
+    })
+
+    it('sem aparelhos, o saldo é o total', () => {
+      renderTab({ totalValue: 1500, devices: [] })
+
+      expect(footer().getByText('Saldo a pagar').nextSibling).toHaveTextContent('1.500,00')
+    })
+
+    it('some enquanto a lista carrega ou falha', () => {
+      renderTab({ devices: null })
+      expect(screen.queryByRole('region', { name: 'Saldo a pagar' })).not.toBeInTheDocument()
+    })
   })
 })

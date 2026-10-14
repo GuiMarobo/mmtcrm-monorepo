@@ -212,7 +212,11 @@ export function NegotiationFormModal({
 
       {negotiation && tradeIn && (
         <Box hidden={tab !== 'troca'}>
-          <NegotiationTradeInTab {...tradeIn} readOnly={negotiation.status !== 'ABERTA'} />
+          <NegotiationTradeInTab
+            {...tradeIn}
+            totalValue={negotiation.totalValue}
+            readOnly={negotiation.status !== 'ABERTA'}
+          />
         </Box>
       )}
 

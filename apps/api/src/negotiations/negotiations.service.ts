@@ -29,6 +29,7 @@ import {
   negotiationItemsSelect,
   toItemResponse,
 } from './negotiation-item-response';
+import { amountDue } from '../used-devices/amount-due';
 
 const insufficientStockForConversion = (productName: string, stock: number) =>
   `Saldo insuficiente do Produto ${productName}: há ${stock} unidade(s) disponível(is)`;
@@ -69,6 +70,12 @@ const negotiationDetailSelect = {
   // RI8/RI9: conta também os itens excluídos — só quem nunca teve item
   // ainda guarda o valor informado; já tendo tido, ele não volta.
   _count: { select: { items: true } },
+  // Spec 007: só o que o Saldo a pagar precisa. A lista da aba Troca vem de
+  // GET /negotiations/:id/used-devices.
+  usedDevices: {
+    where: NOT_DELETED,
+    select: { evaluationStatus: true, estimatedValue: true },
+  },
 } satisfies Prisma.NegotiationSelect;
 
 type NegotiationDetailRow = Prisma.NegotiationGetPayload<{
@@ -142,8 +149,9 @@ export class NegotiationsService {
   }
 
   private toDetailResponse(negotiation: NegotiationDetailRow) {
-    const { items, _count, ...rest } = negotiation;
+    const { items, _count, usedDevices, ...rest } = negotiation;
     const response = this.toResponse(rest);
+    const balance = amountDue(negotiation.totalValue, usedDevices);
     // Antiga ou importada: a tela mostra o valor informado só para leitura e
     // avisa que o primeiro item o substitui. Com R$ 0,00 (Negociação nova
     // criada vazia) não há o que preservar.
@@ -155,6 +163,8 @@ export class NegotiationsService {
       ...response,
       informedValue,
       items: items.map(toItemResponse),
+      tradeInTotal: fromCents(balance.tradeInTotalCents),
+      amountDue: fromCents(balance.amountDueCents),
     };
   }
 
@@ -597,6 +607,48 @@ export class NegotiationsService {
     return this.toResponse(updated);
   }
 
+  // RD11: a troca precisa estar resolvida antes de virar Pedido — nenhum
+  // aparelho aguardando avaliação e o Saldo a pagar não negativo. Roda dentro
+  // da transação da conversão, antes de qualquer escrita, para recusar sem
+  // gravar nada. Recusado não bloqueia: já conta zero no saldo.
+  private async assertTradeInsAllowConversion(
+    tx: Prisma.TransactionClient,
+    id: number,
+  ) {
+    const devices = await tx.usedDevice.findMany({
+      where: { ...NOT_DELETED, negotiationId: id },
+      select: {
+        model: true,
+        serialNumber: true,
+        evaluationStatus: true,
+        estimatedValue: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    const pending = devices.find(
+      (device) => device.evaluationStatus === 'AGUARDANDO',
+    );
+    if (pending) {
+      throw new ConflictException(
+        `O aparelho ${pending.model} (série ${pending.serialNumber}) ainda aguarda avaliação; espere a avaliação ou remova-o da troca antes de converter`,
+      );
+    }
+
+    // O total é relido pela transação: uma edição de itens concorrente não
+    // deixa passar um saldo que ficou negativo.
+    const current = await tx.negotiation.findFirst({
+      where: { ...NOT_DELETED, id },
+      select: { totalValue: true },
+    });
+    if (!current) throw new NotFoundException('Negociação não encontrada');
+    if (amountDue(current.totalValue, devices).amountDueCents < 0) {
+      throw new ConflictException(
+        'Saldo a pagar negativo: a troca vale mais que a compra. Ajuste os itens ou os aparelhos antes de converter',
+      );
+    }
+  }
+
   async convert(id: number, paymentMethod: PaymentMethodEnum, userId: number) {
     const negotiation = await this.ensureExists(id);
     // RN12: converter não passa por `ensureClientEditable` — a anonimização não
@@ -611,6 +663,8 @@ export class NegotiationsService {
     const statusChangedAt = new Date();
 
     await this.prisma.$transaction(async (tx) => {
+      await this.assertTradeInsAllowConversion(tx, id);
+
       const items = await tx.negotiationItem.findMany({
         where: { ...NOT_DELETED, negotiationId: id },
         select: {

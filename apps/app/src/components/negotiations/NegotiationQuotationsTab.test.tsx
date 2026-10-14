@@ -39,6 +39,8 @@ const negotiationDetail = (overrides: Partial<NegotiationDetail> = {}): Negotiat
     item({ quantity: 2, unitPrice: 500, discountType: 'VALOR', discountValue: 0, discountAmount: 0, subtotal: 1000 }),
   ],
   informedValue: null,
+  tradeInTotal: 0,
+  amountDue: 1000,
   ...overrides,
 })
 

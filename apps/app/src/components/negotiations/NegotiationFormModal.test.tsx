@@ -68,6 +68,8 @@ const negotiationDetail = (
     },
   ],
   informedValue: null,
+  tradeInTotal: 0,
+  amountDue: 200,
   ...overrides,
 })
 
