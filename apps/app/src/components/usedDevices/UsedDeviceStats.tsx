@@ -12,17 +12,27 @@ const receivedHint = (count: number) =>
   `${count} ${count === 1 ? 'aparelho' : 'aparelhos'} em negociações ganhas`
 
 export function UsedDeviceStats({ summary }: UsedDeviceStatsProps) {
+  if (!summary) {
+    return (
+      <StatGrid columns={2}>
+        <Stat label="Aguardando Avaliação" value={PENDING} />
+        <Stat label="Recebidos no Mês" value={PENDING} />
+      </StatGrid>
+    )
+  }
+
+  const { awaiting, receivedThisMonth } = summary
   return (
     <StatGrid columns={2}>
       <Stat
         label="Aguardando Avaliação"
-        value={summary ? summary.awaiting : PENDING}
-        hint={summary ? 'na fila de negociações em aberto' : undefined}
+        value={awaiting}
+        hint="na fila de negociações em aberto"
       />
       <Stat
         label="Recebidos no Mês"
-        value={summary ? formatCurrency(summary.receivedThisMonth.value) : PENDING}
-        hint={summary ? receivedHint(summary.receivedThisMonth.count) : undefined}
+        value={formatCurrency(receivedThisMonth.value)}
+        hint={receivedHint(receivedThisMonth.count)}
       />
     </StatGrid>
   )

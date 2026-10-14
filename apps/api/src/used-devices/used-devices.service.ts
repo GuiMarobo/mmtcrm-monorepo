@@ -16,6 +16,7 @@ import {
 } from './dto/list-used-devices-query.dto';
 import { fromCents } from '../negotiations/negotiation-item-response';
 import { amountDue } from './amount-due';
+import { currentStoreMonth } from '../common/store-time';
 
 // RD3: a série é comparada e gravada como o sku — sem espaços nas pontas e em
 // maiúsculas —, para que "f2lx " e "F2LX" contem como o mesmo aparelho.
@@ -117,38 +118,6 @@ const queueWhere = (
   }
   if (status === UsedDeviceQueueFilter.TODOS) return LIVE_DEVICE;
   return { ...LIVE_DEVICE, evaluationStatus: status };
-};
-
-// "Mês corrente" é o da loja, não o do servidor: rodando em UTC, depois das
-// 21h de Brasília do último dia o servidor já estaria no mês seguinte. O
-// Brasil não tem horário de verão desde 2019, então o mês começa às 00:00
-// -03:00.
-const STORE_TIME_ZONE = 'America/Sao_Paulo';
-const STORE_UTC_OFFSET = '-03:00';
-
-const storeMonthFormat = new Intl.DateTimeFormat('en-CA', {
-  timeZone: STORE_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-});
-
-const storeMonthStart = (year: number, month: number) =>
-  new Date(
-    `${year}-${String(month).padStart(2, '0')}-01T00:00:00${STORE_UTC_OFFSET}`,
-  );
-
-const currentStoreMonth = () => {
-  const [year, month] = storeMonthFormat
-    .format(new Date())
-    .split('-')
-    .map(Number);
-  return {
-    gte: storeMonthStart(year, month),
-    lt:
-      month === 12
-        ? storeMonthStart(year + 1, 1)
-        : storeMonthStart(year, month + 1),
-  };
 };
 
 const OLDEST_FIRST = [

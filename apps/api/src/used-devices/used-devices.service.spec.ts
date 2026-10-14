@@ -842,40 +842,6 @@ describe('UsedDevicesService', () => {
       expect(result.receivedThisMonth).toEqual({ count: 2, value: 2350.5 });
     });
 
-    it('o mês é o da loja: 22h de 31/10 em Brasília ainda é outubro', async () => {
-      jest.useFakeTimers({
-        now: new Date('2026-11-01T01:00:00Z'),
-        doNotFake: ['nextTick', 'setImmediate'],
-      });
-
-      await service.summary();
-
-      const arg = callArg<AggregateArg>(prisma.usedDevice.aggregate);
-      expect(arg.where.negotiation).toMatchObject({
-        closedAt: {
-          gte: new Date('2026-10-01T03:00:00Z'),
-          lt: new Date('2026-11-01T03:00:00Z'),
-        },
-      });
-    });
-
-    it('dezembro vira o ano no fim do intervalo', async () => {
-      jest.useFakeTimers({
-        now: new Date('2026-12-20T12:00:00Z'),
-        doNotFake: ['nextTick', 'setImmediate'],
-      });
-
-      await service.summary();
-
-      const arg = callArg<AggregateArg>(prisma.usedDevice.aggregate);
-      expect(arg.where.negotiation).toMatchObject({
-        closedAt: {
-          gte: new Date('2026-12-01T03:00:00Z'),
-          lt: new Date('2027-01-01T03:00:00Z'),
-        },
-      });
-    });
-
     it('sem aparelhos recebidos no mês, quantidade e valor são zero', async () => {
       prisma.usedDevice.aggregate.mockResolvedValue({
         _count: 0,

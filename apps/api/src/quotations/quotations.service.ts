@@ -29,23 +29,10 @@ import {
   splitInstallments,
   totalWithInterestCents,
 } from './installment-pricing';
+import { storeToday } from '../common/store-time';
 
 // RQ5: a validade vai de amanhã a hoje + 90 dias.
 const MAX_VALIDITY_AHEAD_DAYS = 90;
-
-// "Hoje" é o dia do balcão, não o do servidor: rodando em UTC, depois das 21h
-// de Brasília o servidor já estaria no dia seguinte e recusaria "amanhã".
-const STORE_TIME_ZONE = 'America/Sao_Paulo';
-
-const storeDateFormat = new Intl.DateTimeFormat('en-CA', {
-  timeZone: STORE_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-// Datas sem hora circulam como AAAA-MM-DD, que comparam certo como string.
-const storeToday = () => storeDateFormat.format(new Date());
 
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00Z`);
 

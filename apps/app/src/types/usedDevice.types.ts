@@ -71,9 +71,14 @@ export interface UsedDeviceQueue {
 }
 
 // RD17: as duas métricas da tela, calculadas no backend.
+export interface ReceivedThisMonth {
+  count: number
+  value: number
+}
+
 export interface UsedDeviceSummary {
   awaiting: number
-  receivedThisMonth: { count: number; value: number }
+  receivedThisMonth: ReceivedThisMonth
 }
 
 export interface EvaluateUsedDevicePayload {
