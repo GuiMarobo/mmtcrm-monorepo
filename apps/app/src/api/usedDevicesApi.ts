@@ -10,6 +10,7 @@ import type {
   UsedDeviceDetail,
   UsedDeviceQueue,
   UsedDeviceQueueFilter,
+  UsedDeviceSummary,
 } from '../types'
 
 export const usedDevicesApi = {
@@ -31,6 +32,10 @@ export const usedDevicesApi = {
 
   listQueue(status: UsedDeviceQueueFilter): Promise<UsedDeviceQueue> {
     return http.get<UsedDeviceQueue>(`/used-devices?status=${status}`)
+  },
+
+  summary(): Promise<UsedDeviceSummary> {
+    return http.get<UsedDeviceSummary>('/used-devices/summary')
   },
 
   findOne(id: number): Promise<UsedDeviceDetail> {

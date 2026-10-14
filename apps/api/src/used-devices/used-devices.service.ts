@@ -119,6 +119,38 @@ const queueWhere = (
   return { ...LIVE_DEVICE, evaluationStatus: status };
 };
 
+// "Mês corrente" é o da loja, não o do servidor: rodando em UTC, depois das
+// 21h de Brasília do último dia o servidor já estaria no mês seguinte. O
+// Brasil não tem horário de verão desde 2019, então o mês começa às 00:00
+// -03:00.
+const STORE_TIME_ZONE = 'America/Sao_Paulo';
+const STORE_UTC_OFFSET = '-03:00';
+
+const storeMonthFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: STORE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+});
+
+const storeMonthStart = (year: number, month: number) =>
+  new Date(
+    `${year}-${String(month).padStart(2, '0')}-01T00:00:00${STORE_UTC_OFFSET}`,
+  );
+
+const currentStoreMonth = () => {
+  const [year, month] = storeMonthFormat
+    .format(new Date())
+    .split('-')
+    .map(Number);
+  return {
+    gte: storeMonthStart(year, month),
+    lt:
+      month === 12
+        ? storeMonthStart(year + 1, 1)
+        : storeMonthStart(year, month + 1),
+  };
+};
+
 const OLDEST_FIRST = [
   { createdAt: 'asc' },
   { id: 'asc' },
@@ -294,6 +326,38 @@ export class UsedDevicesService {
           : NEWEST_FIRST,
     });
     return { devices: devices.map(toQueueResponse) };
+  }
+
+  // RD17: Aguardando avaliação é o tamanho da fila padrão (RD15). Recebidos no
+  // mês são os aparelhos que de fato entraram na loja: avaliados, numa
+  // Negociação ganha neste mês. Reabrir a Negociação a tira da conta.
+  async summary() {
+    const [awaiting, received] = await Promise.all([
+      this.prisma.usedDevice.count({
+        where: queueWhere(UsedDeviceQueueFilter.AGUARDANDO),
+      }),
+      this.prisma.usedDevice.aggregate({
+        where: {
+          ...LIVE_DEVICE,
+          evaluationStatus: 'AVALIADO',
+          negotiation: {
+            ...LIVE_DEVICE.negotiation,
+            status: 'GANHA',
+            closedAt: currentStoreMonth(),
+          },
+        },
+        _count: true,
+        _sum: { estimatedValue: true },
+      }),
+    ]);
+
+    return {
+      awaiting,
+      receivedThisMonth: {
+        count: received._count,
+        value: Number(received._sum.estimatedValue ?? 0),
+      },
+    };
   }
 
   // O histórico da série são os outros aparelhos não excluídos com a mesma

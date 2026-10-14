@@ -134,6 +134,22 @@ export class UsedDevicesController {
     return this.usedDevicesService.findQueue(query);
   }
 
+  @Get('used-devices/summary')
+  @Roles(RoleEnum.ADMIN, RoleEnum.TECNICO)
+  @ApiOperation({
+    summary: 'Métricas da tela Dispositivos Usados',
+    description:
+      '"awaiting": aparelhos da fila padrão (aguardando avaliação, de ' +
+      'negociações em aberto). "receivedThisMonth": quantidade e soma dos ' +
+      'valores estimados dos aparelhos avaliados de negociações ganhas no mês ' +
+      'corrente, no fuso da loja.',
+  })
+  @ApiResponse({ status: 200, description: 'Métricas' })
+  @ApiResponse({ status: 403, description: 'Perfil sem permissão' })
+  summary() {
+    return this.usedDevicesService.summary();
+  }
+
   @Get('used-devices/:id')
   @Roles(RoleEnum.ADMIN, RoleEnum.TECNICO)
   @ApiOperation({

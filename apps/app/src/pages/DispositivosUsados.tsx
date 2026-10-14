@@ -8,6 +8,7 @@ import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
 import { UsedDevicesDataGrid } from '../components/usedDevices/UsedDevicesDataGrid'
 import { UsedDeviceEvaluationDialog } from '../components/usedDevices/UsedDeviceEvaluationDialog'
+import { UsedDeviceStats } from '../components/usedDevices/UsedDeviceStats'
 import { EVALUATION_STATUS_OPTIONS } from '../types'
 import type {
   EvaluateUsedDevicePayload,
@@ -15,6 +16,7 @@ import type {
   RefuseUsedDevicePayload,
   UsedDeviceDetail,
   UsedDeviceQueueFilter,
+  UsedDeviceSummary,
 } from '../types'
 
 interface DispositivosUsadosProps {
@@ -38,11 +40,13 @@ export function DispositivosUsados({ toast }: DispositivosUsadosProps) {
   const [list, setList] = useState<QueueUsedDevice[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [summary, setSummary] = useState<UsedDeviceSummary | null>(null)
   const [selected, setSelected] = useState<QueueUsedDevice | null>(null)
   const [detail, setDetail] = useState<UsedDeviceDetail | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const openedId = useRef<number | null>(null)
   const latest = useRef(0)
+  const latestSummary = useRef(0)
 
   const reload = useCallback(async (status: UsedDeviceQueueFilter) => {
     const request = ++latest.current
@@ -62,6 +66,22 @@ export function DispositivosUsados({ toast }: DispositivosUsadosProps) {
   useEffect(() => {
     void reload(filter)
   }, [filter, reload])
+
+  // As métricas vêm prontas do backend (RD17). Se a leitura falhar, os cards
+  // ficam no traço em vez de mostrar um número velho ou inventado.
+  const reloadSummary = useCallback(async () => {
+    const request = ++latestSummary.current
+    try {
+      const result = await usedDevicesApi.summary()
+      if (request === latestSummary.current) setSummary(result)
+    } catch {
+      if (request === latestSummary.current) setSummary(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    void reloadSummary()
+  }, [reloadSummary])
 
   const openDetail = async (device: QueueUsedDevice) => {
     openedId.current = device.id
@@ -88,6 +108,7 @@ export function DispositivosUsados({ toast }: DispositivosUsadosProps) {
     await action()
     toast(success)
     void reload(filter)
+    void reloadSummary()
   }
 
   const evaluate = (id: number, payload: EvaluateUsedDevicePayload) =>
@@ -102,6 +123,8 @@ export function DispositivosUsados({ toast }: DispositivosUsadosProps) {
         title="Dispositivos Usados"
         subtitle="A fila de avaliação: confira o iCloud, avalie ou recuse os aparelhos na troca."
       />
+
+      <UsedDeviceStats summary={summary} />
 
       {loadError ? (
         <SectionCard>

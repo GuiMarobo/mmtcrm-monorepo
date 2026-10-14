@@ -784,6 +784,110 @@ describe('UsedDevicesService', () => {
     );
   });
 
+  describe('summary (RD17)', () => {
+    type CountArg = { where: Record<string, unknown> };
+    type AggregateArg = {
+      where: Record<string, unknown>;
+      _count: unknown;
+      _sum: Record<string, unknown>;
+    };
+
+    beforeEach(() => {
+      prisma.usedDevice.count.mockResolvedValue(4);
+      prisma.usedDevice.aggregate.mockResolvedValue({
+        _count: 2,
+        _sum: { estimatedValue: { toString: () => '2350.50' } },
+      });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('Aguardando avaliação conta exatamente a fila padrão (RD15)', async () => {
+      const result = await service.summary();
+
+      expect(callArg<CountArg>(prisma.usedDevice.count).where).toEqual({
+        deletedAt: null,
+        evaluationStatus: 'AGUARDANDO',
+        negotiation: { deletedAt: null, status: 'ABERTA' },
+      });
+      expect(result.awaiting).toBe(4);
+    });
+
+    it('Recebidos no mês: avaliados, não excluídos, de Negociações ganhas no mês', async () => {
+      jest.useFakeTimers({
+        now: new Date('2026-10-14T15:00:00Z'),
+        doNotFake: ['nextTick', 'setImmediate'],
+      });
+
+      const result = await service.summary();
+
+      // Recusado, aguardando, Negociação perdida ou reaberta (ABERTA), fora
+      // do mês e excluído ficam fora pelo filtro.
+      const arg = callArg<AggregateArg>(prisma.usedDevice.aggregate);
+      expect(arg.where).toEqual({
+        deletedAt: null,
+        evaluationStatus: 'AVALIADO',
+        negotiation: {
+          deletedAt: null,
+          status: 'GANHA',
+          closedAt: {
+            gte: new Date('2026-10-01T03:00:00Z'),
+            lt: new Date('2026-11-01T03:00:00Z'),
+          },
+        },
+      });
+      expect(arg._sum).toEqual({ estimatedValue: true });
+      expect(result.receivedThisMonth).toEqual({ count: 2, value: 2350.5 });
+    });
+
+    it('o mês é o da loja: 22h de 31/10 em Brasília ainda é outubro', async () => {
+      jest.useFakeTimers({
+        now: new Date('2026-11-01T01:00:00Z'),
+        doNotFake: ['nextTick', 'setImmediate'],
+      });
+
+      await service.summary();
+
+      const arg = callArg<AggregateArg>(prisma.usedDevice.aggregate);
+      expect(arg.where.negotiation).toMatchObject({
+        closedAt: {
+          gte: new Date('2026-10-01T03:00:00Z'),
+          lt: new Date('2026-11-01T03:00:00Z'),
+        },
+      });
+    });
+
+    it('dezembro vira o ano no fim do intervalo', async () => {
+      jest.useFakeTimers({
+        now: new Date('2026-12-20T12:00:00Z'),
+        doNotFake: ['nextTick', 'setImmediate'],
+      });
+
+      await service.summary();
+
+      const arg = callArg<AggregateArg>(prisma.usedDevice.aggregate);
+      expect(arg.where.negotiation).toMatchObject({
+        closedAt: {
+          gte: new Date('2026-12-01T03:00:00Z'),
+          lt: new Date('2027-01-01T03:00:00Z'),
+        },
+      });
+    });
+
+    it('sem aparelhos recebidos no mês, quantidade e valor são zero', async () => {
+      prisma.usedDevice.aggregate.mockResolvedValue({
+        _count: 0,
+        _sum: { estimatedValue: null },
+      });
+
+      const result = await service.summary();
+
+      expect(result.receivedThisMonth).toEqual({ count: 0, value: 0 });
+    });
+  });
+
   // A autorização é do RolesGuard global, a partir do @Roles do controller.
   describe('perfis', () => {
     const guard = new RolesGuard(new Reflector());
@@ -815,7 +919,7 @@ describe('UsedDevicesService', () => {
       },
     );
 
-    it.each(['findQueue', 'findOne', 'evaluate', 'refuse'] as const)(
+    it.each(['findQueue', 'summary', 'findOne', 'evaluate', 'refuse'] as const)(
       '%s: ADMIN e TECNICO passam; VENDEDOR e ATENDENTE levam 403',
       (handler) => {
         expect(canCall(handler, RoleEnum.ADMIN)).toBe(true);

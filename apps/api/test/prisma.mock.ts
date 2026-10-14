@@ -8,6 +8,7 @@ const model = (): Model => ({
   findUnique: jest.fn(),
   findMany: jest.fn(),
   count: jest.fn(),
+  aggregate: jest.fn(),
   create: jest.fn(),
   createMany: jest.fn(),
   update: jest.fn(),
