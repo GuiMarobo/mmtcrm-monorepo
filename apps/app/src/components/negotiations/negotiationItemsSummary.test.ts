@@ -3,6 +3,7 @@ import {
   calculateItem,
   calculateItemSubtotal,
   itemDiscountError,
+  itemQuantityError,
   sellerDiscountLimitError,
   sumItemsAtPracticedPrice,
   sumNegotiationItems,
@@ -165,5 +166,24 @@ describe('sellerDiscountLimitError (RI6, só para UX — o backend decide)', () 
     expect(
       sellerDiscountLimitError(item('PERCENTUAL', 18), item('PERCENTUAL', 20)),
     ).not.toBeNull()
+  })
+})
+
+describe('itemQuantityError (história 44, só para UX — o backend decide)', () => {
+  it.each([0, -1, 1.5, Number.NaN])('recusa %s', (quantity) => {
+    expect(itemQuantityError(quantity)).toBe('Inteiro a partir de 1')
+  })
+
+  it.each([1, 3])('aceita %s', (quantity) => {
+    expect(itemQuantityError(quantity)).toBeNull()
+  })
+
+  it('item com quantidade inválida não entra na soma, em vez de virar NaN', () => {
+    expect(
+      sumNegotiationItems([
+        { quantity: Number.NaN, unitPrice: 100 },
+        { quantity: 2, unitPrice: 50 },
+      ]),
+    ).toBe(100)
   })
 })

@@ -259,6 +259,33 @@ describe('NegotiationFormModal — validações do item (ticket 06)', () => {
       notes: null,
     })
   })
+
+  it('quantidade inválida aponta o erro na linha e não envia (história 44)', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <NegotiationFormModal
+        isAdmin={false}
+        negotiation={negotiationDetail()}
+        clients={[client()]}
+        products={[product()]}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    await user.tripleClick(screen.getByLabelText('Qtd.'))
+    await user.keyboard('0')
+    await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(screen.getByText('Inteiro a partir de 1')).toBeInTheDocument()
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Quantidade inválida em iPhone 15 Pro: informe um número inteiro a partir de 1.',
+    )
+  })
 })
 
 describe('NegotiationFormModal — desconto do item (ticket 08)', () => {

@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography'
 import {
   calculateItemSubtotal,
   itemDiscountError,
+  itemQuantityError,
   sellerDiscountLimitError,
   sumItemsAtPracticedPrice,
 } from './negotiationItemsSummary'
@@ -153,7 +154,8 @@ export function NegotiationItemsEditor({
               (limitDiscount
                 ? sellerDiscountLimitError(pricedItem, savedById.get(item.productId))
                 : null)
-            const overStock = stock !== null && item.quantity > stock
+            const quantityError = itemQuantityError(item.quantity)
+            const overStock = !quantityError && stock !== null && item.quantity > stock
 
             return (
               <Box key={item.productId}>
@@ -204,13 +206,15 @@ export function NegotiationItemsEditor({
                     label="Qtd."
                     type="number"
                     size="small"
-                    value={item.quantity}
+                    value={Number.isNaN(item.quantity) ? '' : item.quantity}
                     disabled={deleted}
+                    error={!!quantityError}
+                    helperText={quantityError ?? undefined}
                     onChange={(e) => {
-                      const quantity = Number(e.target.value)
-                      if (Number.isInteger(quantity) && quantity >= 1) {
-                        updateItem(item.productId, { quantity })
-                      }
+                      const raw = e.target.value
+                      updateItem(item.productId, {
+                        quantity: raw === '' ? Number.NaN : Number(raw),
+                      })
                     }}
                     slotProps={{ htmlInput: { min: 1, step: 1 } }}
                     sx={{ width: 84 }}

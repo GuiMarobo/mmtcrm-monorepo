@@ -18,8 +18,13 @@ export interface ItemCalculation {
 
 export const toCents = (value: number) => Math.round(value * 100)
 
+export function itemQuantityError(quantity: number): string | null {
+  return Number.isInteger(quantity) && quantity >= 1 ? null : 'Inteiro a partir de 1'
+}
+
 function calculateItemCents(item: PricedItem) {
-  const lineCents = toCents(item.unitPrice) * item.quantity
+  const quantity = itemQuantityError(item.quantity) ? 0 : item.quantity
+  const lineCents = toCents(item.unitPrice) * quantity
   const discountValue = item.discountValue ?? 0
   const discountCents =
     item.discountType === 'PERCENTUAL'

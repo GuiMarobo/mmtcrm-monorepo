@@ -18,6 +18,7 @@ import { sumCashTotal } from './installmentSimulation'
 import {
   SELLER_DISCOUNT_LIMIT_PERCENT,
   findItemOverSellerLimit,
+  itemQuantityError,
   sumItemsAtPracticedPrice,
 } from './negotiationItemsSummary'
 import type { NegotiationItemFormValue } from './NegotiationItemsEditor'
@@ -109,6 +110,16 @@ export function NegotiationFormModal({
     setError(null)
     if (!clientId) {
       setError('Selecione o cliente da negociação.')
+      return
+    }
+
+    const invalidQuantity = items.find((item) => itemQuantityError(item.quantity))
+    if (invalidQuantity) {
+      const name =
+        products.find((p) => p.id === invalidQuantity.productId)?.name ??
+        invalidQuantity.product?.name ??
+        'item'
+      setError(`Quantidade inválida em ${name}: informe um número inteiro a partir de 1.`)
       return
     }
 
