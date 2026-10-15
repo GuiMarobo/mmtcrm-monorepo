@@ -33,4 +33,4 @@ async function bootstrap() {
   console.log(`Swagger: ${await app.getUrl()}/docs`);
 }
 
-bootstrap();
+void bootstrap();

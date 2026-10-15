@@ -211,6 +211,42 @@ describe('NegotiationItemsEditor', () => {
       expect(screen.getByLabelText('Qtd.')).toHaveValue(5)
       expect(screen.getByText(/Saldo em estoque: 2/)).toBeInTheDocument()
     })
+
+    it('quantidade zero aparece no campo com o erro apontado na linha (história 44)', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(
+        <StatefulEditor
+          products={[product()]}
+          initialItems={[{ productId: 'p1', quantity: 1 }]}
+          onChange={onChange}
+        />,
+      )
+
+      await user.tripleClick(screen.getByLabelText('Qtd.'))
+      await user.keyboard('0')
+
+      expect(screen.getByLabelText('Qtd.')).toHaveValue(0)
+      expect(screen.getByLabelText('Qtd.')).toBeInvalid()
+      expect(screen.getByText('Inteiro a partir de 1')).toBeInTheDocument()
+      expect(onChange).toHaveBeenLastCalledWith([{ productId: 'p1', quantity: 0 }])
+    })
+
+    it('apagar a quantidade deixa o campo vazio e com erro, sem virar 0', async () => {
+      const user = userEvent.setup()
+      render(
+        <StatefulEditor
+          products={[product()]}
+          initialItems={[{ productId: 'p1', quantity: 3 }]}
+        />,
+      )
+
+      await user.clear(screen.getByLabelText('Qtd.'))
+
+      expect(screen.getByLabelText('Qtd.')).toHaveValue(null)
+      expect(screen.getByText('Inteiro a partir de 1')).toBeInTheDocument()
+      expect(screen.getAllByText(/R\$\s*0,00/)).toHaveLength(2)
+    })
   })
 
   describe('desconto do item em % ou em R$ (ticket 08)', () => {

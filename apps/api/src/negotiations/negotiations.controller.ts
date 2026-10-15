@@ -100,7 +100,11 @@ export class NegotiationsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Alterar parcialmente a negociação' })
-  @ApiResponse({ status: 400, description: 'PATCH sem nenhum campo' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'PATCH sem nenhum campo, ou com totalValue (derivado dos itens)',
+  })
   @ApiResponse({
     status: 404,
     description: 'Negociação ou cliente não encontrado',

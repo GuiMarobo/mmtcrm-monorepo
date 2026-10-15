@@ -167,3 +167,14 @@ describe('sellerDiscountLimitError (RI6, só para UX — o backend decide)', () 
     ).not.toBeNull()
   })
 })
+
+describe('quantidade inválida no cálculo (história 44)', () => {
+  it('item sem quantidade não entra na soma, em vez de virar NaN', () => {
+    expect(
+      sumNegotiationItems([
+        { quantity: null, unitPrice: 100 },
+        { quantity: 2, unitPrice: 50 },
+      ]),
+    ).toBe(100)
+  })
+})

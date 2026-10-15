@@ -37,6 +37,14 @@ export function isPositiveInteger(value: string): boolean {
   return Number.isInteger(n) && n > 0
 }
 
+export function isValidQuantity(value: number | null): value is number {
+  return value !== null && Number.isInteger(value) && value >= 1
+}
+
+export function quantityError(value: number | null): string | undefined {
+  return isValidQuantity(value) ? undefined : 'Inteiro a partir de 1'
+}
+
 export function validityDaysError(value: string): string | undefined {
   if (!value.trim()) return 'Informe a validade padrão.'
   const days = Number(value)
