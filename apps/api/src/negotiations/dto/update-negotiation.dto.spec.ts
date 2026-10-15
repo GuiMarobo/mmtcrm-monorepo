@@ -22,6 +22,15 @@ describe('UpdateNegotiationDto', () => {
     expect(errors.map((e) => e.property)).toEqual(['totalValue']);
   });
 
+  it.each([null, ''])(
+    'recusa totalValue %p: chave presente nunca passa (ADR 0015)',
+    async (totalValue) => {
+      const errors = await errorsFor({ totalValue });
+
+      expect(errors.map((e) => e.property)).toEqual(['totalValue']);
+    },
+  );
+
   it('aceita clientId e notes', async () => {
     const errors = await errorsFor({
       clientId: '7f1d7c1e-8a2b-4c3d-9e4f-5a6b7c8d9e0f',
