@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, usedDevicesApi } from '../api'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
-import { UsedDevicesDataGrid } from '../components/usedDevices/UsedDevicesDataGrid'
+import { UsedDevicesTable } from '../components/usedDevices/UsedDevicesTable'
 import { UsedDeviceEvaluationDialog } from '../components/usedDevices/UsedDeviceEvaluationDialog'
 import { UsedDeviceStats } from '../components/usedDevices/UsedDeviceStats'
 import { useUsedDeviceSummary } from '../hooks/useUsedDeviceSummary'
@@ -137,7 +137,7 @@ export function DispositivosUsados({ toast }: DispositivosUsadosProps) {
               {EMPTY_LABELS[filter]}
             </Typography>
           ) : (
-            <UsedDevicesDataGrid
+            <UsedDevicesTable
               rows={list}
               loading={loading}
               onOpen={(device) => void openDetail(device)}

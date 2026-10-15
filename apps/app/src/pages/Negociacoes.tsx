@@ -268,6 +268,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
         <NegotiationListView
           items={list}
           loading={loading}
+          loadDetail={(id) => negotiationsApi.findOne(id)}
           onEdit={(n) => void openEdit(n)}
           onRequestTransition={(n, t) => void requestTransition(n, t)}
           onDelete={setConfirmDelete}

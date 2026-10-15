@@ -2,14 +2,12 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import {
-  useGridApiRef,
-  gridFilteredSortedRowEntriesSelector,
-} from '@mui/x-data-grid-premium'
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError, usersApi } from '../api'
 import { UserFormModal } from '../components/users/UserFormModal'
-import { UsersDataGrid } from '../components/users/UsersDataGrid'
+import { UsersTable } from '../components/users/UsersTable'
+import { userSearchValues } from '../components/users/userSearch'
+import { matchesQuery } from '../components/common/dataTableUtils'
 import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
@@ -26,7 +24,6 @@ interface UsuariosProps {
 
 export function Usuarios({ toast }: UsuariosProps) {
   const { user: currentUser } = useAuth()
-  const apiRef = useGridApiRef()
   const [list, setList] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -122,10 +119,13 @@ export function Usuarios({ toast }: UsuariosProps) {
     }
   }
 
+  const visible = useMemo(
+    () => list.filter((u) => matchesQuery(userSearchValues(u), query)),
+    [list, query],
+  )
+
   const exportar = () => {
-    const visiveis = apiRef.current
-      ? gridFilteredSortedRowEntriesSelector(apiRef).map((entry) => entry.model as User)
-      : list
+    const visiveis = visible
 
     if (visiveis.length === 0) {
       toast('Nada para exportar com os filtros atuais.')
@@ -187,11 +187,9 @@ export function Usuarios({ toast }: UsuariosProps) {
 
         {loadError && <ErrorBanner message={loadError} onRetry={() => void reload()} />}
 
-        <UsersDataGrid
-          apiRef={apiRef}
-          rows={list}
+        <UsersTable
+          rows={visible}
           loading={loading}
-          quickFilter={query}
           currentUserId={currentUser?.id}
           onEdit={setEditing}
           onToggleStatus={(u) => void toggleStatus(u)}

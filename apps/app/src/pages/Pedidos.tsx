@@ -2,7 +2,7 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, ordersApi } from '../api'
-import { OrdersDataGrid } from '../components/orders/OrdersDataGrid'
+import { OrdersTable } from '../components/orders/OrdersTable'
 import { OrderDetailDrawer } from '../components/orders/OrderDetailDrawer'
 import { ApproveOrderDialog } from '../components/orders/ApproveOrderDialog'
 import { summarizeAwaitingPayment } from '../components/orders/ordersSummary'
@@ -125,7 +125,7 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
               Nenhum pedido ainda
             </Typography>
           ) : (
-            <OrdersDataGrid
+            <OrdersTable
               rows={list}
               loading={loading}
               onOpen={(order) => void openDetail(order)}

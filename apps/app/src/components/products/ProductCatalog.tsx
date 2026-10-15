@@ -3,7 +3,7 @@ import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import { useMemo, useState, type ReactNode } from 'react'
 import { ProductStats } from './ProductStats'
-import { ProductsDataGrid } from './ProductsDataGrid'
+import { ProductsTable } from './ProductsTable'
 import { ProductsToolbar } from './ProductsToolbar'
 import { EMPTY_PRODUCT_FILTERS, filterProducts, type ProductFilters } from './productsFilter'
 import { SectionCard } from '../common/SectionCard'
@@ -42,7 +42,11 @@ export function ProductCatalog({ list, loading, onOpen }: ProductCatalogProps) {
                 </Button>
               </EmptyMessage>
             ) : (
-              <ProductsDataGrid rows={visible} loading={loading} onOpen={onOpen} />
+              <ProductsTable
+                rows={visible}
+                loading={loading}
+                onOpen={onOpen}
+              />
             )}
           </>
         )}
