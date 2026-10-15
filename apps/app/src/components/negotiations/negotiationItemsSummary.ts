@@ -1,8 +1,9 @@
+import { isValidQuantity } from '../../utils/validators'
 import type { DiscountType } from '../../types'
 
 export interface NegotiationItemDraft {
   productId: string
-  quantity: number
+  quantity: number | null
   unitPrice: number
   discountType?: DiscountType
   discountValue?: number
@@ -18,12 +19,8 @@ export interface ItemCalculation {
 
 export const toCents = (value: number) => Math.round(value * 100)
 
-export function itemQuantityError(quantity: number): string | null {
-  return Number.isInteger(quantity) && quantity >= 1 ? null : 'Inteiro a partir de 1'
-}
-
 function calculateItemCents(item: PricedItem) {
-  const quantity = itemQuantityError(item.quantity) ? 0 : item.quantity
+  const quantity = isValidQuantity(item.quantity) ? item.quantity : 0
   const lineCents = toCents(item.unitPrice) * quantity
   const discountValue = item.discountValue ?? 0
   const discountCents =

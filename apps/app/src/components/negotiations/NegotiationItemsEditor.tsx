@@ -11,12 +11,12 @@ import Typography from '@mui/material/Typography'
 import {
   calculateItemSubtotal,
   itemDiscountError,
-  itemQuantityError,
   sellerDiscountLimitError,
   sumItemsAtPracticedPrice,
 } from './negotiationItemsSummary'
 import { ToneChip } from '../common/ToneChip'
 import { formatCurrency } from '../../utils/format'
+import { isValidQuantity, quantityError } from '../../utils/validators'
 import { DISCOUNT_TYPE_OPTIONS } from '../../types'
 import type {
   CreateNegotiationItemPayload,
@@ -25,7 +25,8 @@ import type {
   Product,
 } from '../../types'
 
-export interface NegotiationItemFormValue extends CreateNegotiationItemPayload {
+export interface NegotiationItemFormValue extends Omit<CreateNegotiationItemPayload, 'quantity'> {
+  quantity: number | null
   unitPrice?: number
   product?: NegotiationItemProduct
 }
@@ -154,8 +155,9 @@ export function NegotiationItemsEditor({
               (limitDiscount
                 ? sellerDiscountLimitError(pricedItem, savedById.get(item.productId))
                 : null)
-            const quantityError = itemQuantityError(item.quantity)
-            const overStock = !quantityError && stock !== null && item.quantity > stock
+            const quantityMessage = quantityError(item.quantity)
+            const overStock =
+              isValidQuantity(item.quantity) && stock !== null && item.quantity > stock
 
             return (
               <Box key={item.productId}>
@@ -206,14 +208,14 @@ export function NegotiationItemsEditor({
                     label="Qtd."
                     type="number"
                     size="small"
-                    value={Number.isNaN(item.quantity) ? '' : item.quantity}
+                    value={item.quantity ?? ''}
                     disabled={deleted}
-                    error={!!quantityError}
-                    helperText={quantityError ?? undefined}
+                    error={!!quantityMessage}
+                    helperText={quantityMessage}
                     onChange={(e) => {
                       const raw = e.target.value
                       updateItem(item.productId, {
-                        quantity: raw === '' ? Number.NaN : Number(raw),
+                        quantity: raw === '' ? null : Number(raw),
                       })
                     }}
                     slotProps={{ htmlInput: { min: 1, step: 1 } }}

@@ -18,9 +18,9 @@ import { sumCashTotal } from './installmentSimulation'
 import {
   SELLER_DISCOUNT_LIMIT_PERCENT,
   findItemOverSellerLimit,
-  itemQuantityError,
   sumItemsAtPracticedPrice,
 } from './negotiationItemsSummary'
+import { isValidQuantity } from '../../utils/validators'
 import type { NegotiationItemFormValue } from './NegotiationItemsEditor'
 import type {
   Client,
@@ -106,6 +106,9 @@ export function NegotiationFormModal({
 
   const informedValue = negotiation?.informedValue ?? null
 
+  const itemDisplayName = (item: NegotiationItemFormValue) =>
+    products.find((p) => p.id === item.productId)?.name ?? item.product?.name ?? 'item'
+
   const submit = async () => {
     setError(null)
     if (!clientId) {
@@ -113,35 +116,33 @@ export function NegotiationFormModal({
       return
     }
 
-    const invalidQuantity = items.find((item) => itemQuantityError(item.quantity))
+    const invalidQuantity = items.find((item) => !isValidQuantity(item.quantity))
     if (invalidQuantity) {
-      const name =
-        products.find((p) => p.id === invalidQuantity.productId)?.name ??
-        invalidQuantity.product?.name ??
-        'item'
-      setError(`Quantidade inválida em ${name}: informe um número inteiro a partir de 1.`)
+      setError(
+        `Quantidade inválida em ${itemDisplayName(invalidQuantity)}: informe um número inteiro a partir de 1.`,
+      )
       return
     }
 
     const overLimit = isAdmin ? undefined : findItemOverSellerLimit(items, savedItems, products)
     if (overLimit) {
-      const name =
-        products.find((p) => p.id === overLimit.productId)?.name ??
-        overLimit.product?.name ??
-        'item'
       setError(
-        `Desconto acima de ${SELLER_DISCOUNT_LIMIT_PERCENT}% exige administrador: reduza o desconto de ${name} para ${SELLER_DISCOUNT_LIMIT_PERCENT}% ou menos.`,
+        `Desconto acima de ${SELLER_DISCOUNT_LIMIT_PERCENT}% exige administrador: reduza o desconto de ${itemDisplayName(overLimit)} para ${SELLER_DISCOUNT_LIMIT_PERCENT}% ou menos.`,
       )
       return
     }
 
-    const payloadItems = items.map(
-      ({ productId, quantity, discountType, discountValue }) => ({
-        productId,
-        quantity,
-        discountType: discountType ?? 'VALOR',
-        discountValue: discountValue ?? 0,
-      }),
+    const payloadItems = items.flatMap(({ productId, quantity, discountType, discountValue }) =>
+      isValidQuantity(quantity)
+        ? [
+            {
+              productId,
+              quantity,
+              discountType: discountType ?? 'VALOR',
+              discountValue: discountValue ?? 0,
+            },
+          ]
+        : [],
     )
 
     setSaving(true)

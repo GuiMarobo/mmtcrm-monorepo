@@ -20,6 +20,10 @@ export interface AuthenticatedUser {
   mustChangePassword: boolean;
 }
 
+export interface AuthenticatedRequest {
+  user?: AuthenticatedUser;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly usersService: UsersService) {
@@ -39,7 +43,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: user.id,
       email: user.email,
-      role: user.role as RoleEnum,
+      role: RoleEnum[user.role],
       mustChangePassword: user.mustChangePassword,
     };
   }

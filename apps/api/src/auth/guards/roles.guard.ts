@@ -7,7 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { RoleEnum } from '../../users/dto/create-user.dto';
-import type { AuthenticatedUser } from '../strategies/jwt.strategy';
+import type { AuthenticatedRequest } from '../strategies/jwt.strategy';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -23,9 +23,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context
-      .switchToHttp()
-      .getRequest<{ user?: AuthenticatedUser }>();
+    const { user } = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     if (!user) {
       throw new ForbiddenException('Acesso negado');
