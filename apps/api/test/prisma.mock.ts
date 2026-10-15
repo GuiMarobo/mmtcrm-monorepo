@@ -8,6 +8,7 @@ const model = (): Model => ({
   findUnique: jest.fn(),
   findMany: jest.fn(),
   count: jest.fn(),
+  aggregate: jest.fn(),
   create: jest.fn(),
   createMany: jest.fn(),
   update: jest.fn(),
@@ -29,6 +30,7 @@ export interface MockPrisma {
   installmentRate: Model;
   quotation: Model;
   quotationItem: Model;
+  usedDevice: Model;
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
 }
@@ -49,6 +51,7 @@ export function createMockPrisma(): MockPrisma {
     installmentRate: model(),
     quotation: model(),
     quotationItem: model(),
+    usedDevice: model(),
     $queryRaw: jest.fn(),
   } as unknown as MockPrisma;
 

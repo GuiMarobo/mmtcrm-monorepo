@@ -4,7 +4,6 @@ import { Box, CssBaseline, ThemeProvider } from '@mui/material'
 import { theme } from './theme'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
-import { Placeholder } from './components/Placeholder'
 import { Toast } from './components/common/Toast'
 import { Login } from './pages/Login'
 import { ChangePassword } from './pages/ChangePassword'
@@ -25,6 +24,9 @@ const Pedidos = lazy(() =>
 )
 const Produtos = lazy(() =>
   import('./pages/Produtos').then((m) => ({ default: m.Produtos })),
+)
+const DispositivosUsados = lazy(() =>
+  import('./pages/DispositivosUsados').then((m) => ({ default: m.DispositivosUsados })),
 )
 const Configuracoes = lazy(() =>
   import('./pages/Configuracoes').then((m) => ({ default: m.Configuracoes })),
@@ -73,7 +75,7 @@ function AppRoot() {
     negociacoes: <Negociacoes toast={show} />,
     pedidos: <Pedidos toast={show} onNavigate={navigate} />,
     produtos: <Produtos toast={show} />,
-    usados: <Placeholder title="Dispositivos Usados" hint="Avaliação e laudo de trade-in." />,
+    usados: <DispositivosUsados toast={show} />,
     configuracoes: <Configuracoes toast={show} />,
   }
 

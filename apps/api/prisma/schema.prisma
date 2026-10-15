@@ -58,6 +58,8 @@ model User {
   erasuresPerformed DataErasureLog[]
   stockMovements    StockMovement[]
   quotations        Quotation[]
+  usedDevicesCreated   UsedDevice[] @relation("UsedDeviceCreatedBy")
+  usedDevicesEvaluated UsedDevice[] @relation("UsedDeviceEvaluator")
 
   @@index([email])
   @@index([deletedAt])
@@ -126,6 +128,7 @@ model Negotiation {
   order    Order?
   items    NegotiationItem[]
   quotations Quotation[]
+  usedDevices UsedDevice[]
 
   @@index([clientId])
   @@index([deletedAt])
@@ -338,6 +341,7 @@ model Quotation {
   // SetNull preserva o Orçamento quando o autor é excluído, como StockMovement.userId.
   author      User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
   items       QuotationItem[]
+  tradeIns    QuotationTradeIn[]
 
   @@index([negotiationId])
   @@map("quotations")
@@ -364,4 +368,78 @@ model QuotationItem {
   @@index([quotationId])
   @@index([productId])
   @@map("quotation_items")
+}
+
+// Aparelho na troca do orçamento (spec 007, RD12): espelha o aparelho AVALIADO
+// no momento da emissão, como QuotationItem espelha o item. Modelo, série e
+// valor de troca são copiados: reavaliar ou remover o aparelho depois não muda
+// o papel emitido (ADR 0017). A referência ao aparelho de origem é só
+// rastreabilidade — SetNull, e o Orçamento nunca depende dela. Sem deletedAt.
+model QuotationTradeIn {
+  id           Int     @id @default(autoincrement())
+  quotationId  Int     @map("quotation_id")
+  usedDeviceId Int?    @map("used_device_id")
+  model        String
+  serialNumber String  @map("serial_number")
+  tradeInValue Decimal @map("trade_in_value") @db.Decimal(12, 2)
+
+  quotation  Quotation   @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  usedDevice UsedDevice? @relation(fields: [usedDeviceId], references: [id], onDelete: SetNull)
+
+  @@index([quotationId])
+  @@index([usedDeviceId])
+  @@map("quotation_trade_ins")
+}
+
+// Resultado da Avaliação do aparelho usado (spec 007). Nasce AGUARDANDO; avaliar
+// e recusar se sobrescrevem enquanto a Negociação está Aberta, e não existe
+// "voltar para aguardando" (RD8).
+enum EvaluationStatus {
+  AGUARDANDO
+  AVALIADO
+  RECUSADO
+}
+
+enum DeviceCondition {
+  EXCELENTE
+  BOM
+  REGULAR
+  RUIM
+}
+
+// Aparelho usado que o Cliente oferece como parte do pagamento (spec 007 / ADR
+// 0018). Só nasce dentro de uma Negociação (RD1): zero ou muitos por
+// Negociação, por isso negotiationId não é @unique. A série é gravada
+// normalizada, como o sku, e pode repetir — o aparelho volta à loja (RD3) —
+// então o índice dela é simples, não único. Os campos da avaliação ficam nulos
+// enquanto aguarda. "Recebido" e o Saldo a pagar não são gravados: derivam da
+// situação da Negociação e dos valores avaliados.
+model UsedDevice {
+  id               Int              @id @default(autoincrement())
+  negotiationId    Int              @map("negotiation_id")
+  model            String
+  serialNumber     String           @map("serial_number")
+  imei             String?
+  evaluationStatus EvaluationStatus @default(AGUARDANDO) @map("evaluation_status")
+  condition        DeviceCondition?
+  estimatedValue   Decimal?         @map("estimated_value") @db.Decimal(12, 2)
+  report           String?
+  icloudUnlocked   Boolean?         @map("icloud_unlocked")
+  evaluatedAt      DateTime?        @map("evaluated_at")
+  evaluatorId      Int?             @map("evaluator_id")
+  createdById      Int?             @map("created_by_id")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  deletedAt        DateTime?        @map("deleted_at")
+
+  negotiation Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  // SetNull preserva o aparelho quando o usuário é excluído, como StockMovement.userId.
+  evaluator   User?       @relation("UsedDeviceEvaluator", fields: [evaluatorId], references: [id], onDelete: SetNull)
+  createdBy   User?       @relation("UsedDeviceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  quotationTradeIns QuotationTradeIn[]
+
+  @@index([negotiationId])
+  @@index([serialNumber])
+  @@index([deletedAt])
+  @@map("used_devices")
 }

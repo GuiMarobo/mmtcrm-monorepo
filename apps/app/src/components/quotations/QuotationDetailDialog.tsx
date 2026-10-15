@@ -18,7 +18,12 @@ import { backdropClasses } from '@mui/material/Backdrop'
 import { formatCurrency, formatDate, formatIsoDate, formatPercent } from '../../utils/format'
 import { ToneChip } from '../common/ToneChip'
 import { describeCondition, sumInstallments } from './quotationCondition'
-import type { CompanySettings, QuotationDetail, QuotationItem } from '../../types'
+import type {
+  CompanySettings,
+  QuotationDetail,
+  QuotationItem,
+  QuotationTradeIn,
+} from '../../types'
 
 const PRINT_ROOT_ID = 'quotation-print'
 
@@ -125,6 +130,7 @@ function QuotationDocument({
     installmentValue: quotation.installmentValue,
     firstInstallment: quotation.firstInstallmentValue,
   }
+  const withTradeIn = quotation.tradeIns.length > 0
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -180,6 +186,8 @@ function QuotationDocument({
         </TableBody>
       </Table>
 
+      {withTradeIn && <TradeInTable tradeIns={quotation.tradeIns} />}
+
       <Box
         sx={{
           alignSelf: 'flex-end',
@@ -191,14 +199,49 @@ function QuotationDocument({
         }}
       >
         <SummaryLine label="Total à vista" value={formatCurrency(quotation.totalValue)} />
+        {withTradeIn && (
+          <>
+            <SummaryLine
+              label="Total das trocas"
+              value={formatCurrency(-quotation.tradeInTotal)}
+            />
+            <SummaryLine label="Saldo a pagar" value={formatCurrency(quotation.amountDue)} />
+          </>
+        )}
         <Divider />
         <SummaryLine
-          label={`Cartão de crédito · taxa ${formatPercent(quotation.ratePercent)}`}
+          label={`Cartão de crédito${withTradeIn ? ' sobre o saldo' : ''} · taxa ${formatPercent(quotation.ratePercent)}`}
           value={describeCondition(condition)}
           strong
         />
         <SummaryLine label="Total parcelado" value={formatCurrency(sumInstallments(condition))} />
       </Box>
+    </Box>
+  )
+}
+
+function TradeInTable({ tradeIns }: { tradeIns: QuotationTradeIn[] }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Aparelhos na troca</Typography>
+      <Table size="small" aria-label="Aparelhos na troca">
+        <TableHead>
+          <TableRow>
+            <TableCell>Modelo</TableCell>
+            <TableCell>Série</TableCell>
+            <TableCell align="right">Valor de troca</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {tradeIns.map((tradeIn) => (
+            <TableRow key={tradeIn.id}>
+              <TableCell sx={{ fontWeight: 600 }}>{tradeIn.model}</TableCell>
+              <TableCell>{tradeIn.serialNumber}</TableCell>
+              <TableCell align="right">{formatCurrency(tradeIn.tradeInValue)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </Box>
   )
 }

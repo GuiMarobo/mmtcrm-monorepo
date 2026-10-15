@@ -8,7 +8,7 @@ import { ApproveOrderDialog } from '../components/orders/ApproveOrderDialog'
 import { summarizeAwaitingPayment } from '../components/orders/ordersSummary'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
-import type { NegotiationItem, Order, Route } from '../types'
+import type { NegotiationItem, Order, OrderTradeIn, Route } from '../types'
 
 interface PedidosProps {
   toast: (msg: string, type?: 'success' | 'error') => void
@@ -21,6 +21,7 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Order | null>(null)
   const [selectedItems, setSelectedItems] = useState<NegotiationItem[] | null>(null)
+  const [selectedTradeIns, setSelectedTradeIns] = useState<OrderTradeIn[] | null>(null)
   const openedId = useRef<number | null>(null)
   const [pendingApprove, setPendingApprove] = useState<Order | null>(null)
   const [approving, setApproving] = useState(false)
@@ -47,9 +48,12 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
     openedId.current = order.id
     setSelected(order)
     setSelectedItems(null)
+    setSelectedTradeIns(null)
     try {
       const detail = await ordersApi.findOne(order.id)
-      if (openedId.current === order.id) setSelectedItems(detail.items)
+      if (openedId.current !== order.id) return
+      setSelectedItems(detail.items)
+      setSelectedTradeIns(detail.tradeIns)
     } catch (err) {
       if (openedId.current !== order.id) return
       setSelectedItems([])
@@ -134,6 +138,7 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
         <OrderDetailDrawer
           order={selected}
           items={selectedItems}
+          tradeIns={selectedTradeIns}
           approving={approving}
           onApprove={() => setPendingApprove(selected)}
           onGoToNegotiations={() => {

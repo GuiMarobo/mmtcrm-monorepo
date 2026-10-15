@@ -120,7 +120,8 @@ export class NegotiationsController {
   @ApiOperation({
     summary: 'Excluir a negociação',
     description:
-      'Exclusão lógica: a negociação e o pedido derivado recebem deleted_at e ' +
+      'Exclusão lógica: a negociação, o pedido derivado e os aparelhos na ' +
+      'troca recebem deleted_at e ' +
       'somem das consultas, preservando o histórico comercial e fiscal.',
   })
   @ApiResponse({ status: 404, description: 'Negociação não encontrada' })

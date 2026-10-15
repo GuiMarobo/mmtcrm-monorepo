@@ -25,6 +25,16 @@ export interface Order {
   vendedor: OrderVendedor | null
 }
 
+export interface OrderTradeIn {
+  id: number
+  model: string
+  serialNumber: string
+  tradeInValue: number
+}
+
 export interface OrderDetail extends Order {
   items: NegotiationItem[]
+  tradeIns: OrderTradeIn[]
+  tradeInTotal: number
+  amountDue: number
 }

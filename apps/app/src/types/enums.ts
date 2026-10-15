@@ -223,3 +223,28 @@ export const DISCOUNT_TYPE_LABELS: Record<DiscountType, string> = {
 
 export const DISCOUNT_TYPE_OPTIONS: { value: DiscountType; label: string }[] =
   DISCOUNT_TYPES.map((v) => ({ value: v, label: DISCOUNT_TYPE_LABELS[v] }))
+
+export const EVALUATION_STATUSES = ['AGUARDANDO', 'AVALIADO', 'RECUSADO'] as const
+export type EvaluationStatus = (typeof EVALUATION_STATUSES)[number]
+
+export const EVALUATION_STATUS_LABELS: Record<EvaluationStatus, string> = {
+  AGUARDANDO: 'Aguardando avaliação',
+  AVALIADO: 'Avaliado',
+  RECUSADO: 'Recusado',
+}
+
+export const EVALUATION_STATUS_OPTIONS: { value: EvaluationStatus; label: string }[] =
+  EVALUATION_STATUSES.map((v) => ({ value: v, label: EVALUATION_STATUS_LABELS[v] }))
+
+export const DEVICE_CONDITIONS = ['EXCELENTE', 'BOM', 'REGULAR', 'RUIM'] as const
+export type DeviceCondition = (typeof DEVICE_CONDITIONS)[number]
+
+export const DEVICE_CONDITION_LABELS: Record<DeviceCondition, string> = {
+  EXCELENTE: 'Excelente',
+  BOM: 'Bom',
+  REGULAR: 'Regular',
+  RUIM: 'Ruim',
+}
+
+export const DEVICE_CONDITION_OPTIONS: { value: DeviceCondition; label: string }[] =
+  DEVICE_CONDITIONS.map((v) => ({ value: v, label: DEVICE_CONDITION_LABELS[v] }))

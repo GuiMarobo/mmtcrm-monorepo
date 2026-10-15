@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { OrderDetailDrawer } from './OrderDetailDrawer'
-import type { NegotiationItem, Order } from '../../types'
+import type { NegotiationItem, Order, OrderTradeIn } from '../../types'
 
 const order = (overrides: Partial<Order> = {}): Order => ({
   id: 7,
@@ -30,6 +30,14 @@ const item = (overrides: Partial<NegotiationItem> = {}): NegotiationItem => ({
   ...overrides,
 })
 
+const tradeIn = (overrides: Partial<OrderTradeIn> = {}): OrderTradeIn => ({
+  id: 41,
+  model: 'iPhone 12 128 GB',
+  serialNumber: 'F2LXK0ABCD',
+  tradeInValue: 1200.1,
+  ...overrides,
+})
+
 const noop = () => undefined
 
 describe('OrderDetailDrawer', () => {
@@ -38,6 +46,7 @@ describe('OrderDetailDrawer', () => {
       <OrderDetailDrawer
         order={order()}
         items={[]}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={noop}
@@ -56,6 +65,7 @@ describe('OrderDetailDrawer', () => {
       <OrderDetailDrawer
         order={order({ status: 'COMPRA_APROVADA' })}
         items={[]}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={noop}
@@ -77,6 +87,7 @@ describe('OrderDetailDrawer', () => {
       <OrderDetailDrawer
         order={order()}
         items={[]}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={onGoToNegotiations}
@@ -108,6 +119,7 @@ describe('OrderDetailDrawer', () => {
             subtotal: 85,
           }),
         ]}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={noop}
@@ -131,6 +143,7 @@ describe('OrderDetailDrawer', () => {
       <OrderDetailDrawer
         order={order()}
         items={[item({ discountType: 'VALOR', discountValue: 0, discountAmount: 0, subtotal: 300 })]}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={noop}
@@ -151,6 +164,7 @@ describe('OrderDetailDrawer', () => {
             product: { id: 'p1', name: 'Painel', sku: 'PNL-1', status: 'ATIVO', deleted: true },
           }),
         ]}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={noop}
@@ -166,6 +180,7 @@ describe('OrderDetailDrawer', () => {
       <OrderDetailDrawer
         order={order()}
         items={[]}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={noop}
@@ -182,6 +197,7 @@ describe('OrderDetailDrawer', () => {
       <OrderDetailDrawer
         order={order()}
         items={null}
+        tradeIns={[]}
         approving={false}
         onApprove={noop}
         onGoToNegotiations={noop}
@@ -191,5 +207,101 @@ describe('OrderDetailDrawer', () => {
 
     expect(screen.getByText('Carregando itens…')).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Itens' })).not.toBeInTheDocument()
+  })
+
+  it('com troca mostra os aparelhos, o total, o total das trocas e o Saldo a pagar (história 45)', () => {
+    render(
+      <OrderDetailDrawer
+        order={order()}
+        items={[]}
+        tradeIns={[
+          tradeIn(),
+          tradeIn({ id: 42, model: 'Galaxy S21', serialNumber: 'R58N123', tradeInValue: 99.9 }),
+        ]}
+        approving={false}
+        onApprove={noop}
+        onGoToNegotiations={noop}
+        onClose={noop}
+      />,
+    )
+
+    const list = screen.getByRole('list', { name: 'Aparelhos na troca' })
+    const [iphone, galaxy] = within(list).getAllByRole('listitem')
+    expect(within(iphone).getByText('iPhone 12 128 GB')).toBeInTheDocument()
+    expect(within(iphone).getByText(/Série F2LXK0ABCD/)).toBeInTheDocument()
+    expect(within(iphone).getByText(/R\$\s1\.200,10/)).toBeInTheDocument()
+    expect(within(galaxy).getByText('Galaxy S21')).toBeInTheDocument()
+    expect(within(galaxy).getByText(/R\$\s99,90/)).toBeInTheDocument()
+
+    expect(screen.getByText('Total do pedido').nextSibling).toHaveTextContent(/R\$\s2\.500,00/)
+    expect(screen.getByText('Total das trocas').nextSibling).toHaveTextContent(/R\$\s1\.300,00/)
+    expect(screen.getByText('Saldo a pagar').nextSibling).toHaveTextContent(/R\$\s1\.200,00/)
+  })
+
+  it('sem troca não mostra o bloco de troca nem o Saldo a pagar', () => {
+    render(
+      <OrderDetailDrawer
+        order={order()}
+        items={[]}
+        tradeIns={[]}
+        approving={false}
+        onApprove={noop}
+        onGoToNegotiations={noop}
+        onClose={noop}
+      />,
+    )
+
+    expect(screen.queryByRole('list', { name: 'Aparelhos na troca' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Saldo a pagar')).not.toBeInTheDocument()
+    expect(screen.queryByText('Total das trocas')).not.toBeInTheDocument()
+  })
+
+  it('enquanto a troca não carrega, não deixa aprovar sem saber o Saldo a pagar', () => {
+    render(
+      <OrderDetailDrawer
+        order={order()}
+        items={null}
+        tradeIns={null}
+        approving={false}
+        onApprove={noop}
+        onGoToNegotiations={noop}
+        onClose={noop}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Aprovar Compra' })).toBeDisabled()
+  })
+
+  it('se a troca não carregou, avisa e não deixa aprovar', () => {
+    render(
+      <OrderDetailDrawer
+        order={order()}
+        items={[]}
+        tradeIns={null}
+        approving={false}
+        onApprove={noop}
+        onGoToNegotiations={noop}
+        onClose={noop}
+      />,
+    )
+
+    expect(screen.getByText(/Não foi possível carregar a troca/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Aprovar Compra' })).toBeDisabled()
+  })
+
+  it('sem troca, aprovar continua disponível', () => {
+    render(
+      <OrderDetailDrawer
+        order={order()}
+        items={[]}
+        tradeIns={[]}
+        approving={false}
+        onApprove={noop}
+        onGoToNegotiations={noop}
+        onClose={noop}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Aprovar Compra' })).toBeEnabled()
   })
 })

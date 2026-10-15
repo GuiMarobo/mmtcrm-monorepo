@@ -25,10 +25,11 @@ export class QuotationsController {
   @ApiOperation({
     summary: 'Emitir um Orçamento a partir da negociação',
     description:
-      'Congela os itens da negociação e calcula no backend o total à vista, o ' +
-      'total com juros e a parcela; do corpo vêm só o nº de parcelas, a taxa e ' +
-      'a validade. Taxa e validade ausentes vêm da configuração (0% e 7 dias se ' +
-      'nunca configurada). Não muda a negociação, o pedido nem o estoque.',
+      'Congela os itens e os aparelhos avaliados na troca e calcula no backend ' +
+      'o total à vista, o Saldo a pagar e, sobre o saldo, o total com juros e a ' +
+      'parcela; do corpo vêm só o nº de parcelas, a taxa e a validade. Taxa e ' +
+      'validade ausentes vêm da configuração (0% e 7 dias se nunca ' +
+      'configurada). Não muda a negociação, o pedido, o estoque nem os aparelhos.',
   })
   @ApiResponse({ status: 201, description: 'Orçamento emitido' })
   @ApiResponse({
@@ -41,7 +42,9 @@ export class QuotationsController {
   @ApiResponse({ status: 404, description: 'Negociação não encontrada' })
   @ApiResponse({
     status: 409,
-    description: 'Negociação não está em aberto ou não tem itens',
+    description:
+      'Negociação não está em aberto, não tem itens, tem aparelho aguardando ' +
+      'avaliação ou tem Saldo a pagar negativo',
   })
   issue(
     @Param('id', ParseIntPipe) id: number,
@@ -70,7 +73,8 @@ export class QuotationsController {
     summary: 'Detalhar um Orçamento emitido',
     description:
       'O que saiu no papel: dados congelados, itens com nome e código do ' +
-      'Produto lidos do catálogo, parcelas derivadas, e Cliente e vendedor ' +
+      'Produto lidos do catálogo, aparelhos na troca e Saldo a pagar como ' +
+      'congelados na emissão, parcelas derivadas, e Cliente e vendedor ' +
       'responsável lidos pela negociação. Vencido continua consultável.',
   })
   @ApiResponse({ status: 200, description: 'Orçamento emitido' })

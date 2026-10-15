@@ -23,8 +23,19 @@ export interface Quotation {
 
 export type QuotationItem = NegotiationItem
 
+export interface QuotationTradeIn {
+  id: number
+  usedDeviceId: number | null
+  model: string
+  serialNumber: string
+  tradeInValue: number
+}
+
 export interface QuotationWithItems extends Quotation {
   items: QuotationItem[]
+  tradeIns: QuotationTradeIn[]
+  tradeInTotal: number
+  amountDue: number
 }
 
 export interface QuotationClient {

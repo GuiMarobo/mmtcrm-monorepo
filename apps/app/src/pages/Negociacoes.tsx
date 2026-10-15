@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { useNegotiationQuotations } from '../hooks/useNegotiationQuotations'
+import { useNegotiationUsedDevices } from '../hooks/useNegotiationUsedDevices'
 import { useQuotationDetail } from '../hooks/useQuotationDetail'
 import { useQuotationSettings } from '../hooks/useQuotationSettings'
 import { NegotiationFormModal } from '../components/negotiations/NegotiationFormModal'
@@ -57,6 +58,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [editing, setEditing] = useState<NegotiationDetail | null>(null)
   const quotationSettings = useQuotationSettings()
   const negotiationQuotations = useNegotiationQuotations()
+  const usedDevices = useNegotiationUsedDevices(toast)
   const quotationDetail = useQuotationDetail()
   const [converting, setConverting] = useState<Negotiation | null>(null)
   const [pending, setPending] = useState<PendingTransition | null>(null)
@@ -130,6 +132,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const openEdit = async (negotiation: Negotiation) => {
     void quotationSettings.load()
     void negotiationQuotations.load(negotiation.id)
+    void usedDevices.load(negotiation.id)
     try {
       const detail = await negotiationsApi.findOne(negotiation.id)
       setEditing(detail)
@@ -152,8 +155,10 @@ export function Negociacoes({ toast }: NegociacoesProps) {
     }
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve
-      if (target === 'GANHA') setConverting(negotiation)
-      else setPending({ negotiation, target })
+      if (target === 'GANHA') {
+        void usedDevices.load(negotiation.id)
+        setConverting(negotiation)
+      } else setPending({ negotiation, target })
     })
   }
 
@@ -282,6 +287,7 @@ export function Negociacoes({ toast }: NegociacoesProps) {
           quotationsError={negotiationQuotations.error}
           onIssueQuotation={issueQuotation}
           onOpenQuotation={(quotation) => void quotationDetail.open(quotation.id)}
+          tradeIn={editing ? usedDevices.tradeInFor(editing.id) : undefined}
           onClose={() => {
             setCreating(false)
             setEditing(null)
@@ -303,6 +309,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
       {converting && (
         <ConvertToOrderModal
           negotiation={converting}
+          tradeIns={usedDevices.devices}
+          tradeInsError={usedDevices.error}
           loading={busy}
           onConfirm={applyConvert}
           onCancel={() => {

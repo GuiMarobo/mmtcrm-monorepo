@@ -71,6 +71,13 @@ type CreatedItem = {
   discountValue: unknown;
 };
 
+type CreatedTradeIn = {
+  usedDeviceId: number;
+  model: string;
+  serialNumber: string;
+  tradeInValue: unknown;
+};
+
 type CreateArg = {
   data: {
     negotiationId: number;
@@ -82,8 +89,19 @@ type CreateArg = {
     validUntil: Date;
     authorId: number;
     items: { create: CreatedItem[] };
+    tradeIns: { create: CreatedTradeIn[] };
   };
 };
+
+// Aparelho na troca da Negociação 3, como o banco devolve.
+const usedDeviceRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 40,
+  model: 'iPhone 12 128 GB',
+  serialNumber: 'F2LXK0AAAAAA',
+  evaluationStatus: 'AVALIADO',
+  estimatedValue: decimal('300.00'),
+  ...overrides,
+});
 
 const asDecimal = (value: unknown) =>
   typeof value === 'number' ? decimal(value.toFixed(2)) : value;
@@ -118,6 +136,10 @@ describe('QuotationsService', () => {
             discountValue: item.discountValue,
             product: product(item.productId, `Produto ${item.productId}`),
           })),
+          tradeIns: data.tradeIns.create.map((tradeIn, index) => ({
+            id: 200 + index,
+            ...tradeIn,
+          })),
         });
       },
     );
@@ -144,6 +166,7 @@ describe('QuotationsService', () => {
 
     prisma.negotiation.findFirst.mockResolvedValue(negotiationRow());
     prisma.negotiationItem.findMany.mockResolvedValue(negotiationItemRows());
+    prisma.usedDevice.findMany.mockResolvedValue([]);
     prisma.companySettings.findUnique.mockResolvedValue({
       name: 'MMT Urbana',
       cnpj: null,
@@ -462,6 +485,166 @@ describe('QuotationsService', () => {
     });
   });
 
+  // RD12 (spec 007): o Orçamento reflete a troca. A emissão espera as
+  // avaliações, recusa saldo negativo, congela os avaliados e parcela o saldo.
+  describe('issue com aparelho na troca (RD12)', () => {
+    it('recusa com 409 aparelho aguardando avaliação, nomeando-o, sem gravar', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([
+        usedDeviceRow(),
+        usedDeviceRow({
+          id: 41,
+          model: 'Apple Watch S6',
+          serialNumber: 'GY7AAAAAAAA',
+          evaluationStatus: 'AGUARDANDO',
+          estimatedValue: null,
+        }),
+      ]);
+
+      await expect(issue()).rejects.toBeInstanceOf(ConflictException);
+      await expect(issue()).rejects.toThrow(
+        'O aparelho Apple Watch S6 (série GY7AAAAAAAA) ainda aguarda avaliação',
+      );
+      expect(prisma.quotation.create).not.toHaveBeenCalled();
+    });
+
+    it('recusa com 409 Saldo a pagar negativo, sem gravar', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([
+        usedDeviceRow({ estimatedValue: decimal('1100.01') }),
+      ]);
+
+      await expect(issue()).rejects.toBeInstanceOf(ConflictException);
+      await expect(issue()).rejects.toThrow('Saldo a pagar negativo');
+      expect(prisma.quotation.create).not.toHaveBeenCalled();
+    });
+
+    it('só lê os aparelhos não excluídos da Negociação, dentro da transação', async () => {
+      await issue();
+
+      const { where } = callArg<{ where: Record<string, unknown> }>(
+        prisma.usedDevice.findMany,
+      );
+      expect(where).toMatchObject({ deletedAt: null, negotiationId: 3 });
+    });
+
+    it('congela só os avaliados, copiando modelo, série e valor de troca; recusado fica de fora', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([
+        usedDeviceRow(),
+        usedDeviceRow({
+          id: 41,
+          model: 'Apple Watch S6',
+          serialNumber: 'GY7AAAAAAAA',
+          evaluationStatus: 'RECUSADO',
+          estimatedValue: null,
+        }),
+        usedDeviceRow({
+          id: 42,
+          model: 'iPad 9',
+          serialNumber: 'DMPAAAAAAAA',
+          estimatedValue: decimal('150.50'),
+        }),
+      ]);
+
+      const result = await issue();
+
+      const { data } = callArg<CreateArg>(prisma.quotation.create);
+      expect(
+        data.tradeIns.create.map((tradeIn) => ({
+          ...tradeIn,
+          tradeInValue: String(tradeIn.tradeInValue),
+        })),
+      ).toEqual([
+        {
+          usedDeviceId: 40,
+          model: 'iPhone 12 128 GB',
+          serialNumber: 'F2LXK0AAAAAA',
+          tradeInValue: '300.00',
+        },
+        {
+          usedDeviceId: 42,
+          model: 'iPad 9',
+          serialNumber: 'DMPAAAAAAAA',
+          tradeInValue: '150.50',
+        },
+      ]);
+      expect(result.tradeIns.map((tradeIn) => tradeIn.model)).toEqual([
+        'iPhone 12 128 GB',
+        'iPad 9',
+      ]);
+    });
+
+    it('parcela sobre o Saldo a pagar e mantém o total à vista dos itens', async () => {
+      // 1.100,00 − 300,00 = 800,00; 10x a 5% = 840,00.
+      prisma.usedDevice.findMany.mockResolvedValue([usedDeviceRow()]);
+
+      const result = await issue({ installments: 10 });
+
+      const { data } = callArg<CreateArg>(prisma.quotation.create);
+      expect(data.totalValue).toBe(1100);
+      expect(data.totalWithInterest).toBe(840);
+      expect(result).toMatchObject({
+        totalValue: 1100,
+        tradeInTotal: 300,
+        amountDue: 800,
+        totalWithInterest: 840,
+        installmentValue: 84,
+        firstInstallmentValue: 84,
+      });
+      expect(result.tradeIns).toEqual([
+        {
+          id: 200,
+          usedDeviceId: 40,
+          model: 'iPhone 12 128 GB',
+          serialNumber: 'F2LXK0AAAAAA',
+          tradeInValue: 300,
+        },
+      ]);
+    });
+
+    it('parcela base truncada sobre o saldo, com o resíduo na primeira', async () => {
+      // 1.100,00 − 100,01 = 999,99; 12x a 3,33% = 1.033,29 → 86,10 e 86,19.
+      prisma.usedDevice.findMany.mockResolvedValue([
+        usedDeviceRow({ estimatedValue: decimal('100.01') }),
+      ]);
+
+      const result = await issue({ installments: 12, ratePercent: 3.33 });
+
+      expect(result).toMatchObject({
+        amountDue: 999.99,
+        totalWithInterest: 1033.29,
+        installmentValue: 86.1,
+        firstInstallmentValue: 86.19,
+      });
+    });
+
+    it('troca que zera o saldo emite com total parcelado zero', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([
+        usedDeviceRow({ estimatedValue: decimal('1100.00') }),
+      ]);
+
+      await expect(issue({ installments: 3 })).resolves.toMatchObject({
+        amountDue: 0,
+        totalWithInterest: 0,
+      });
+    });
+
+    it('sem aparelhos, o saldo é o total à vista e não há linhas de troca', async () => {
+      const result = await issue({ installments: 10 });
+
+      const { data } = callArg<CreateArg>(prisma.quotation.create);
+      expect(data.tradeIns.create).toEqual([]);
+      expect(result).toMatchObject({ amountDue: 1100, tradeIns: [] });
+    });
+
+    it('não altera os aparelhos ao emitir', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([usedDeviceRow()]);
+
+      await issue();
+
+      expect(prisma.usedDevice.update).not.toHaveBeenCalled();
+      expect(prisma.usedDevice.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findByNegotiation', () => {
     const quotationRow = (overrides: Record<string, unknown> = {}) => ({
       id: 7,
@@ -606,6 +789,7 @@ describe('QuotationsService', () => {
           product: product('p1', 'iPhone 15 Pro'),
         },
       ],
+      tradeIns: [],
       ...overrides,
     });
 
@@ -693,6 +877,100 @@ describe('QuotationsService', () => {
 
       await expect(service.findOne(7)).resolves.toMatchObject({
         expired: true,
+      });
+    });
+
+    it('sem trocas, o saldo é o total à vista e a lista de trocas vem vazia', async () => {
+      prisma.quotation.findFirst.mockResolvedValue(detailRow());
+
+      await expect(service.findOne(7)).resolves.toMatchObject({
+        totalValue: 11350,
+        tradeInTotal: 0,
+        amountDue: 11350,
+        tradeIns: [],
+      });
+    });
+
+    it('traz as trocas e o saldo lidos do que foi congelado, nunca dos aparelhos atuais (RD12)', async () => {
+      prisma.quotation.findFirst.mockResolvedValue(
+        detailRow({
+          totalWithInterest: decimal('9350.00'),
+          tradeIns: [
+            {
+              id: 200,
+              usedDeviceId: 40,
+              model: 'iPhone 12 128 GB',
+              serialNumber: 'F2LXK0AAAAAA',
+              tradeInValue: decimal('1500.00'),
+            },
+            {
+              id: 201,
+              usedDeviceId: null,
+              model: 'Apple Watch S6',
+              serialNumber: 'GY7AAAAAAAA',
+              tradeInValue: decimal('500.00'),
+            },
+          ],
+        }),
+      );
+
+      const result = await service.findOne(7);
+
+      expect(prisma.usedDevice.findMany).not.toHaveBeenCalled();
+      expect(result.tradeInTotal).toBe(2000);
+      expect(result.amountDue).toBe(9350);
+      expect(result.tradeIns).toEqual([
+        {
+          id: 200,
+          usedDeviceId: 40,
+          model: 'iPhone 12 128 GB',
+          serialNumber: 'F2LXK0AAAAAA',
+          tradeInValue: 1500,
+        },
+        {
+          id: 201,
+          usedDeviceId: null,
+          model: 'Apple Watch S6',
+          serialNumber: 'GY7AAAAAAAA',
+          tradeInValue: 500,
+        },
+      ]);
+    });
+
+    it('reavaliar ou remover o aparelho depois da emissão não altera o emitido', async () => {
+      prisma.usedDevice.findMany.mockResolvedValue([usedDeviceRow()]);
+      const issued = await issue({ installments: 10 });
+      const { data } = callArg<CreateArg>(prisma.quotation.create);
+
+      // O Técnico reavalia para 900,00 e o Vendedor remove outro aparelho.
+      prisma.usedDevice.findMany.mockResolvedValue([
+        usedDeviceRow({ estimatedValue: decimal('900.00') }),
+      ]);
+      prisma.usedDevice.findMany.mockClear();
+      prisma.quotation.findFirst.mockResolvedValue(
+        detailRow({
+          totalValue: decimal(data.totalValue.toFixed(2)),
+          installments: data.installments,
+          ratePercent: decimal(data.ratePercent.toFixed(2)),
+          totalWithInterest: decimal(data.totalWithInterest.toFixed(2)),
+          validUntil: data.validUntil,
+          tradeIns: data.tradeIns.create.map((tradeIn, index) => ({
+            id: 200 + index,
+            ...tradeIn,
+          })),
+        }),
+      );
+
+      const reread = await service.findOne(7);
+
+      expect(prisma.usedDevice.findMany).not.toHaveBeenCalled();
+      expect(reread).toMatchObject({
+        totalValue: issued.totalValue,
+        amountDue: issued.amountDue,
+        totalWithInterest: issued.totalWithInterest,
+        installmentValue: issued.installmentValue,
+        firstInstallmentValue: issued.firstInstallmentValue,
+        tradeIns: issued.tradeIns,
       });
     });
 

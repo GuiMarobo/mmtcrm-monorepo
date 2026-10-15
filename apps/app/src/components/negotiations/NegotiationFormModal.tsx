@@ -12,6 +12,9 @@ import { formatCurrency } from '../../utils/format'
 import { FormDialog } from '../common/FormDialog'
 import { NegotiationItemsEditor } from './NegotiationItemsEditor'
 import { NegotiationQuotationsTab } from './NegotiationQuotationsTab'
+import { NegotiationTradeInTab, type NegotiationTradeIn } from './NegotiationTradeInTab'
+import { quotationBlockedReason } from './amountDue'
+import { sumCashTotal } from './installmentSimulation'
 import {
   SELLER_DISCOUNT_LIMIT_PERCENT,
   findItemOverSellerLimit,
@@ -29,7 +32,7 @@ import type {
   ReplaceNegotiationPayload,
 } from '../../types'
 
-type NegotiationModalTab = 'itens' | 'orcamentos'
+type NegotiationModalTab = 'itens' | 'orcamentos' | 'troca'
 
 const DEFAULT_VALIDITY_DAYS = 7
 
@@ -45,6 +48,7 @@ interface NegotiationFormModalProps {
   quotationsError?: string | null
   onIssueQuotation?: (payload: IssueQuotationPayload) => Promise<unknown>
   onOpenQuotation?: (quotation: Quotation) => void
+  tradeIn?: NegotiationTradeIn
   onClose: () => void
   onCreate: (payload: CreateNegotiationPayload) => Promise<void>
   onUpdate: (payload: ReplaceNegotiationPayload) => Promise<void>
@@ -62,19 +66,25 @@ export function NegotiationFormModal({
   quotationsError = null,
   onIssueQuotation,
   onOpenQuotation,
+  tradeIn,
   onClose,
   onCreate,
   onUpdate,
 }: NegotiationFormModalProps) {
   const isEdit = !!negotiation
   const [tab, setTab] = useState<NegotiationModalTab>('itens')
+  const loadedTradeIns = tradeIn ? tradeIn.devices : []
   const issueBlockedReason = !negotiation
     ? null
     : negotiation.status !== 'ABERTA'
       ? 'Simular e emitir orçamento só para negociação em aberto.'
       : negotiation.items.length === 0
         ? 'Salve ao menos um item na negociação para simular o parcelamento.'
-        : null
+        : tradeIn?.error
+          ? `${tradeIn.error} Sem os aparelhos na troca, não é possível simular nem emitir o orçamento.`
+          : !loadedTradeIns
+            ? 'Carregando os aparelhos na troca…'
+            : quotationBlockedReason(sumCashTotal(negotiation.items), loadedTradeIns)
   const knownWithoutIssued = !quotationsError && !!quotations && quotations.length === 0
   const quotationsTabDisabled = !!issueBlockedReason && knownWithoutIssued
   const [clientId, setClientId] = useState(negotiation?.clientId ?? '')
@@ -181,6 +191,7 @@ export function NegotiationFormModal({
           >
             <Tab value="itens" label="Itens" />
             <Tab value="orcamentos" label="Orçamentos" disabled={quotationsTabDisabled} />
+            {tradeIn && <Tab value="troca" label="Troca" />}
           </Tabs>
           {quotationsTabDisabled && (
             <Typography sx={{ fontSize: 12, color: 'text.disabled', mt: 0.75 }}>
@@ -194,6 +205,7 @@ export function NegotiationFormModal({
         <Box hidden={tab !== 'orcamentos'}>
           <NegotiationQuotationsTab
             items={negotiation.items}
+            tradeIns={loadedTradeIns ?? []}
             installmentRates={installmentRates}
             installmentRatesError={installmentRatesError}
             defaultValidityDays={defaultValidityDays}
@@ -202,6 +214,16 @@ export function NegotiationFormModal({
             blockedReason={issueBlockedReason}
             onIssueQuotation={onIssueQuotation}
             onOpenQuotation={onOpenQuotation}
+          />
+        </Box>
+      )}
+
+      {negotiation && tradeIn && (
+        <Box hidden={tab !== 'troca'}>
+          <NegotiationTradeInTab
+            {...tradeIn}
+            totalValue={negotiation.totalValue}
+            readOnly={negotiation.status !== 'ABERTA'}
           />
         </Box>
       )}

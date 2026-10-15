@@ -51,3 +51,9 @@ export function ratePercentError(value: string): string | undefined {
   if (Number.isNaN(rate) || rate < 0 || rate > 100) return 'De 0 a 100%.'
   return /^\d+(\.\d{1,2})?$/.test(value.trim()) ? undefined : 'Até duas casas decimais.'
 }
+
+export function imeiError(value: string): string | undefined {
+  const imei = value.trim()
+  if (!imei) return undefined
+  return /^\d{15}$/.test(imei) ? undefined : 'O IMEI tem 15 dígitos.'
+}

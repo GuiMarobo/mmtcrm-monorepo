@@ -22,7 +22,17 @@ const orderRow = (overrides: Record<string, unknown> = {}) => ({
     client: { id: 'c1', name: 'Fulana', status: 'ATIVO' },
     vendedor: { id: 2, name: 'Vendedora' },
     items: [],
+    usedDevices: [],
   },
+  ...overrides,
+});
+
+const usedDeviceRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 41,
+  model: 'iPhone 12 128 GB',
+  serialNumber: 'F2LXK0ABCD',
+  evaluationStatus: 'AVALIADO',
+  estimatedValue: { toString: () => '1200.10' },
   ...overrides,
 });
 
@@ -318,6 +328,100 @@ describe('OrdersService leitura', () => {
       const result = await service.findOne(7);
 
       expect(result.items).toEqual([]);
+    });
+
+    it('sem troca: lista vazia e Saldo a pagar igual ao valor do Pedido', async () => {
+      prisma.order.findFirst.mockResolvedValue(orderRow());
+
+      const result = await service.findOne(7);
+
+      expect(result.tradeIns).toEqual([]);
+      expect(result.tradeInTotal).toBe(0);
+      expect(result.amountDue).toBe(1500);
+      expect(result.totalValue).toBe(1500);
+    });
+
+    it('com troca: traz os aparelhos avaliados e o Saldo a pagar, sem mexer no valor (história 45 / ADR 0018)', async () => {
+      prisma.order.findFirst.mockResolvedValue(
+        orderRow({
+          negotiation: {
+            ...orderRow().negotiation,
+            usedDevices: [
+              usedDeviceRow(),
+              usedDeviceRow({
+                id: 42,
+                model: 'Galaxy S21',
+                serialNumber: 'R58N123',
+                estimatedValue: { toString: () => '99.90' },
+              }),
+            ],
+          },
+        }),
+      );
+
+      const result = await service.findOne(7);
+
+      expect(result.tradeIns).toEqual([
+        {
+          id: 41,
+          model: 'iPhone 12 128 GB',
+          serialNumber: 'F2LXK0ABCD',
+          tradeInValue: 1200.1,
+        },
+        {
+          id: 42,
+          model: 'Galaxy S21',
+          serialNumber: 'R58N123',
+          tradeInValue: 99.9,
+        },
+      ]);
+      expect(result.tradeInTotal).toBe(1300);
+      expect(result.amountDue).toBe(200);
+      expect(result.totalValue).toBe(1500);
+    });
+
+    it('aparelho recusado fica fora da lista e conta zero no saldo', async () => {
+      prisma.order.findFirst.mockResolvedValue(
+        orderRow({
+          negotiation: {
+            ...orderRow().negotiation,
+            usedDevices: [
+              usedDeviceRow(),
+              usedDeviceRow({
+                id: 42,
+                evaluationStatus: 'RECUSADO',
+                estimatedValue: null,
+              }),
+            ],
+          },
+        }),
+      );
+
+      const result = await service.findOne(7);
+
+      expect(result.tradeIns.map((tradeIn) => tradeIn.id)).toEqual([41]);
+      expect(result.tradeInTotal).toBe(1200.1);
+      expect(result.amountDue).toBe(299.9);
+    });
+
+    it('lê os aparelhos não excluídos da Negociação, em ordem de cadastro', async () => {
+      prisma.order.findFirst.mockResolvedValue(orderRow());
+
+      await service.findOne(7);
+
+      const { select } = callArg<{
+        select: {
+          negotiation: {
+            select: { usedDevices: { where: unknown; orderBy: unknown } };
+          };
+        };
+      }>(prisma.order.findFirst);
+      expect(select.negotiation.select.usedDevices.where).toEqual({
+        deletedAt: null,
+      });
+      expect(select.negotiation.select.usedDevices.orderBy).toEqual({
+        id: 'asc',
+      });
     });
 
     it('404 quando inexistente ou excluído', async () => {
