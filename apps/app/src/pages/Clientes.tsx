@@ -3,17 +3,15 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined'
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import {
-  useGridApiRef,
-  gridFilteredSortedRowEntriesSelector,
-} from '@mui/x-data-grid-premium'
-import type { GridRowSelectionModel } from '@mui/x-data-grid-premium'
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError, clientsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { ImportClientesModal } from '../components/clients/ImportClientesModal'
 import { ClientFormModal } from '../components/clients/ClientFormModal'
-import { ClientsDataGrid } from '../components/clients/ClientsDataGrid'
+import { ClientsTable } from '../components/clients/ClientsTable'
+import { clientSearchValues } from '../components/clients/clientSearch'
+import type { RowId } from '../components/common/DataTable'
+import { matchesQuery } from '../components/common/dataTableUtils'
 import { EraseDataDialog } from '../components/lgpd/EraseDataDialog'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { PageHeader } from '../components/common/PageHeader'
@@ -28,16 +26,13 @@ interface ClientesProps {
   toast: (msg: string, type?: 'success' | 'error') => void
 }
 
-const EMPTY_SELECTION: GridRowSelectionModel = { type: 'include', ids: new Set() }
-
 export function Clientes({ toast }: ClientesProps) {
   const { user } = useAuth()
-  const apiRef = useGridApiRef()
   const [list, setList] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [selection, setSelection] = useState<GridRowSelectionModel>(EMPTY_SELECTION)
+  const [selection, setSelection] = useState<ReadonlySet<RowId>>(new Set())
   const [editing, setEditing] = useState<Client | null>(null)
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -63,12 +58,15 @@ export function Clientes({ toast }: ClientesProps) {
     void reload()
   }, [])
 
-  const selectedIds = useMemo(() => {
-    if (selection.type === 'include') return selection.ids
-    const all = new Set(list.map((c) => c.id))
-    selection.ids.forEach((id) => all.delete(String(id)))
-    return all
-  }, [selection, list])
+  const selectedIds = useMemo(
+    () => new Set(list.filter((c) => selection.has(c.id)).map((c) => c.id)),
+    [selection, list],
+  )
+
+  const visible = useMemo(
+    () => list.filter((c) => matchesQuery(clientSearchValues(c), query)),
+    [list, query],
+  )
 
   const stats = useMemo(() => {
     const total = list.length
@@ -158,9 +156,7 @@ export function Clientes({ toast }: ClientesProps) {
   }
 
   const exportar = async () => {
-    const visiveis = apiRef.current
-      ? gridFilteredSortedRowEntriesSelector(apiRef).map((entry) => entry.model as Client)
-      : list
+    const visiveis = visible
 
     if (visiveis.length === 0) {
       toast('Nada para exportar com os filtros atuais.')
@@ -258,12 +254,10 @@ export function Clientes({ toast }: ClientesProps) {
 
         {loadError && <ErrorBanner message={loadError} onRetry={() => void reload()} />}
 
-        <ClientsDataGrid
-          apiRef={apiRef}
-          rows={list}
+        <ClientsTable
+          rows={visible}
           loading={loading}
-          quickFilter={query}
-          selection={selection}
+          selected={selection}
           onSelectionChange={setSelection}
           role={user?.role}
           onEdit={setEditing}

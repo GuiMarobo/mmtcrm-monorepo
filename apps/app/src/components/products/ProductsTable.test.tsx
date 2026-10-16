@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ProductsDataGrid } from './ProductsDataGrid'
+import { ProductsTable } from './ProductsTable'
 import type { Product } from '../../types'
 
 const product = (overrides: Partial<Product> = {}): Product => ({
@@ -20,23 +20,26 @@ const product = (overrides: Partial<Product> = {}): Product => ({
 
 const noop = () => undefined
 
-describe('ProductsDataGrid', () => {
+describe('ProductsTable', () => {
   it('mostra as colunas do catálogo com os rótulos em pt-BR', () => {
-    render(<ProductsDataGrid rows={[product()]} loading={false} onOpen={noop} />)
+    render(
+      <ProductsTable rows={[product()]} loading={false} onOpen={noop} />,
+    )
 
     expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
     expect(screen.getByText('IP15P-256')).toBeInTheDocument()
     expect(screen.getByText('iPhone')).toBeInTheDocument()
     expect(screen.getByText('R$ 7.999,90')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument()
+    expect(screen.getByText('5 un.')).toBeInTheDocument()
   })
 
   it('exibe a situação como rótulo em pt-BR, não como valor do enum', () => {
     render(
-      <ProductsDataGrid
+      <ProductsTable
         rows={[product({ status: 'INATIVO' })]}
         loading={false}
         onOpen={noop}
+       
       />,
     )
 
@@ -44,11 +47,30 @@ describe('ProductsDataGrid', () => {
     expect(screen.queryByText('INATIVO')).not.toBeInTheDocument()
   })
 
+  it('é uma tabela densa', () => {
+    const { container } = render(
+      <ProductsTable rows={[product()]} loading={false} onOpen={noop} />,
+    )
+
+    expect(container.querySelector('.MuiTableCell-sizeSmall')).not.toBeNull()
+  })
+
+  it('mostra o saldo como chip: unidades em estoque ou "Sem estoque"', () => {
+    render(
+      <ProductsTable
+        rows={[product(), product({ id: 'p2', name: 'AirPods', stock: 0 })]}
+        loading={false}
+        onOpen={noop}
+      />,
+    )
+
+    expect(screen.getByText('5 un.')).toBeInTheDocument()
+    expect(screen.getByText('Sem estoque')).toBeInTheDocument()
+  })
+
   it('clicar numa linha abre o detalhe do Produto daquela linha', async () => {
     const onOpen = vi.fn()
-    render(
-      <ProductsDataGrid rows={[product()]} loading={false} onOpen={onOpen} />,
-    )
+    render(<ProductsTable rows={[product()]} loading={false} onOpen={onOpen} />)
 
     await userEvent.click(screen.getByText('iPhone 15 Pro'))
 
@@ -61,7 +83,7 @@ describe('ProductsDataGrid', () => {
       vi.unstubAllGlobals()
     })
 
-    it('mantém a mesma grade, só sem as colunas menos essenciais e em densidade compacta', () => {
+    it('esconde as colunas menos essenciais', () => {
       vi.stubGlobal('matchMedia', (query: string) => ({
         matches: true,
         media: query,
@@ -73,17 +95,14 @@ describe('ProductsDataGrid', () => {
         dispatchEvent: () => false,
       }))
 
-      const { container } = render(
-        <ProductsDataGrid rows={[product()]} loading={false} onOpen={noop} />,
+      render(
+        <ProductsTable rows={[product()]} loading={false} onOpen={noop} />,
       )
 
       expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
-      expect(screen.getByText('R$ 7.999,90')).toBeInTheDocument()
       expect(screen.getByText('Ativo')).toBeInTheDocument()
       expect(screen.queryByText('IP15P-256')).not.toBeInTheDocument()
-      expect(screen.queryByText('Código de Referência')).not.toBeInTheDocument()
       expect(screen.queryByText('Categoria')).not.toBeInTheDocument()
-      expect(container.querySelector('.MuiDataGrid-root--densityCompact')).not.toBeNull()
     })
   })
 })

@@ -18,20 +18,15 @@ import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ProductStatusBadge } from './ProductStatusBadge'
 import { DetailField, DetailSection } from '../common/DetailSection'
+import { MOVEMENT_TONE } from './movementTone'
 import { ToneChip } from '../common/ToneChip'
 import { formatCurrency, formatDate } from '../../utils/format'
-import type { BadgeTone } from '../../theme/tones'
-import type { Product, StockMovement, StockMovementType } from '../../types'
+import type { Product, StockMovement } from '../../types'
 import {
   PRODUCT_CATEGORY_LABELS,
   SALE_MOVEMENT_LABELS,
   STOCK_MOVEMENT_TYPE_LABELS,
 } from '../../types'
-
-const MOVEMENT_TONE: Record<StockMovementType, BadgeTone> = {
-  ENTRADA: 'green',
-  SAIDA: 'amber',
-}
 
 interface ProductDetailDrawerProps {
   product: Product
