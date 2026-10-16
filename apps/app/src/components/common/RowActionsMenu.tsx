@@ -3,6 +3,7 @@ import IconButton from '@mui/material/IconButton'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
+import Tooltip from '@mui/material/Tooltip'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -11,6 +12,7 @@ export interface RowAction {
   label: string
   icon: ReactNode
   onClick: () => void
+  disabledReason?: string
 }
 
 interface RowActionsMenuProps {
@@ -38,19 +40,33 @@ export function RowActionsMenu({ label, actions }: RowActionsMenuProps) {
         onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{ list: { disabledItemsFocusable: true } }}
       >
-        {actions.map((action) => (
-          <MenuItem
-            key={action.key}
-            onClick={() => {
-              setAnchor(null)
-              action.onClick()
-            }}
-          >
-            <ListItemIcon>{action.icon}</ListItemIcon>
-            {action.label}
-          </MenuItem>
-        ))}
+        {actions.map((action) => {
+          const content = (
+            <>
+              <ListItemIcon>{action.icon}</ListItemIcon>
+              {action.label}
+            </>
+          )
+          return action.disabledReason ? (
+            <Tooltip key={action.key} title={action.disabledReason} placement="left" describeChild>
+              <MenuItem disabled sx={{ '&.Mui-disabled': { pointerEvents: 'auto' } }}>
+                {content}
+              </MenuItem>
+            </Tooltip>
+          ) : (
+            <MenuItem
+              key={action.key}
+              onClick={() => {
+                setAnchor(null)
+                action.onClick()
+              }}
+            >
+              {content}
+            </MenuItem>
+          )
+        })}
       </Menu>
     </>
   )
