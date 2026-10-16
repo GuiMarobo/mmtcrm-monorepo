@@ -13,7 +13,7 @@ const order = (overrides: Partial<Order> = {}): Order => ({
   statusChangedAt: '2026-02-01T00:00:00Z',
   negotiationId: 3,
   notes: null,
-  client: { id: 'c1', name: 'Fulana de Tal', status: 'ATIVO' },
+  client: { id: 'c1', name: 'Fulana de Tal', status: 'ATIVO', anonymizedAt: null },
   vendedor: { id: 2, name: 'Vendedora' },
   ...overrides,
 })

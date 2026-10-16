@@ -25,7 +25,9 @@ const orderSelect = {
     select: {
       id: true,
       notes: true,
-      client: { select: { id: true, name: true, status: true } },
+      client: {
+        select: { id: true, name: true, status: true, anonymizedAt: true },
+      },
       vendedor: { select: { id: true, name: true } },
     },
   },

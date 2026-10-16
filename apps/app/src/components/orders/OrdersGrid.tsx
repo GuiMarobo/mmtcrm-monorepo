@@ -1,7 +1,11 @@
+import ErrorOutlined from '@mui/icons-material/ErrorOutlined'
+import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined'
+import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
@@ -9,15 +13,23 @@ import { DataGridPremium } from '@mui/x-data-grid-premium'
 import type { GridColDef, GridSortModel } from '@mui/x-data-grid-premium'
 import { useMemo, useState } from 'react'
 import { OrderStatusBadge } from '../common/OrderStatusBadge'
+import { PersonCell } from '../common/PersonCell'
 import { ErrorBanner } from '../common/SectionCard'
-import { formatCurrency, formatDate } from '../../utils/format'
+import {
+  formatCurrency,
+  formatDateTime,
+  formatRelativeTime,
+  initials,
+} from '../../utils/format'
 import type { Order } from '../../types'
 import { PAYMENT_METHOD_LABELS } from '../../types'
 import {
   INITIAL_ORDERS_TAB,
   ORDERS_TABS,
+  PAYMENT_ALERT_DAYS,
   countOrdersByTab,
   ordersInTab,
+  paymentAlert,
   tabDefinition,
 } from './ordersList'
 import type { OrdersTab } from './ordersList'
@@ -35,7 +47,80 @@ const initialSortModel = (tab: OrdersTab): GridSortModel => [
   { field: 'statusChangedAt', sort: tabDefinition(tab).initialDirection },
 ]
 
-const columns: GridColDef<Order>[] = [
+const ALERT_ICONS = {
+  warning: {
+    Icon: WarningAmberOutlined,
+    color: 'warning',
+    label: `Alerta de cobrança: ${PAYMENT_ALERT_DAYS.warning} dias ou mais`,
+  },
+  error: {
+    Icon: ErrorOutlined,
+    color: 'error',
+    label: `Alerta de cobrança: ${PAYMENT_ALERT_DAYS.error} dias ou mais`,
+  },
+} as const
+
+function ClientCell({ order }: { order: Order }) {
+  if (!order.client) return <Box component="span">-</Box>
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+      <Avatar
+        sx={{
+          width: 32,
+          height: 32,
+          fontSize: 12.5,
+          fontWeight: 700,
+          bgcolor: 'primary.light',
+          color: 'primary.main',
+        }}
+      >
+        {initials(order.client.name)}
+      </Avatar>
+      <PersonCell
+        name={order.client.name}
+        secondary={`Vendedor: ${order.vendedor?.name ?? '-'}`}
+        anonymized={order.client.anonymizedAt !== null}
+      />
+    </Box>
+  )
+}
+
+function ValueCell({ order }: { order: Order }) {
+  return (
+    <Box sx={{ display: 'grid', gap: 0.25, textAlign: 'right' }}>
+      <Box component="span" sx={{ fontWeight: 700 }}>
+        {formatCurrency(order.totalValue)}
+      </Box>
+      <Box component="span" sx={{ color: 'text.disabled', fontSize: 12 }}>
+        {order.paymentMethod ? PAYMENT_METHOD_LABELS[order.paymentMethod] : '-'}
+      </Box>
+    </Box>
+  )
+}
+
+function StatusSinceCell({ order, showAlert }: { order: Order; showAlert: boolean }) {
+  const now = new Date()
+  const alert = showAlert ? paymentAlert(order, now) : 'none'
+  const alertIcon = alert === 'none' ? null : ALERT_ICONS[alert]
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+      {alertIcon && <alertIcon.Icon color={alertIcon.color} titleAccess={alertIcon.label} />}
+      <Tooltip title={formatDateTime(order.statusChangedAt)}>
+        <Box
+          component="span"
+          sx={{
+            color: alertIcon ? `${alertIcon.color}.main` : 'text.primary',
+            fontWeight: alertIcon ? 600 : 400,
+          }}
+        >
+          {formatRelativeTime(order.statusChangedAt, now)}
+        </Box>
+      </Tooltip>
+    </Box>
+  )
+}
+
+const buildColumns = (tab: OrdersTab): GridColDef<Order>[] => [
   {
     field: 'code',
     headerName: 'Código',
@@ -50,43 +135,25 @@ const columns: GridColDef<Order>[] = [
   {
     field: 'cliente',
     headerName: 'Cliente',
-    flex: 1.6,
-    minWidth: 190,
+    flex: 1.8,
+    minWidth: 220,
     valueGetter: (_, row) => row.client?.name ?? '-',
-  },
-  {
-    field: 'vendedor',
-    headerName: 'Vendedor',
-    flex: 1,
-    minWidth: 140,
-    valueGetter: (_, row) => row.vendedor?.name ?? '-',
+    renderCell: ({ row }) => <ClientCell order={row} />,
   },
   {
     field: 'totalValue',
     headerName: 'Valor',
     type: 'number',
-    flex: 0.9,
-    minWidth: 120,
-    renderCell: ({ row }) => (
-      <Box component="span" sx={{ fontWeight: 700 }}>
-        {formatCurrency(row.totalValue)}
-      </Box>
-    ),
-  },
-  {
-    field: 'paymentMethod',
-    headerName: 'Forma de pagamento',
-    flex: 1.1,
-    minWidth: 160,
-    valueGetter: (_, row) =>
-      row.paymentMethod ? PAYMENT_METHOD_LABELS[row.paymentMethod] : '-',
+    flex: 1,
+    minWidth: 130,
+    renderCell: ({ row }) => <ValueCell order={row} />,
   },
   {
     field: 'statusChangedAt',
     headerName: 'Situação desde',
     flex: 1,
-    minWidth: 130,
-    valueFormatter: (value: string) => formatDate(value),
+    minWidth: 140,
+    renderCell: ({ row }) => <StatusSinceCell order={row} showAlert={tab === 'aguardando'} />,
   },
   {
     field: 'status',
@@ -106,13 +173,13 @@ export function OrdersGrid({
   disableVirtualization = false,
 }: OrdersGridProps) {
   const theme = useTheme()
-  const compact = useMediaQuery(theme.breakpoints.down('md'))
   const narrow = useMediaQuery(theme.breakpoints.down('sm'))
   const [tab, setTab] = useState<OrdersTab>(INITIAL_ORDERS_TAB)
   const [sortModel, setSortModel] = useState<GridSortModel>(initialSortModel(INITIAL_ORDERS_TAB))
 
   const counts = useMemo(() => countOrdersByTab(rows), [rows])
   const tabRows = useMemo(() => ordersInTab(rows, tab), [rows, tab])
+  const columns = useMemo(() => buildColumns(tab), [tab])
   const { emptyMessage } = tabDefinition(tab)
 
   const changeTab = (next: OrdersTab) => {
@@ -163,8 +230,7 @@ export function OrdersGrid({
             sortModel={sortModel}
             onSortModelChange={setSortModel}
             columnVisibilityModel={{
-              vendedor: !narrow,
-              paymentMethod: !compact,
+              statusChangedAt: !narrow || tab === 'aguardando',
               status: tab === 'todos',
             }}
             initialState={{

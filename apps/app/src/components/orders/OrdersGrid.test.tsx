@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { OrdersGrid } from './OrdersGrid'
@@ -13,7 +13,7 @@ const order = (overrides: Partial<Order> = {}): Order => ({
   statusChangedAt: '2026-09-11T00:00:00Z',
   negotiationId: 1,
   notes: null,
-  client: { id: 'c1', name: 'Maria Souza', status: 'ATIVO' },
+  client: { id: 'c1', name: 'Maria Souza', status: 'ATIVO', anonymizedAt: null },
   vendedor: { id: 1, name: 'João Vendedor' },
   ...overrides,
 })
@@ -153,5 +153,145 @@ describe('OrdersGrid', () => {
     renderGrid()
 
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  describe('leitura da linha', () => {
+    const NOW = new Date('2026-09-20T12:00:00Z')
+    const daysAgo = (days: number) =>
+      new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+
+    const rowOf = (code: string) => {
+      const row = screen.getByText(code).closest('[role="row"]')
+      if (!(row instanceof HTMLElement)) throw new Error(`linha ${code} não encontrada`)
+      return row
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('Cliente mostra avatar com iniciais, o nome e o vendedor embaixo; Vendedor e Forma de pagamento não são mais colunas', () => {
+      renderGrid({ rows: [order({ code: 'PED-0001' })] })
+
+      const row = rowOf('PED-0001')
+      expect(within(row).getByText('MS')).toBeInTheDocument()
+      expect(within(row).getByText('Maria Souza')).toBeInTheDocument()
+      expect(within(row).getByText('Vendedor: João Vendedor')).toBeInTheDocument()
+      expect(within(row).queryByText('Anonimizado')).not.toBeInTheDocument()
+      expect(screen.queryByRole('columnheader', { name: 'Vendedor' })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('columnheader', { name: 'Forma de pagamento' }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('Cliente anonimizado ganha o chip Anonimizado', () => {
+      renderGrid({
+        rows: [
+          order({
+            code: 'PED-0001',
+            client: {
+              id: 'c1',
+              name: 'Titular removido',
+              status: 'INATIVO',
+              anonymizedAt: '2026-08-01T00:00:00Z',
+            },
+          }),
+        ],
+      })
+
+      const row = rowOf('PED-0001')
+      expect(within(row).getByText('TR')).toBeInTheDocument()
+      expect(within(row).getByText('Anonimizado')).toBeInTheDocument()
+    })
+
+    it('Valor mostra o valor formatado com a forma de pagamento embaixo, ou "-" sem forma', () => {
+      renderGrid({
+        rows: [
+          order({ id: 1, code: 'PED-0001', statusChangedAt: daysAgo(1) }),
+          order({
+            id: 2,
+            code: 'PED-0002',
+            paymentMethod: null,
+            totalValue: 150,
+            statusChangedAt: daysAgo(2),
+          }),
+        ],
+      })
+
+      const withMethod = rowOf('PED-0001')
+      expect(within(withMethod).getByText('R$ 7.999,90')).toBeInTheDocument()
+      expect(within(withMethod).getByText('PIX')).toBeInTheDocument()
+
+      const withoutMethod = rowOf('PED-0002')
+      expect(within(withoutMethod).getByText('R$ 150,00')).toBeInTheDocument()
+      expect(within(withoutMethod).getByText('-')).toBeInTheDocument()
+    })
+
+    it('Situação desde aparece em tempo relativo, com a data exata na dica', async () => {
+      renderGrid({ rows: [order({ code: 'PED-0001', statusChangedAt: daysAgo(3) })] })
+
+      const relative = within(rowOf('PED-0001')).getByText('há 3 dias')
+      await userEvent.hover(relative)
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('17/09/2026')
+    })
+
+    it('alerta de cobrança na aba Aguardando: nada abaixo de 3 dias, âmbar a partir de 3, vermelho a partir de 7', () => {
+      renderGrid({
+        rows: [
+          order({ id: 1, code: 'PED-0001', statusChangedAt: daysAgo(2.9) }),
+          order({ id: 2, code: 'PED-0002', statusChangedAt: daysAgo(3) }),
+          order({ id: 3, code: 'PED-0003', statusChangedAt: daysAgo(6.9) }),
+          order({ id: 4, code: 'PED-0004', statusChangedAt: daysAgo(7) }),
+        ],
+      })
+
+      expect(within(rowOf('PED-0001')).queryByRole('img', { name: /Alerta de cobrança/ })).not.toBeInTheDocument()
+
+      for (const code of ['PED-0002', 'PED-0003']) {
+        const alert = within(rowOf(code)).getByRole('img', {
+          name: 'Alerta de cobrança: 3 dias ou mais',
+        })
+        expect(alert).toHaveClass('MuiSvgIcon-colorWarning')
+      }
+
+      const red = within(rowOf('PED-0004')).getByRole('img', {
+        name: 'Alerta de cobrança: 7 dias ou mais',
+      })
+      expect(red).toHaveClass('MuiSvgIcon-colorError')
+    })
+
+    it('sem alerta de cobrança fora da aba Aguardando, mesmo em pedido parado há muito tempo', async () => {
+      renderGrid({
+        rows: [
+          order({ id: 1, code: 'PED-0001', statusChangedAt: daysAgo(10) }),
+          order({
+            id: 2,
+            code: 'PED-0002',
+            status: 'COMPRA_APROVADA',
+            statusChangedAt: daysAgo(10),
+          }),
+          order({
+            id: 3,
+            code: 'PED-0003',
+            status: 'DESISTENCIA',
+            statusChangedAt: daysAgo(10),
+          }),
+        ],
+      })
+
+      await userEvent.click(tab(/Compra aprovada/))
+      expect(screen.queryByRole('img', { name: /Alerta de cobrança/ })).not.toBeInTheDocument()
+
+      await userEvent.click(tab(/Desistência/))
+      expect(screen.queryByRole('img', { name: /Alerta de cobrança/ })).not.toBeInTheDocument()
+
+      await userEvent.click(tab(/Todos/))
+      expect(screen.queryByRole('img', { name: /Alerta de cobrança/ })).not.toBeInTheDocument()
+    })
   })
 })

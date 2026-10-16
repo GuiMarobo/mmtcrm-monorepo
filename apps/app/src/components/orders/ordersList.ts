@@ -1,4 +1,5 @@
 import type { Order, OrderStatus } from '../../types'
+import { DAY_MS } from '../../utils/format'
 
 export type OrdersTab = 'aguardando' | 'aprovada' | 'desistencia' | 'todos'
 
@@ -55,3 +56,15 @@ export const countOrdersByTab = (orders: Order[]): Record<OrdersTab, number> =>
   Object.fromEntries(
     ORDERS_TABS.map(({ value }) => [value, ordersInTab(orders, value).length]),
   ) as Record<OrdersTab, number>
+
+export type PaymentAlert = 'none' | 'warning' | 'error'
+
+export const PAYMENT_ALERT_DAYS = { warning: 3, error: 7 } as const
+
+export const paymentAlert = (order: Order, now: Date): PaymentAlert => {
+  if (order.status !== 'EM_NEGOCIACAO') return 'none'
+  const days = (now.getTime() - new Date(order.statusChangedAt).getTime()) / DAY_MS
+  if (days >= PAYMENT_ALERT_DAYS.error) return 'error'
+  if (days >= PAYMENT_ALERT_DAYS.warning) return 'warning'
+  return 'none'
+}
