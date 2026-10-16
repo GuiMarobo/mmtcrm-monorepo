@@ -2,12 +2,12 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, ordersApi } from '../api'
-import { OrdersTable } from '../components/orders/OrdersTable'
+import { OrdersGrid } from '../components/orders/OrdersGrid'
 import { OrderDetailDrawer } from '../components/orders/OrderDetailDrawer'
 import { ApproveOrderDialog } from '../components/orders/ApproveOrderDialog'
 import { summarizeAwaitingPayment } from '../components/orders/ordersSummary'
 import { PageHeader } from '../components/common/PageHeader'
-import { ErrorBanner, SectionCard, SectionToolbar } from '../components/common/SectionCard'
+import { SectionCard, SectionToolbar } from '../components/common/SectionCard'
 import type { NegotiationItem, Order, OrderTradeIn, Route } from '../types'
 
 interface PedidosProps {
@@ -99,12 +99,8 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
         subtitle="A fila de cobrança: acompanhe e confirme o pagamento de cada pedido."
       />
 
-      {loadError ? (
-        <SectionCard>
-          <ErrorBanner message={loadError} onRetry={() => void reload()} />
-        </SectionCard>
-      ) : (
-        <SectionCard>
+      <SectionCard>
+        {!loadError && (
           <SectionToolbar>
             <Typography
               sx={{ fontSize: 13, fontWeight: 600, color: 'text.secondary' }}
@@ -112,27 +108,16 @@ export function Pedidos({ toast, onNavigate }: PedidosProps) {
               {summary.label}
             </Typography>
           </SectionToolbar>
+        )}
 
-          {!loading && list.length === 0 ? (
-            <Typography
-              sx={{
-                p: 6,
-                textAlign: 'center',
-                color: 'text.disabled',
-                fontSize: 13,
-              }}
-            >
-              Nenhum pedido ainda
-            </Typography>
-          ) : (
-            <OrdersTable
-              rows={list}
-              loading={loading}
-              onOpen={(order) => void openDetail(order)}
-            />
-          )}
-        </SectionCard>
-      )}
+        <OrdersGrid
+          rows={list}
+          loading={loading}
+          error={loadError}
+          onRetry={() => void reload()}
+          onOpen={(order) => void openDetail(order)}
+        />
+      </SectionCard>
 
       {selected && (
         <OrderDetailDrawer
