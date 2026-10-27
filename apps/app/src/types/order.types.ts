@@ -5,6 +5,7 @@ export interface OrderClient {
   id: string
   name: string
   status: ClientStatus
+  anonymizedAt: string | null
 }
 
 export interface OrderVendedor {

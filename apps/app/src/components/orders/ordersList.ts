@@ -1,0 +1,70 @@
+import type { Order, OrderStatus } from '../../types'
+import { DAY_MS } from '../../utils/format'
+
+export type OrdersTab = 'aguardando' | 'aprovada' | 'desistencia' | 'todos'
+
+export interface OrdersTabDefinition {
+  value: OrdersTab
+  label: string
+  status: OrderStatus | null
+  initialDirection: 'asc' | 'desc'
+  emptyMessage: string
+}
+
+export const ORDERS_TABS: OrdersTabDefinition[] = [
+  {
+    value: 'aguardando',
+    label: 'Aguardando pagamento',
+    status: 'EM_NEGOCIACAO',
+    initialDirection: 'asc',
+    emptyMessage: 'Nenhum pedido aguardando pagamento',
+  },
+  {
+    value: 'aprovada',
+    label: 'Compra aprovada',
+    status: 'COMPRA_APROVADA',
+    initialDirection: 'desc',
+    emptyMessage: 'Nenhum pedido com compra aprovada',
+  },
+  {
+    value: 'desistencia',
+    label: 'Desistência',
+    status: 'DESISTENCIA',
+    initialDirection: 'desc',
+    emptyMessage: 'Nenhuma desistência',
+  },
+  {
+    value: 'todos',
+    label: 'Todos',
+    status: null,
+    initialDirection: 'desc',
+    emptyMessage: 'Nenhum pedido ainda',
+  },
+]
+
+export const INITIAL_ORDERS_TAB: OrdersTab = 'aguardando'
+
+export const tabDefinition = (tab: OrdersTab): OrdersTabDefinition =>
+  ORDERS_TABS.find((definition) => definition.value === tab) ?? ORDERS_TABS[0]
+
+export const ordersInTab = (orders: Order[], tab: OrdersTab): Order[] => {
+  const { status } = tabDefinition(tab)
+  return status === null ? orders : orders.filter((order) => order.status === status)
+}
+
+export const countOrdersByTab = (orders: Order[]): Record<OrdersTab, number> =>
+  Object.fromEntries(
+    ORDERS_TABS.map(({ value }) => [value, ordersInTab(orders, value).length]),
+  ) as Record<OrdersTab, number>
+
+export type PaymentAlert = 'none' | 'warning' | 'error'
+
+export const PAYMENT_ALERT_DAYS = { warning: 3, error: 7 } as const
+
+export const paymentAlert = (order: Order, now: Date): PaymentAlert => {
+  if (order.status !== 'EM_NEGOCIACAO') return 'none'
+  const days = (now.getTime() - new Date(order.statusChangedAt).getTime()) / DAY_MS
+  if (days >= PAYMENT_ALERT_DAYS.error) return 'error'
+  if (days >= PAYMENT_ALERT_DAYS.warning) return 'warning'
+  return 'none'
+}

@@ -19,7 +19,7 @@ const orderRow = (overrides: Record<string, unknown> = {}) => ({
   negotiation: {
     id: 3,
     notes: null,
-    client: { id: 'c1', name: 'Fulana', status: 'ATIVO' },
+    client: { id: 'c1', name: 'Fulana', status: 'ATIVO', anonymizedAt: null },
     vendedor: { id: 2, name: 'Vendedora' },
     items: [],
     usedDevices: [],
@@ -207,7 +207,37 @@ describe('OrdersService leitura', () => {
         id: 'c1',
         name: 'Fulana',
         status: 'ATIVO',
+        anonymizedAt: null,
       });
+    });
+
+    it('traz o anonymizedAt do Cliente (spec 012 história 29)', async () => {
+      const anonymizedAt = new Date('2026-02-01T00:00:00Z');
+      prisma.order.findMany.mockResolvedValue([
+        orderRow({
+          negotiation: {
+            ...orderRow().negotiation,
+            client: {
+              id: 'c1',
+              name: 'Titular removido',
+              status: 'ATIVO',
+              anonymizedAt,
+            },
+          },
+        }),
+      ]);
+
+      const [first] = await service.findAll();
+
+      const { select } = callArg<{
+        select: {
+          negotiation: {
+            select: { client: { select: Record<string, unknown> } };
+          };
+        };
+      }>(prisma.order.findMany);
+      expect(select.negotiation.select.client.select.anonymizedAt).toBe(true);
+      expect(first.client.anonymizedAt).toBe(anonymizedAt);
     });
   });
 
@@ -224,6 +254,35 @@ describe('OrdersService leitura', () => {
         client: { id: 'c1', name: 'Fulana' },
         vendedor: { id: 2, name: 'Vendedora' },
       });
+    });
+
+    it('traz o anonymizedAt do Cliente (spec 012 história 55)', async () => {
+      const anonymizedAt = new Date('2026-02-01T00:00:00Z');
+      prisma.order.findFirst.mockResolvedValue(
+        orderRow({
+          negotiation: {
+            ...orderRow().negotiation,
+            client: {
+              id: 'c1',
+              name: 'Titular removido',
+              status: 'ATIVO',
+              anonymizedAt,
+            },
+          },
+        }),
+      );
+
+      const result = await service.findOne(7);
+
+      const { select } = callArg<{
+        select: {
+          negotiation: {
+            select: { client: { select: Record<string, unknown> } };
+          };
+        };
+      }>(prisma.order.findFirst);
+      expect(select.negotiation.select.client.select.anonymizedAt).toBe(true);
+      expect(result.client.anonymizedAt).toBe(anonymizedAt);
     });
 
     it('inclui os itens da Negociação de origem, no shape do detalhe da Negociação (RB7)', async () => {
