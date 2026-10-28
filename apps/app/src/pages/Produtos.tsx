@@ -25,6 +25,11 @@ import type {
   UpdateProductPricePayload,
 } from '../types'
 
+interface ProductAction {
+  kind: 'edit' | 'price' | 'stock' | ProductConfirmAction
+  product: Product
+}
+
 interface ProdutosProps {
   toast: (msg: string, type?: 'success' | 'error') => void
 }
@@ -39,10 +44,7 @@ export function Produtos({ toast }: ProdutosProps) {
   const [detail, setDetail] = useState<ProductDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
-  const [movingStock, setMovingStock] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [updatingPrice, setUpdatingPrice] = useState(false)
-  const [confirming, setConfirming] = useState<ProductConfirmAction | null>(null)
+  const [action, setAction] = useState<ProductAction | null>(null)
   const [reactivating, setReactivating] = useState(false)
   const openedId = useRef<string | null>(null)
 
@@ -90,10 +92,6 @@ export function Produtos({ toast }: ProdutosProps) {
 
   const closeDetail = () => {
     openedId.current = null
-    setMovingStock(false)
-    setEditing(false)
-    setUpdatingPrice(false)
-    setConfirming(null)
     setSelected(null)
     setDetail(null)
     setDetailError(null)
@@ -115,43 +113,38 @@ export function Produtos({ toast }: ProdutosProps) {
     }
   }
 
-  const moveStock = async (payload: CreateStockMovementPayload) => {
-    if (!detail) return
-    const updated = await productsApi.moveStock(detail.id, payload)
+  const moveStock = async (product: Product, payload: CreateStockMovementPayload) => {
+    const updated = await productsApi.moveStock(product.id, payload)
     applyDetail(updated)
-    setMovingStock(false)
+    setAction(null)
     toast(`Movimentação registrada. Saldo atual: ${updated.stock}`)
   }
 
-  const updateProduct = async (payload: UpdateProductPayload) => {
-    if (!detail) return
-    const updated = await productsApi.update(detail.id, payload)
+  const updateProduct = async (product: Product, payload: UpdateProductPayload) => {
+    const updated = await productsApi.update(product.id, payload)
     applyDetail(updated)
-    setEditing(false)
+    setAction(null)
     toast(`Produto "${updated.name}" atualizado`)
   }
 
-  const updatePrice = async (payload: UpdateProductPricePayload) => {
-    if (!detail) return
-    const updated = await productsApi.updatePrice(detail.id, payload)
+  const updatePrice = async (product: Product, payload: UpdateProductPricePayload) => {
+    const updated = await productsApi.updatePrice(product.id, payload)
     applyDetail(updated)
-    setUpdatingPrice(false)
+    setAction(null)
     toast(`Preço atualizado para ${formatCurrency(updated.price)}`)
   }
 
-  const discontinue = async () => {
-    if (!detail) return
-    const updated = await productsApi.discontinue(detail.id)
+  const discontinue = async (product: Product) => {
+    const updated = await productsApi.discontinue(product.id)
     applyDetail(updated)
-    setConfirming(null)
+    setAction(null)
     toast(`Produto "${updated.name}" descontinuado`)
   }
 
-  const reactivate = async () => {
-    if (!detail) return
+  const reactivate = async (product: Product) => {
     setReactivating(true)
     try {
-      const updated = await productsApi.reactivate(detail.id)
+      const updated = await productsApi.reactivate(product.id)
       applyDetail(updated)
       toast(`Produto "${updated.name}" reativado`)
     } catch (err) {
@@ -161,21 +154,24 @@ export function Produtos({ toast }: ProdutosProps) {
     }
   }
 
-  const removeProduct = async () => {
-    if (!detail) return
+  const removeProduct = async (product: Product) => {
     const drop = () => {
-      setList((prev) => prev.filter((p) => p.id !== detail.id))
-      closeDetail()
+      setList((prev) => prev.filter((p) => p.id !== product.id))
+      setAction(null)
+      if (openedId.current === product.id) closeDetail()
     }
     try {
-      await productsApi.remove(detail.id)
+      await productsApi.remove(product.id)
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) drop()
       throw err
     }
     drop()
-    toast(`Produto "${detail.name}" excluído`)
+    toast(`Produto "${product.name}" excluído`)
   }
+
+  const startOnDetail = (kind: ProductAction['kind']) =>
+    detail ? () => setAction({ kind, product: detail }) : undefined
 
   return (
     <Box>
@@ -214,50 +210,54 @@ export function Produtos({ toast }: ProdutosProps) {
           movementsLoading={detailLoading}
           movementsError={detailError}
           isAdmin={isAdmin}
-          onUpdatePrice={detail ? () => setUpdatingPrice(true) : undefined}
-          onMoveStock={detail ? () => setMovingStock(true) : undefined}
-          onEdit={detail ? () => setEditing(true) : undefined}
-          onDiscontinue={detail ? () => setConfirming('discontinue') : undefined}
+          onUpdatePrice={startOnDetail('price')}
+          onMoveStock={startOnDetail('stock')}
+          onEdit={startOnDetail('edit')}
+          onDiscontinue={startOnDetail('discontinue')}
           onReactivate={
-            detail && !reactivating ? () => void reactivate() : undefined
+            detail && !reactivating ? () => void reactivate(detail) : undefined
           }
-          onDelete={detail ? () => setConfirming('delete') : undefined}
+          onDelete={startOnDetail('delete')}
           onClose={closeDetail}
         />
       )}
 
-      {movingStock && detail && (
+      {action?.kind === 'stock' && (
         <StockMovementModal
-          product={detail}
-          onClose={() => setMovingStock(false)}
-          onSave={moveStock}
+          product={action.product}
+          onClose={() => setAction(null)}
+          onSave={(payload) => moveStock(action.product, payload)}
           onError={(message) => toast(message, 'error')}
         />
       )}
 
-      {updatingPrice && detail && (
+      {action?.kind === 'price' && (
         <ProductPriceModal
-          product={detail}
-          onClose={() => setUpdatingPrice(false)}
-          onSave={updatePrice}
+          product={action.product}
+          onClose={() => setAction(null)}
+          onSave={(payload) => updatePrice(action.product, payload)}
           onError={(message) => toast(message, 'error')}
         />
       )}
 
-      {editing && detail && (
+      {action?.kind === 'edit' && (
         <ProductFormModal
-          product={detail}
-          onClose={() => setEditing(false)}
-          onSave={updateProduct}
+          product={action.product}
+          onClose={() => setAction(null)}
+          onSave={(payload) => updateProduct(action.product, payload)}
         />
       )}
 
-      {confirming && detail && (
+      {(action?.kind === 'discontinue' || action?.kind === 'delete') && (
         <ProductConfirmDialog
-          action={confirming}
-          product={detail}
-          onConfirm={confirming === 'delete' ? removeProduct : discontinue}
-          onCancel={() => setConfirming(null)}
+          action={action.kind}
+          product={action.product}
+          onConfirm={() =>
+            action.kind === 'delete'
+              ? removeProduct(action.product)
+              : discontinue(action.product)
+          }
+          onCancel={() => setAction(null)}
           onError={(message) => toast(message, 'error')}
         />
       )}
