@@ -10,12 +10,27 @@ import {
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import Box from '@mui/material/Box'
+import Pagination from '@mui/material/Pagination'
+import type { UsePaginationItem } from '@mui/material/usePagination'
 import { useMemo, useState } from 'react'
 import { NegotiationCard, NegotiationCardOverlay } from './NegotiationCard'
 import { NegotiationColumn } from './NegotiationColumn'
 import { canTransition } from './transitions'
 import type { Negotiation, NegotiationStatus } from '../../types'
-import { NEGOTIATION_STATUSES } from '../../types'
+import { NEGOTIATION_STATUS_LABELS, NEGOTIATION_STATUSES } from '../../types'
+
+export const BOARD_PAGE_SIZE = 3
+
+const PAGINATION_ARIA: Record<Exclude<UsePaginationItem['type'], 'page'>, string> = {
+  first: 'Primeira página',
+  last: 'Última página',
+  next: 'Próxima página',
+  previous: 'Página anterior',
+  'start-ellipsis': 'Páginas anteriores',
+  'end-ellipsis': 'Páginas seguintes',
+}
+
+const FIRST_PAGES: Record<NegotiationStatus, number> = { ABERTA: 1, GANHA: 1, PERDIDA: 1 }
 
 interface NegotiationBoardProps {
   items: Negotiation[]
@@ -34,6 +49,7 @@ export function NegotiationBoard({
 }: NegotiationBoardProps) {
   const [override, setOverride] = useState<Record<number, NegotiationStatus>>({})
   const [activeId, setActiveId] = useState<number | null>(null)
+  const [pages, setPages] = useState<Record<NegotiationStatus, number>>(FIRST_PAGES)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -101,6 +117,9 @@ export function NegotiationBoard({
       >
         {NEGOTIATION_STATUSES.map((status) => {
           const cards = columns[status]
+          const pageCount = Math.max(1, Math.ceil(cards.length / BOARD_PAGE_SIZE))
+          const page = Math.min(pages[status], pageCount)
+          const pageCards = cards.slice((page - 1) * BOARD_PAGE_SIZE, page * BOARD_PAGE_SIZE)
           const accepting =
             activeNegotiation !== null && canTransition(statusOf(activeNegotiation), status)
           return (
@@ -110,8 +129,23 @@ export function NegotiationBoard({
               count={cards.length}
               total={cards.reduce((acc, n) => acc + n.totalValue, 0)}
               accepting={accepting}
+              footer={
+                pageCount > 1 && (
+                  <Pagination
+                    size="small"
+                    count={pageCount}
+                    page={page}
+                    siblingCount={0}
+                    onChange={(_, next) => setPages((prev) => ({ ...prev, [status]: next }))}
+                    aria-label={`Páginas de ${NEGOTIATION_STATUS_LABELS[status]}`}
+                    getItemAriaLabel={(type, item) =>
+                      type === 'page' ? `Página ${item}` : PAGINATION_ARIA[type]
+                    }
+                  />
+                )
+              }
             >
-              {cards.map((n) => (
+              {pageCards.map((n) => (
                 <NegotiationCard
                   key={n.id}
                   negotiation={n}

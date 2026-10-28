@@ -20,6 +20,7 @@ interface NegotiationColumnProps {
   count: number
   total: number
   accepting: boolean
+  footer?: ReactNode
   children: ReactNode
 }
 
@@ -28,6 +29,7 @@ export function NegotiationColumn({
   count,
   total,
   accepting,
+  footer,
   children,
 }: NegotiationColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
@@ -94,8 +96,6 @@ export function NegotiationColumn({
           display: 'flex',
           flexDirection: 'column',
           gap: 1,
-          maxHeight: { xs: 'none', md: '58vh' },
-          overflow: 'auto',
         }}
       >
         {count === 0 ? (
@@ -108,6 +108,21 @@ export function NegotiationColumn({
           children
         )}
       </Box>
+
+      {footer && (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            p: 1,
+            borderTop: 1,
+            borderColor: 'divider',
+            backgroundColor: 'background.paper',
+          }}
+        >
+          {footer}
+        </Box>
+      )}
     </Paper>
   )
 }

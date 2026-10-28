@@ -2,7 +2,7 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, clientsApi, negotiationsApi, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { useNegotiationQuotations } from '../hooks/useNegotiationQuotations'
@@ -13,6 +13,8 @@ import { NegotiationFormModal } from '../components/negotiations/NegotiationForm
 import { ConvertToOrderModal } from '../components/negotiations/ConvertToOrderModal'
 import { NegotiationBoard } from '../components/negotiations/NegotiationBoard'
 import { NegotiationListView } from '../components/negotiations/NegotiationListView'
+import { NegotiationSearchBar } from '../components/negotiations/NegotiationSearchBar'
+import { filterNegotiations } from '../components/negotiations/negotiationSearch'
 import { NegotiationStats } from '../components/negotiations/NegotiationStats'
 import { TransitionConfirmDialog } from '../components/negotiations/TransitionConfirmDialog'
 import { ViewSwitch } from '../components/negotiations/ViewSwitch'
@@ -54,6 +56,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [view, setView] = useState<NegotiationView>('quadro')
+  const [query, setQuery] = useState('')
+  const visible = useMemo(() => filterNegotiations(list, query), [list, query])
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<NegotiationDetail | null>(null)
   const quotationSettings = useQuotationSettings()
@@ -240,6 +244,13 @@ export function Negociacoes({ toast }: NegociacoesProps) {
 
       <NegotiationStats list={list} />
 
+      <NegotiationSearchBar
+        query={query}
+        onChange={setQuery}
+        found={visible.length}
+        total={list.length}
+      />
+
       {loadError && (
         <SectionCard>
           <ErrorBanner message={loadError} onRetry={() => void reload()} />
@@ -256,7 +267,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
           </SectionCard>
         ) : (
           <NegotiationBoard
-            items={list}
+            key={query}
+            items={visible}
             onMove={requestTransition}
             onRefuse={() => toast(TRANSITION_REFUSAL, 'error')}
             onEdit={(n) => void openEdit(n)}
@@ -266,7 +278,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
 
       {!loadError && view === 'lista' && (
         <NegotiationListView
-          items={list}
+          key={query}
+          items={visible}
           loading={loading}
           loadDetail={(id) => negotiationsApi.findOne(id)}
           onEdit={(n) => void openEdit(n)}
