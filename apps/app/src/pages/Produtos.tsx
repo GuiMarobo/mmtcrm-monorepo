@@ -171,6 +171,9 @@ export function Produtos({ toast }: ProdutosProps) {
     toast(`Produto "${product.name}" excluído`)
   }
 
+  const startOn = (kind: ProductAction['kind']) => (product: Product) =>
+    setAction({ kind, product })
+
   const startOnDetail = (kind: ProductAction['kind']) =>
     detail ? () => setAction({ kind, product: detail }) : undefined
 
@@ -204,6 +207,18 @@ export function Produtos({ toast }: ProdutosProps) {
               rows={list}
               loading={loading}
               onOpen={(product) => void openDetail(product)}
+              actions={
+                isAdmin
+                  ? {
+                      onEdit: startOn('edit'),
+                      onUpdatePrice: startOn('price'),
+                      onMoveStock: startOn('stock'),
+                      onDiscontinue: startOn('discontinue'),
+                      onReactivate: (product) => void reactivate(product),
+                      onDelete: startOn('delete'),
+                    }
+                  : undefined
+              }
             />
           </SectionCard>
         </>

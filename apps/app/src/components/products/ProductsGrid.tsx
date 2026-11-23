@@ -1,3 +1,9 @@
+import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import PriceChangeOutlinedIcon from '@mui/icons-material/PriceChangeOutlined'
+import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined'
+import SwapVertOutlinedIcon from '@mui/icons-material/SwapVertOutlined'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
@@ -8,7 +14,7 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { DataGridPremium } from '@mui/x-data-grid-premium'
 import type { GridColDef } from '@mui/x-data-grid-premium'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { CategoryAvatar } from './CategoryAvatar'
 import { ProductStatusBadge } from './ProductStatusBadge'
 import {
@@ -23,6 +29,8 @@ import {
 } from './productsList'
 import type { ProductsTab } from './productsList'
 import { FilterButton, FilterChips } from '../common/FilterPanel'
+import { RowActionsMenu } from '../common/RowActionsMenu'
+import type { RowAction } from '../common/RowActionsMenu'
 import { SearchField } from '../common/SearchField'
 import { SectionToolbar } from '../common/SectionCard'
 import { ToneChip } from '../common/ToneChip'
@@ -34,10 +42,20 @@ import {
   PRODUCT_STATUS_LABELS,
 } from '../../types'
 
+export interface ProductRowActions {
+  onEdit: (product: Product) => void
+  onUpdatePrice: (product: Product) => void
+  onMoveStock: (product: Product) => void
+  onDiscontinue: (product: Product) => void
+  onReactivate: (product: Product) => void
+  onDelete: (product: Product) => void
+}
+
 interface ProductsGridProps {
   rows: Product[]
   loading: boolean
   onOpen: (product: Product) => void
+  actions?: ProductRowActions
   disableVirtualization?: boolean
 }
 
@@ -95,7 +113,75 @@ function StockChip({ stock }: { stock: number }) {
   )
 }
 
-const columns: GridColDef<Product>[] = [
+function rowActionsFor(product: Product, handlers: ProductRowActions): RowAction[] {
+  const situation: RowAction =
+    product.status === 'ATIVO'
+      ? {
+          key: 'discontinue',
+          label: 'Descontinuar',
+          icon: <BlockOutlinedIcon />,
+          onClick: () => handlers.onDiscontinue(product),
+        }
+      : {
+          key: 'reactivate',
+          label: 'Reativar',
+          icon: <ReplayOutlinedIcon />,
+          onClick: () => handlers.onReactivate(product),
+        }
+  return [
+    {
+      key: 'edit',
+      label: 'Editar',
+      icon: <EditOutlinedIcon />,
+      onClick: () => handlers.onEdit(product),
+    },
+    {
+      key: 'price',
+      label: 'Alterar preço',
+      icon: <PriceChangeOutlinedIcon />,
+      onClick: () => handlers.onUpdatePrice(product),
+    },
+    {
+      key: 'stock',
+      label: 'Movimentar estoque',
+      icon: <SwapVertOutlinedIcon />,
+      onClick: () => handlers.onMoveStock(product),
+    },
+    situation,
+    {
+      key: 'delete',
+      label: 'Excluir',
+      icon: <DeleteOutlinedIcon />,
+      onClick: () => handlers.onDelete(product),
+    },
+  ]
+}
+
+function actionsColumn(
+  handlers: MutableRefObject<ProductRowActions | undefined>,
+): GridColDef<Product> {
+  return {
+    field: 'actions',
+    headerName: '',
+    width: 56,
+    sortable: false,
+    filterable: false,
+    disableColumnMenu: true,
+    disableReorder: true,
+    align: 'right',
+    renderCell: ({ row }) =>
+      handlers.current && (
+        <Box onClick={(event) => event.stopPropagation()}>
+          <RowActionsMenu
+            label={`Ações de ${row.name}`}
+            actions={rowActionsFor(row, handlers.current)}
+          />
+        </Box>
+      ),
+  }
+}
+
+const baseColumns: GridColDef<Product>[] = [
   {
     field: 'name',
     headerName: 'Produto',
@@ -144,6 +230,7 @@ export function ProductsGrid({
   rows,
   loading,
   onOpen,
+  actions,
   disableVirtualization = false,
 }: ProductsGridProps) {
   const theme = useTheme()
@@ -155,6 +242,13 @@ export function ProductsGrid({
   const searched = useMemo(
     () => filterByCategories(searchProducts(rows, query), categories),
     [rows, query, categories],
+  )
+  const actionsRef = useRef(actions)
+  actionsRef.current = actions
+  const withActions = actions !== undefined
+  const columns = useMemo(
+    () => (withActions ? [...baseColumns, actionsColumn(actionsRef)] : baseColumns),
+    [withActions],
   )
   const counts = useMemo(() => countProductsByTab(searched), [searched])
   const tabRows = useMemo(() => productsInTab(searched, tab), [searched, tab])

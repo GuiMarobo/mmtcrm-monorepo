@@ -316,6 +316,70 @@ describe('ProductsGrid', () => {
     })
   })
 
+  describe('menu ⋮ da linha', () => {
+    const rowActions = () => ({
+      onEdit: vi.fn(),
+      onUpdatePrice: vi.fn(),
+      onMoveStock: vi.fn(),
+      onDiscontinue: vi.fn(),
+      onReactivate: vi.fn(),
+      onDelete: vi.fn(),
+    })
+
+    const openMenu = async (name: string) =>
+      userEvent.click(within(rowOf(name)).getByRole('button', { name: `Ações de ${name}` }))
+
+    it('sem ações (VENDEDOR) a linha não tem ⋮', () => {
+      renderGrid()
+
+      expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Ações de/ })).not.toBeInTheDocument()
+    })
+
+    it.each([
+      [
+        'Ativo',
+        'iPhone 15 Pro',
+        ['Editar', 'Alterar preço', 'Movimentar estoque', 'Descontinuar', 'Excluir'],
+      ],
+      [
+        'Inativo',
+        'Capa MagSafe',
+        ['Editar', 'Alterar preço', 'Movimentar estoque', 'Reativar', 'Excluir'],
+      ],
+    ])('Produto %s oferece os itens da sua Situação', async (_, name, items) => {
+      renderGrid({ actions: rowActions() })
+
+      await openMenu(name)
+
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(items)
+    })
+
+    it.each([
+      ['Editar', 'onEdit', 'iPhone 15 Pro', 'iphone'],
+      ['Alterar preço', 'onUpdatePrice', 'MacBook Air', 'mac'],
+      ['Movimentar estoque', 'onMoveStock', 'AirPods Pro', 'airpods'],
+      ['Descontinuar', 'onDiscontinue', 'iPhone 15 Pro', 'iphone'],
+      ['Reativar', 'onReactivate', 'Capa MagSafe', 'capa'],
+      ['Excluir', 'onDelete', 'Apple Watch Série 9', 'watch'],
+    ] as const)(
+      '⋮ › %s age sobre o Produto da linha sem abrir o detalhe',
+      async (item, callback, name, id) => {
+        const onOpen = vi.fn()
+        const actions = rowActions()
+        renderGrid({ onOpen, actions })
+
+        await openMenu(name)
+        await userEvent.click(screen.getByRole('menuitem', { name: item }))
+
+        expect(actions[callback]).toHaveBeenCalledTimes(1)
+        expect(actions[callback]).toHaveBeenCalledWith(expect.objectContaining({ id }))
+        expect(onOpen).not.toHaveBeenCalled()
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      },
+    )
+  })
+
   describe('no telefone', () => {
     afterEach(() => {
       vi.unstubAllGlobals()
