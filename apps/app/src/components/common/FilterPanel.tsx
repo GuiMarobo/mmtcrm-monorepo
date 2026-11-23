@@ -66,9 +66,11 @@ export function FilterButton<T extends string>({
         anchorEl={anchor}
         onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        slotProps={{ paper: { role: 'dialog', 'aria-label': title, sx: { p: 2, minWidth: 240 } } }}
+        slotProps={{ paper: { role: 'dialog', 'aria-label': title, sx: { p: 2, minWidth: (theme) => theme.spacing(30) } } }}
       >
-        <Typography sx={{ fontWeight: 600, fontSize: 13, mb: 1 }}>{title}</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          {title}
+        </Typography>
         <FormGroup>
           {options.map((option) => (
             <FormControlLabel
@@ -117,14 +119,10 @@ export function FilterChips<T extends string>({ options, selected, onRemove }: F
           <Chip
             size="small"
             label={option.label}
+            aria-label={`Remover filtro ${option.label}`}
+            onClick={() => onRemove(option.value)}
             onDelete={() => onRemove(option.value)}
-            deleteIcon={
-              <CancelIcon
-                role="button"
-                aria-hidden={false}
-                aria-label={`Remover filtro ${option.label}`}
-              />
-            }
+            deleteIcon={<CancelIcon />}
           />
         </li>
       ))}

@@ -264,6 +264,10 @@ describe('ProductsGrid', () => {
         'iPhone',
         'Mac',
       ])
+      expect(within(chips).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+        'Remover filtro iPhone',
+        'Remover filtro Mac',
+      ])
 
       await userEvent.click(within(chips).getByRole('button', { name: 'Remover filtro Mac' }))
       expect(visibleNames()).toEqual(['iPhone 15 Pro'])
