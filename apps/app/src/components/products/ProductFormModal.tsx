@@ -5,7 +5,7 @@ import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
@@ -138,14 +138,15 @@ export function ProductFormModal(props: ProductFormModalProps) {
     if (props.duplicateOf) return toDuplicateForm(props.duplicateOf, takenSkus)
     return EMPTY_FORM
   })
-  const nameRef = useRef<HTMLInputElement>(null)
   const duplicating = !props.product && !!props.duplicateOf
 
-  useEffect(() => {
-    const input = nameRef.current
-    if (!duplicating || !input) return
-    input.setSelectionRange(input.value.length, input.value.length)
-  }, [duplicating])
+  const placeCaretAtEnd = useCallback(
+    (input: HTMLInputElement | null) => {
+      if (!duplicating || !input) return
+      input.setSelectionRange(input.value.length, input.value.length)
+    },
+    [duplicating],
+  )
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -223,7 +224,7 @@ export function ProductFormModal(props: ProductFormModalProps) {
               label="Nome"
               required
               value={form.name}
-              inputRef={nameRef}
+              inputRef={placeCaretAtEnd}
               autoFocus={duplicating}
               onChange={(e) => changeName(e.target.value)}
               onBlur={() => handleBlur('name')}

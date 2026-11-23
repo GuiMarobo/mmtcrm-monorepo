@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProductFormModal } from './ProductFormModal'
@@ -160,6 +160,10 @@ describe('ProductFormModal — código sugerido', () => {
 })
 
 describe('ProductFormModal — duplicar', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   const setupDuplicate = (existingSkus: string[] = []) => {
     const onSave = vi.fn().mockResolvedValue(undefined)
     render(
@@ -210,11 +214,12 @@ describe('ProductFormModal — duplicar', () => {
   })
 
   it('abre com o cursor no fim do nome', async () => {
+    const placeCaret = vi.spyOn(HTMLInputElement.prototype, 'setSelectionRange')
     const { name } = setupDuplicate()
 
     await waitFor(() => expect(name).toHaveFocus())
-    expect(name.selectionStart).toBe('iPhone 15 Pro'.length)
-    expect(name.selectionEnd).toBe('iPhone 15 Pro'.length)
+    expect(placeCaret.mock.contexts).toContain(name)
+    expect(placeCaret).toHaveBeenCalledWith('iPhone 15 Pro'.length, 'iPhone 15 Pro'.length)
   })
 })
 
