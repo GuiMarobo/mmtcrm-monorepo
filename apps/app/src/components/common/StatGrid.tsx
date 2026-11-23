@@ -1,15 +1,38 @@
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined'
+import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import type { ReactNode } from 'react'
+import { TONES } from '../../theme/tones'
+import type { BadgeTone } from '../../theme/tones'
 
 interface StatGridProps {
   children: ReactNode
   columns?: 2 | 3 | 4
+  variant?: 'divided' | 'cards'
 }
 
-export function StatGrid({ children, columns = 4 }: StatGridProps) {
+export function StatGrid({ children, columns = 4, variant = 'divided' }: StatGridProps) {
+  if (variant === 'cards') {
+    return (
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, 1fr)',
+            lg: `repeat(${columns}, 1fr)`,
+          },
+          gap: 2,
+          mb: 2.5,
+        }}
+      >
+        {children}
+      </Box>
+    )
+  }
+
   return (
     <Paper
       variant="outlined"
@@ -71,5 +94,50 @@ export function Stat({ label, value, hint }: StatProps) {
         </Box>
       )}
     </Box>
+  )
+}
+
+interface KpiStatProps {
+  icon: ReactNode
+  tone: BadgeTone
+  label: string
+  value: ReactNode
+  hint?: ReactNode
+}
+
+export function KpiStat({ icon, tone, label, value, hint }: KpiStatProps) {
+  return (
+    <Paper
+      variant="outlined"
+      role="group"
+      aria-label={label}
+      sx={{ p: 2.5, boxShadow: 'none', display: 'flex', flexDirection: 'column', gap: 1 }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+        <Avatar
+          variant="rounded"
+          sx={{ width: 32, height: 32, bgcolor: TONES[tone].bg, color: TONES[tone].color }}
+        >
+          {icon}
+        </Avatar>
+        <Typography
+          sx={{
+            color: 'text.secondary',
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {label}
+        </Typography>
+      </Box>
+      <Typography sx={{ fontSize: { xs: 26, sm: 30 }, fontWeight: 700, letterSpacing: '-0.02em' }}>
+        {value}
+      </Typography>
+      {hint != null && (
+        <Typography sx={{ color: 'text.disabled', fontSize: 12.5 }}>{hint}</Typography>
+      )}
+    </Paper>
   )
 }

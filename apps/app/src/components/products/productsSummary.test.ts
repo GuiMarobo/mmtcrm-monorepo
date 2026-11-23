@@ -23,6 +23,8 @@ describe('summarizeCatalog', () => {
       activeCount: 0,
       units: 0,
       stockValue: 0,
+      outOfStockCount: 0,
+      lowStockCount: 0,
     })
   })
 
@@ -59,5 +61,18 @@ describe('summarizeCatalog', () => {
     expect(result.activeCount).toBe(2)
     expect(result.units).toBe(5)
     expect(result.stockValue).toBe(1000)
+  })
+
+  it('conta zerados e baixos com o limite de 3 unidades, independentemente da situação', () => {
+    const result = summarizeCatalog([
+      product({ id: 'p1', stock: 0 }),
+      product({ id: 'p2', stock: 0, status: 'INATIVO' }),
+      product({ id: 'p3', stock: 1 }),
+      product({ id: 'p4', stock: 3 }),
+      product({ id: 'p5', stock: 4 }),
+    ])
+
+    expect(result.outOfStockCount).toBe(2)
+    expect(result.lowStockCount).toBe(2)
   })
 })
