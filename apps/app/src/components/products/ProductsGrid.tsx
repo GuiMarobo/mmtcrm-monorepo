@@ -152,7 +152,7 @@ export function ProductsGrid({
 
   if (!loading && rows.length === 0) return <EmptyMessage text="Nenhum produto ainda" />
 
-  const searchEmpty = !loading && query.trim() !== '' && tabRows.length === 0
+  const searchEmpty = !loading && query.trim() !== '' && searched.length === 0
 
   return (
     <Box>

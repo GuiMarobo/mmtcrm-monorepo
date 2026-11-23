@@ -157,6 +157,15 @@ describe('ProductsGrid', () => {
     expect(screen.getByText('Nenhum produto inativo')).toBeInTheDocument()
   })
 
+  it('aba vazia durante uma busca que acha produtos em outras abas mostra a mensagem da aba', async () => {
+    renderGrid()
+
+    search('macbook')
+    await userEvent.click(tab(/Inativos/))
+    expect(screen.getByText('Nenhum produto inativo')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Limpar busca' })).not.toBeInTheDocument()
+  })
+
   it('clicar numa linha abre o detalhe do Produto daquela linha', async () => {
     const onOpen = vi.fn()
     renderGrid({ onOpen })
