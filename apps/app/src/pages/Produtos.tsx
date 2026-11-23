@@ -4,14 +4,15 @@ import Button from '@mui/material/Button'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
-import { ProductCatalog } from '../components/products/ProductCatalog'
 import {
   ProductConfirmDialog,
   type ProductConfirmAction,
 } from '../components/products/ProductConfirmDialog'
 import { ProductDetailDrawer } from '../components/products/ProductDetailDrawer'
 import { ProductFormModal } from '../components/products/ProductFormModal'
+import { ProductsGrid } from '../components/products/ProductsGrid'
 import { ProductPriceModal } from '../components/products/ProductPriceModal'
+import { ProductStats } from '../components/products/ProductStats'
 import { StockMovementModal } from '../components/products/StockMovementModal'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
@@ -196,11 +197,16 @@ export function Produtos({ toast }: ProdutosProps) {
           <ErrorBanner message={loadError} onRetry={() => void reload()} />
         </SectionCard>
       ) : (
-        <ProductCatalog
-          list={list}
-          loading={loading}
-          onOpen={(product) => void openDetail(product)}
-        />
+        <>
+          <ProductStats list={list} loading={loading} />
+          <SectionCard>
+            <ProductsGrid
+              rows={list}
+              loading={loading}
+              onOpen={(product) => void openDetail(product)}
+            />
+          </SectionCard>
+        </>
       )}
 
       {selected && (

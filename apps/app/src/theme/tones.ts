@@ -1,4 +1,4 @@
-export type BadgeTone = 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'purple'
+export type BadgeTone = 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'purple' | 'pink'
 
 interface ToneStyle {
   color: string
@@ -12,4 +12,5 @@ export const TONES: Record<BadgeTone, ToneStyle> = {
   blue: { color: '#2563eb', bg: '#dbeafe' },
   gray: { color: '#475569', bg: '#f1f5f9' },
   purple: { color: '#7c3aed', bg: '#ede9fe' },
+  pink: { color: '#db2777', bg: '#fce7f3' },
 }
