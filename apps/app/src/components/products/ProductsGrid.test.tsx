@@ -67,6 +67,15 @@ const search = (text: string) =>
     target: { value: text },
   })
 
+const filterButton = () => screen.getByRole('button', { name: /Filtrar/ })
+
+const applyCategories = async (...labels: string[]) => {
+  await userEvent.click(filterButton())
+  const panel = screen.getByRole('dialog')
+  for (const label of labels) await userEvent.click(within(panel).getByRole('checkbox', { name: label }))
+  await userEvent.click(within(panel).getByRole('button', { name: 'Aplicar filtro' }))
+}
+
 describe('ProductsGrid', () => {
   it('abre na aba Todos, com contador em cada uma das quatro abas', () => {
     renderGrid()
@@ -132,22 +141,36 @@ describe('ProductsGrid', () => {
     expect(visibleNames()).toEqual(['Capa MagSafe'])
   })
 
-  it('busca sem resultado mostra mensagem própria e "Limpar busca" volta ao catálogo', async () => {
-    renderGrid()
+  it.each([
+    ['só a busca', async () => search('pixel')],
+    ['só o filtro', async () => applyCategories('iPad')],
+    [
+      'busca e filtro juntos',
+      async () => {
+        await applyCategories('Mac')
+        search('iphone')
+      },
+    ],
+  ])(
+    'sem resultado (%s) mostra mensagem própria e "Limpar filtros" zera busca e filtro',
+    async (_, narrow) => {
+      renderGrid()
 
-    search('pixel')
-    expect(screen.getByText('Nenhum produto encontrado para a busca')).toBeInTheDocument()
+      await narrow()
+      expect(screen.getByText('Nenhum produto encontrado para a busca e os filtros')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Limpar busca' }))
-    expect(screen.getByPlaceholderText(/Buscar por nome ou código/)).toHaveValue('')
-    expect(visibleNames()).toHaveLength(5)
-  })
+      await userEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+      expect(screen.getByPlaceholderText(/Buscar por nome ou código/)).toHaveValue('')
+      expect(filterButton()).toHaveTextContent(/^Filtrar$/)
+      expect(visibleNames()).toHaveLength(5)
+    },
+  )
 
   it('catálogo vazio mostra "Nenhum produto ainda"', () => {
     renderGrid({ rows: [] })
 
     expect(screen.getByText('Nenhum produto ainda')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Limpar busca' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Limpar filtros' })).not.toBeInTheDocument()
   })
 
   it('aba vazia sem busca tem a sua mensagem', async () => {
@@ -163,7 +186,7 @@ describe('ProductsGrid', () => {
     search('macbook')
     await userEvent.click(tab(/Inativos/))
     expect(screen.getByText('Nenhum produto inativo')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Limpar busca' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Limpar filtros' })).not.toBeInTheDocument()
   })
 
   it('clicar numa linha abre o detalhe do Produto daquela linha', async () => {
@@ -183,6 +206,78 @@ describe('ProductsGrid', () => {
     renderGrid({ rows: many })
 
     expect(visibleNames()).toHaveLength(25)
+  })
+
+  describe('filtro de categoria', () => {
+    it('o painel oferece as seis categorias e aplicar recorta linhas e contadores das abas', async () => {
+      renderGrid()
+
+      await userEvent.click(filterButton())
+      expect(
+        within(screen.getByRole('dialog'))
+          .getAllByRole('checkbox')
+          .map((box) => box.closest('label')?.textContent),
+      ).toEqual(['iPhone', 'iPad', 'Mac', 'Apple Watch', 'Áudio', 'Acessórios'])
+      await userEvent.keyboard('{Escape}')
+
+      await applyCategories('iPhone', 'Áudio', 'Acessórios')
+      expect(visibleNames()).toEqual(['AirPods Pro', 'Capa MagSafe', 'iPhone 15 Pro'])
+      expect(within(tab(/Todos/)).getByText('3')).toBeInTheDocument()
+      expect(within(tab(/^Ativos/)).getByText('2')).toBeInTheDocument()
+      expect(within(tab(/Inativos/)).getByText('1')).toBeInTheDocument()
+      expect(within(tab(/Sem estoque/)).getByText('1')).toBeInTheDocument()
+    })
+
+    it('o botão Filtrar mostra quantos filtros estão ativos, e nada quando nenhum', async () => {
+      renderGrid()
+
+      expect(filterButton()).toHaveTextContent(/^Filtrar$/)
+
+      await applyCategories('iPhone', 'Mac')
+      expect(filterButton()).toHaveTextContent(/^Filtrar2$/)
+    })
+
+    it('filtros aplicados viram chips; remover um chip refiltra e baixa o contador', async () => {
+      renderGrid()
+
+      await applyCategories('iPhone', 'Mac')
+      const chips = screen.getByRole('list', { name: 'Filtros ativos' })
+      expect(within(chips).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        'iPhone',
+        'Mac',
+      ])
+
+      await userEvent.click(within(chips).getByRole('button', { name: 'Remover filtro Mac' }))
+      expect(visibleNames()).toEqual(['iPhone 15 Pro'])
+      expect(filterButton()).toHaveTextContent(/^Filtrar1$/)
+      expect(within(chips).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+        'iPhone',
+      ])
+    })
+
+    it('"Limpar todos" no painel volta ao catálogo completo, sem chips nem contador', async () => {
+      renderGrid()
+
+      await applyCategories('iPhone', 'Mac')
+      await userEvent.click(filterButton())
+      await userEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Limpar todos' }),
+      )
+
+      expect(visibleNames()).toHaveLength(5)
+      expect(filterButton()).toHaveTextContent(/^Filtrar$/)
+      expect(screen.queryByRole('list', { name: 'Filtros ativos' })).not.toBeInTheDocument()
+    })
+
+    it('busca e categorias valem juntas', async () => {
+      renderGrid()
+
+      await applyCategories('iPhone', 'Mac')
+      search('pro')
+      expect(visibleNames()).toEqual(['iPhone 15 Pro'])
+      expect(within(tab(/Todos/)).getByText('1')).toBeInTheDocument()
+      expect(within(tab(/Sem estoque/)).getByText('0')).toBeInTheDocument()
+    })
   })
 
   describe('leitura da linha', () => {

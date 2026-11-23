@@ -15,18 +15,24 @@ import {
   INITIAL_PRODUCTS_TAB,
   PRODUCTS_TABS,
   countProductsByTab,
+  filterByCategories,
   productsInTab,
   searchProducts,
   stockLevel,
   tabDefinition,
 } from './productsList'
 import type { ProductsTab } from './productsList'
+import { FilterButton, FilterChips } from '../common/FilterPanel'
 import { SearchField } from '../common/SearchField'
 import { SectionToolbar } from '../common/SectionCard'
 import { ToneChip } from '../common/ToneChip'
 import { formatCurrency, formatDate } from '../../utils/format'
-import type { Product } from '../../types'
-import { PRODUCT_CATEGORY_LABELS, PRODUCT_STATUS_LABELS } from '../../types'
+import type { Product, ProductCategory } from '../../types'
+import {
+  PRODUCT_CATEGORY_LABELS,
+  PRODUCT_CATEGORY_OPTIONS,
+  PRODUCT_STATUS_LABELS,
+} from '../../types'
 
 interface ProductsGridProps {
   rows: Product[]
@@ -144,15 +150,25 @@ export function ProductsGrid({
   const narrow = useMediaQuery(theme.breakpoints.down('sm'))
   const [tab, setTab] = useState<ProductsTab>(INITIAL_PRODUCTS_TAB)
   const [query, setQuery] = useState('')
+  const [categories, setCategories] = useState<ProductCategory[]>([])
 
-  const searched = useMemo(() => searchProducts(rows, query), [rows, query])
+  const searched = useMemo(
+    () => filterByCategories(searchProducts(rows, query), categories),
+    [rows, query, categories],
+  )
   const counts = useMemo(() => countProductsByTab(searched), [searched])
   const tabRows = useMemo(() => productsInTab(searched, tab), [searched, tab])
   const { emptyMessage } = tabDefinition(tab)
 
   if (!loading && rows.length === 0) return <EmptyMessage text="Nenhum produto ainda" />
 
-  const searchEmpty = !loading && query.trim() !== '' && searched.length === 0
+  const narrowed = query.trim() !== '' || categories.length > 0
+  const narrowedEmpty = !loading && narrowed && searched.length === 0
+
+  const clearFilters = () => {
+    setQuery('')
+    setCategories([])
+  }
 
   return (
     <Box>
@@ -187,11 +203,22 @@ export function ProductsGrid({
           onChange={setQuery}
           placeholder="Buscar por nome ou código de referência…"
         />
+        <FilterButton
+          title="Categorias"
+          options={PRODUCT_CATEGORY_OPTIONS}
+          selected={categories}
+          onApply={setCategories}
+        />
       </SectionToolbar>
-      {searchEmpty ? (
-        <EmptyMessage text="Nenhum produto encontrado para a busca">
-          <Button size="small" onClick={() => setQuery('')} sx={{ mt: 1.5 }}>
-            Limpar busca
+      <FilterChips
+        options={PRODUCT_CATEGORY_OPTIONS}
+        selected={categories}
+        onRemove={(category) => setCategories((current) => current.filter((c) => c !== category))}
+      />
+      {narrowedEmpty ? (
+        <EmptyMessage text="Nenhum produto encontrado para a busca e os filtros">
+          <Button size="small" onClick={clearFilters} sx={{ mt: 1.5 }}>
+            Limpar filtros
           </Button>
         </EmptyMessage>
       ) : (

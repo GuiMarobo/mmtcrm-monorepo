@@ -1,4 +1,4 @@
-import type { Product } from '../../types'
+import type { Product, ProductCategory } from '../../types'
 
 export type ProductsTab = 'todos' | 'ativos' | 'inativos' | 'sem-estoque'
 
@@ -59,6 +59,14 @@ export const searchProducts = (products: Product[], query: string): Product[] =>
     (product) => normalize(product.name).includes(needle) || normalize(product.sku).includes(needle),
   )
 }
+
+export const filterByCategories = (
+  products: Product[],
+  categories: ProductCategory[],
+): Product[] =>
+  categories.length === 0
+    ? products
+    : products.filter((product) => categories.includes(product.category))
 
 export type StockLevel = 'zerado' | 'baixo' | 'normal'
 
