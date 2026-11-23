@@ -41,13 +41,14 @@ describe('ProductFormModal — edição (RP3)', () => {
     expect(screen.queryByLabelText(/Quantidade Inicial/)).not.toBeInTheDocument()
   })
 
-  it('envia só nome, código, descrição e categoria', async () => {
+  it('editar o nome mantém o código; envia só nome, código, descrição e categoria', async () => {
     const user = userEvent.setup()
     const { onSave } = setupEdit()
 
     const name = screen.getByLabelText(/^Nome/)
     await user.clear(name)
     await user.type(name, 'iPhone 15 Pro Max')
+    expect(screen.getByLabelText(/Código de Referência/)).toHaveValue('IP15P-256')
     await user.clear(screen.getByLabelText('Descrição'))
     await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
 
