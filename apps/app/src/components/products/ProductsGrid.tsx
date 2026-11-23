@@ -13,7 +13,7 @@ import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { DataGridPremium } from '@mui/x-data-grid-premium'
-import type { GridColDef } from '@mui/x-data-grid-premium'
+import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid-premium'
 import { useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { CategoryAvatar } from './CategoryAvatar'
 import { ProductStatusBadge } from './ProductStatusBadge'
@@ -28,9 +28,13 @@ import {
   tabDefinition,
 } from './productsList'
 import type { ProductsTab } from './productsList'
+import type { BatchAction } from './productsBatch'
+import { BulkActionsBar } from '../common/BulkActionsBar'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { FilterButton, FilterChips } from '../common/FilterPanel'
 import { RowActionsMenu } from '../common/RowActionsMenu'
 import type { RowAction } from '../common/RowActionsMenu'
+import type { BulkAction } from '../common/BulkActionsBar'
 import { SearchField } from '../common/SearchField'
 import { SectionToolbar } from '../common/SectionCard'
 import { ToneChip } from '../common/ToneChip'
@@ -56,10 +60,19 @@ interface ProductsGridProps {
   loading: boolean
   onOpen: (product: Product) => void
   actions?: ProductRowActions
+  onBatch?: (action: BatchAction, products: Product[]) => Promise<void>
   disableVirtualization?: boolean
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
+
+const EMPTY_SELECTION: GridRowSelectionModel = { type: 'include', ids: new Set() }
+
+function selectedIn(rows: Product[], model: GridRowSelectionModel): Product[] {
+  return model.type === 'include'
+    ? rows.filter((row) => model.ids.has(row.id))
+    : rows.filter((row) => !model.ids.has(row.id))
+}
 
 function ProductCell({ product }: { product: Product }) {
   return (
@@ -157,6 +170,55 @@ function rowActionsFor(product: Product, handlers: ProductRowActions): RowAction
   ]
 }
 
+type ConfirmedBatchAction = Exclude<BatchAction, 'reactivate'>
+
+const BATCH_CONFIRM: Record<
+  ConfirmedBatchAction,
+  { verb: string; description: string; danger: boolean }
+> = {
+  discontinue: {
+    verb: 'Descontinuar',
+    description:
+      'Os produtos passam a Inativo e deixam de ser oferecidos em novas negociações. Podem ser reativados depois.',
+    danger: false,
+  },
+  delete: {
+    verb: 'Excluir',
+    description: 'Os produtos saem do catálogo. O histórico de estoque é preservado.',
+    danger: true,
+  },
+}
+
+const productsCount = (count: number) => (count === 1 ? '1 produto' : `${count} produtos`)
+
+function bulkActionsFor(selected: Product[], start: (action: BatchAction) => void): BulkAction[] {
+  const bulk: BulkAction[] = []
+  if (selected.some((product) => product.status === 'ATIVO')) {
+    bulk.push({
+      key: 'discontinue',
+      label: 'Descontinuar',
+      icon: <BlockOutlinedIcon />,
+      onClick: () => start('discontinue'),
+    })
+  }
+  if (selected.some((product) => product.status === 'INATIVO')) {
+    bulk.push({
+      key: 'reactivate',
+      label: 'Reativar',
+      icon: <ReplayOutlinedIcon />,
+      onClick: () => start('reactivate'),
+    })
+  }
+  bulk.push({
+    key: 'delete',
+    label: 'Excluir',
+    icon: <DeleteOutlinedIcon />,
+    danger: true,
+    onClick: () => start('delete'),
+  })
+  return bulk
+}
+
 function actionsColumn(
   handlers: MutableRefObject<ProductRowActions | undefined>,
 ): GridColDef<Product> {
@@ -231,6 +293,7 @@ export function ProductsGrid({
   loading,
   onOpen,
   actions,
+  onBatch,
   disableVirtualization = false,
 }: ProductsGridProps) {
   const theme = useTheme()
@@ -238,6 +301,9 @@ export function ProductsGrid({
   const [tab, setTab] = useState<ProductsTab>(INITIAL_PRODUCTS_TAB)
   const [query, setQuery] = useState('')
   const [categories, setCategories] = useState<ProductCategory[]>([])
+  const [selection, setSelection] = useState<GridRowSelectionModel>(EMPTY_SELECTION)
+  const [confirming, setConfirming] = useState<ConfirmedBatchAction | null>(null)
+  const [running, setRunning] = useState(false)
 
   const searched = useMemo(
     () => filterByCategories(searchProducts(rows, query), categories),
@@ -253,22 +319,54 @@ export function ProductsGrid({
   const counts = useMemo(() => countProductsByTab(searched), [searched])
   const tabRows = useMemo(() => productsInTab(searched, tab), [searched, tab])
   const { emptyMessage } = tabDefinition(tab)
+  const selected = useMemo(() => selectedIn(tabRows, selection), [tabRows, selection])
 
   if (!loading && rows.length === 0) return <EmptyMessage text="Nenhum produto ainda" />
 
   const narrowed = query.trim() !== '' || categories.length > 0
   const narrowedEmpty = !loading && narrowed && searched.length === 0
 
+  const clearSelection = () => setSelection(EMPTY_SELECTION)
+
+  const runBatch = async (action: BatchAction) => {
+    if (!onBatch) return
+    setRunning(true)
+    try {
+      await onBatch(action, selected)
+    } finally {
+      setRunning(false)
+      setConfirming(null)
+      clearSelection()
+    }
+  }
+
+  const startBatch = (action: BatchAction) => {
+    if (action === 'reactivate') void runBatch(action)
+    else setConfirming(action)
+  }
+  const changeTab = (next: ProductsTab) => {
+    setTab(next)
+    clearSelection()
+  }
+  const changeQuery = (next: string) => {
+    setQuery(next)
+    clearSelection()
+  }
+  const changeCategories = (next: ProductCategory[]) => {
+    setCategories(next)
+    clearSelection()
+  }
+
   const clearFilters = () => {
-    setQuery('')
-    setCategories([])
+    changeQuery('')
+    changeCategories([])
   }
 
   return (
     <Box>
       <Tabs
         value={tab}
-        onChange={(_, next: ProductsTab) => setTab(next)}
+        onChange={(_, next: ProductsTab) => changeTab(next)}
         variant="scrollable"
         allowScrollButtonsMobile
         aria-label="Situação dos produtos"
@@ -294,20 +392,20 @@ export function ProductsGrid({
       <SectionToolbar>
         <SearchField
           value={query}
-          onChange={setQuery}
+          onChange={changeQuery}
           placeholder="Buscar por nome ou código de referência…"
         />
         <FilterButton
           title="Categorias"
           options={PRODUCT_CATEGORY_OPTIONS}
           selected={categories}
-          onApply={setCategories}
+          onApply={changeCategories}
         />
       </SectionToolbar>
       <FilterChips
         options={PRODUCT_CATEGORY_OPTIONS}
         selected={categories}
-        onRemove={(category) => setCategories((current) => current.filter((c) => c !== category))}
+        onRemove={(category) => changeCategories(categories.filter((c) => c !== category))}
       />
       {narrowedEmpty ? (
         <EmptyMessage text="Nenhum produto encontrado para a busca e os filtros">
@@ -316,38 +414,62 @@ export function ProductsGrid({
           </Button>
         </EmptyMessage>
       ) : (
-        <DataGridPremium
-          rows={tabRows}
-          columns={columns}
-          loading={loading}
-          getRowId={(row: Product) => row.id}
-          onRowClick={({ row }: { row: Product }) => onOpen(row)}
-          columnVisibilityModel={{ sku: !narrow, status: !narrow }}
-          pagination
-          pageSizeOptions={PAGE_SIZE_OPTIONS}
-          initialState={{
-            sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
-            pagination: { paginationModel: { pageSize: 25, page: 0 } },
-          }}
-          disableVirtualization={disableVirtualization}
-          autoHeight
-          slots={{
-            noRowsOverlay: () => (
-              <Typography
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  color: 'text.disabled',
-                  fontSize: 13,
-                }}
-              >
-                {emptyMessage}
-              </Typography>
-            ),
-          }}
-          sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+        <Box sx={{ position: 'relative' }}>
+          <DataGridPremium
+            rows={tabRows}
+            columns={columns}
+            loading={loading}
+            getRowId={(row: Product) => row.id}
+            onRowClick={({ row }: { row: Product }) => onOpen(row)}
+            checkboxSelection={onBatch !== undefined}
+            disableRowSelectionOnClick
+            rowSelectionModel={selection}
+            onRowSelectionModelChange={setSelection}
+            columnVisibilityModel={{ sku: !narrow, status: !narrow }}
+            pagination
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            initialState={{
+              sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
+              pagination: { paginationModel: { pageSize: 25, page: 0 } },
+            }}
+            disableVirtualization={disableVirtualization}
+            autoHeight
+            slots={{
+              noRowsOverlay: () => (
+                <Typography
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    color: 'text.disabled',
+                    fontSize: 13,
+                  }}
+                >
+                  {emptyMessage}
+                </Typography>
+              ),
+            }}
+            sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+          />
+          {onBatch && !running && selected.length > 0 && (
+            <BulkActionsBar
+              count={selected.length}
+              actions={bulkActionsFor(selected, startBatch)}
+              onClear={clearSelection}
+            />
+          )}
+        </Box>
+      )}
+      {confirming && (
+        <ConfirmDialog
+          title={`${BATCH_CONFIRM[confirming].verb} ${productsCount(selected.length)}?`}
+          description={BATCH_CONFIRM[confirming].description}
+          confirmLabel={BATCH_CONFIRM[confirming].verb}
+          danger={BATCH_CONFIRM[confirming].danger}
+          loading={running}
+          onConfirm={() => void runBatch(confirming)}
+          onCancel={() => setConfirming(null)}
         />
       )}
     </Box>

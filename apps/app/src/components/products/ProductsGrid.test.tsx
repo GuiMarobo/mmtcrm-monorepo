@@ -380,6 +380,133 @@ describe('ProductsGrid', () => {
     )
   })
 
+  describe('seleção e ações em massa', () => {
+    const bar = () => screen.queryByRole('toolbar', { name: 'Ações em massa' })
+    const shownBar = () => screen.getByRole('toolbar', { name: 'Ações em massa' })
+
+    const toggleRow = (name: string) => userEvent.click(within(rowOf(name)).getByRole('checkbox'))
+
+    it('sem ações em massa (VENDEDOR) não há checkbox nem barra', () => {
+      renderGrid()
+
+      expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
+      expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+      expect(bar()).not.toBeInTheDocument()
+    })
+
+    it('ADMIN marca o checkbox da linha: a barra aparece com a contagem e o detalhe não abre', async () => {
+      const onOpen = vi.fn()
+      renderGrid({ onOpen, onBatch: vi.fn() })
+
+      expect(bar()).not.toBeInTheDocument()
+      await toggleRow('iPhone 15 Pro')
+      await toggleRow('MacBook Air')
+
+      expect(within(shownBar()).getByText('2 selecionados')).toBeInTheDocument()
+      expect(onOpen).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['sem busca, todos os 33 do catálogo', '', '33 selecionados'],
+      ['com busca, só os 29 que ela encontra', 'iphone', '29 selecionados'],
+    ])('o checkbox do cabeçalho seleciona todos os filtrados em todas as páginas: %s', async (_, text, count) => {
+      const many = Array.from({ length: 28 }, (_, index) =>
+        product({ id: `extra-${index}`, name: `iPhone ${index}`, sku: `IP-${index}` }),
+      )
+      renderGrid({ rows: [...catalog, ...many], onBatch: vi.fn() })
+
+      if (text) search(text)
+      await userEvent.click(within(screen.getAllByRole('row')[0]).getByRole('checkbox'))
+
+      expect(within(shownBar()).getByText(count)).toBeInTheDocument()
+    })
+
+    it.each([
+      ['trocar de aba', () => userEvent.click(tab(/^Ativos/))],
+      ['buscar', async () => search('iphone')],
+      ['filtrar por categoria', () => applyCategories('iPhone')],
+    ])('a seleção é limpa ao %s', async (_, change) => {
+      renderGrid({ onBatch: vi.fn() })
+      await toggleRow('iPhone 15 Pro')
+      expect(bar()).toBeInTheDocument()
+
+      await change()
+
+      expect(bar()).not.toBeInTheDocument()
+      expect(within(rowOf('iPhone 15 Pro')).getByRole('checkbox')).not.toBeChecked()
+    })
+
+    const barButtons = () =>
+      within(shownBar())
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+        .filter(Boolean)
+
+    it.each([
+      ['só Ativos', ['iPhone 15 Pro', 'MacBook Air'], ['Descontinuar', 'Excluir']],
+      ['só Inativos', ['Capa MagSafe'], ['Reativar', 'Excluir']],
+      ['Ativos e Inativos', ['iPhone 15 Pro', 'Capa MagSafe'], ['Descontinuar', 'Reativar', 'Excluir']],
+    ])('com %s selecionados a barra oferece só as ações que cabem', async (_, names, buttons) => {
+      renderGrid({ onBatch: vi.fn() })
+
+      for (const name of names) await toggleRow(name)
+
+      expect(barButtons()).toEqual(buttons)
+    })
+
+    const batchCall = (onBatch: ReturnType<typeof vi.fn>) =>
+      onBatch.mock.calls.map(([action, products]) => [
+        action,
+        (products as Product[]).map((p) => p.id).sort(),
+      ])
+
+    it.each([
+      ['Descontinuar', 'Descontinuar 2 produtos?', 'discontinue'],
+      ['Excluir', 'Excluir 2 produtos?', 'delete'],
+    ])('%s pede confirmação com a quantidade e, confirmado, executa o lote e limpa a seleção', async (label, title, action) => {
+      const onBatch = vi.fn().mockResolvedValue(undefined)
+      renderGrid({ onBatch })
+      await toggleRow('iPhone 15 Pro')
+      await toggleRow('MacBook Air')
+
+      await userEvent.click(within(shownBar()).getByRole('button', { name: label }))
+      const dialog = screen.getByRole('dialog')
+      expect(within(dialog).getByText(title)).toBeInTheDocument()
+      expect(onBatch).not.toHaveBeenCalled()
+
+      await userEvent.click(within(dialog).getByRole('button', { name: label }))
+
+      expect(batchCall(onBatch)).toEqual([[action, ['iphone', 'mac']]])
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(bar()).not.toBeInTheDocument()
+    })
+
+    it('cancelar a confirmação não executa nada e mantém a seleção', async () => {
+      const onBatch = vi.fn()
+      renderGrid({ onBatch })
+      await toggleRow('iPhone 15 Pro')
+
+      await userEvent.click(within(shownBar()).getByRole('button', { name: 'Excluir' }))
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }))
+
+      expect(onBatch).not.toHaveBeenCalled()
+      expect(within(shownBar()).getByText('1 selecionado')).toBeInTheDocument()
+    })
+
+    it('Reativar executa direto, sem confirmação, e limpa a seleção', async () => {
+      const onBatch = vi.fn().mockResolvedValue(undefined)
+      renderGrid({ onBatch })
+      await toggleRow('Capa MagSafe')
+      await toggleRow('Apple Watch Série 9')
+
+      await userEvent.click(within(shownBar()).getByRole('button', { name: 'Reativar' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(batchCall(onBatch)).toEqual([['reactivate', ['capa', 'watch']]])
+      expect(bar()).not.toBeInTheDocument()
+    })
+  })
+
   describe('no telefone', () => {
     afterEach(() => {
       vi.unstubAllGlobals()

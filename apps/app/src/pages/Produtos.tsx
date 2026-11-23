@@ -11,6 +11,8 @@ import {
 import { ProductDetailDrawer } from '../components/products/ProductDetailDrawer'
 import { ProductFormModal } from '../components/products/ProductFormModal'
 import { ProductsGrid } from '../components/products/ProductsGrid'
+import { runBatch, summarizeBatch } from '../components/products/productsBatch'
+import type { BatchAction } from '../components/products/productsBatch'
 import { ProductPriceModal } from '../components/products/ProductPriceModal'
 import { ProductStats } from '../components/products/ProductStats'
 import { StockMovementModal } from '../components/products/StockMovementModal'
@@ -171,6 +173,32 @@ export function Produtos({ toast }: ProdutosProps) {
     toast(`Produto "${product.name}" excluído`)
   }
 
+  const runProductsBatch = async (batchAction: BatchAction, products: Product[]) => {
+    if (batchAction === 'delete') {
+      const results = await runBatch(batchAction, products, (product) =>
+        productsApi.remove(product.id),
+      )
+      const gone = new Set(
+        results.filter((result) => result.outcome !== 'failed').map((result) => result.item.id),
+      )
+      setList((prev) => prev.filter((product) => !gone.has(product.id)))
+      if (openedId.current && gone.has(openedId.current)) closeDetail()
+      const summary = summarizeBatch(batchAction, results)
+      toast(summary.message, summary.type)
+      return
+    }
+    const results = await runBatch(batchAction, products, (product) =>
+      batchAction === 'discontinue'
+        ? productsApi.discontinue(product.id)
+        : productsApi.reactivate(product.id),
+    )
+    for (const result of results) {
+      if (result.outcome === 'succeeded') applyDetail(result.value)
+    }
+    const summary = summarizeBatch(batchAction, results)
+    toast(summary.message, summary.type)
+  }
+
   const startOn = (kind: ProductAction['kind']) => (product: Product) =>
     setAction({ kind, product })
 
@@ -219,6 +247,7 @@ export function Produtos({ toast }: ProdutosProps) {
                     }
                   : undefined
               }
+              onBatch={isAdmin ? runProductsBatch : undefined}
             />
           </SectionCard>
         </>
