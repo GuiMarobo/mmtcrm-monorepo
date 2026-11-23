@@ -56,6 +56,7 @@ interface DataTableProps<T> {
   expandLabel?: (row: T) => string
   renderActions?: (row: T) => ReactNode
   selection?: DataTableSelection<T>
+  pageResetKey?: string
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
@@ -87,11 +88,18 @@ export function DataTable<T>({
   expandLabel,
   renderActions,
   selection,
+  pageResetKey,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<DataTableSort | null>(initialSort ?? null)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(PAGE_SIZE_OPTIONS[0])
   const [expanded, setExpanded] = useState<ReadonlySet<RowId>>(new Set())
+  const [seenResetKey, setSeenResetKey] = useState(pageResetKey)
+
+  if (pageResetKey !== seenResetKey) {
+    setSeenResetKey(pageResetKey)
+    setPage(0)
+  }
 
   const visibleColumns = columns.filter((column) => !column.hidden)
   const sortBy = sort ? columns.find((column) => column.key === sort.key)?.sortValue : undefined

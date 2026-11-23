@@ -60,6 +60,25 @@ describe('DataTable', () => {
     expect(screen.getAllByRole('row')).toHaveLength(3)
   })
 
+  it('mudar pageResetKey volta à primeira página e mantém a ordenação', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ id: i, name: `Item ${i}`, value: i }))
+    const table = (key: string) => (
+      <DataTable label="Teste" rows={many} columns={columns} getRowId={(row) => row.id} pageResetKey={key} />
+    )
+    const { rerender } = render(table('a'))
+    await userEvent.click(screen.getByRole('button', { name: 'Valor' }))
+    await userEvent.click(screen.getByRole('button', { name: /Valor/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
+    expect(firstColumn()).toEqual(['Item 1', 'Item 0'])
+
+    rerender(table('a'))
+    expect(firstColumn()).toEqual(['Item 1', 'Item 0'])
+
+    rerender(table('b'))
+    expect(screen.getByText('1–10 de 12')).toBeInTheDocument()
+    expect(firstColumn()[0]).toBe('Item 11')
+  })
+
   it('sem paginação, mostra todas as linhas e nenhum rodapé', () => {
     const many = Array.from({ length: 12 }, (_, i) => ({ id: i, name: `Item ${i}`, value: i }))
     render(

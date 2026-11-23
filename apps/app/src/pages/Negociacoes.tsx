@@ -267,8 +267,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
           </SectionCard>
         ) : (
           <NegotiationBoard
-            key={query}
             items={visible}
+            pageResetKey={query.trim()}
             onMove={requestTransition}
             onRefuse={() => toast(TRANSITION_REFUSAL, 'error')}
             onEdit={(n) => void openEdit(n)}
@@ -278,8 +278,8 @@ export function Negociacoes({ toast }: NegociacoesProps) {
 
       {!loadError && view === 'lista' && (
         <NegotiationListView
-          key={query}
           items={visible}
+          pageResetKey={query.trim()}
           loading={loading}
           loadDetail={(id) => negotiationsApi.findOne(id)}
           onEdit={(n) => void openEdit(n)}

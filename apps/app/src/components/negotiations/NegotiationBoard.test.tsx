@@ -51,6 +51,29 @@ describe('NegotiationBoard', () => {
     expect(wonColumn().getByText('Cliente 25')).toBeInTheDocument()
   })
 
+  it('mudar pageResetKey volta as colunas à primeira página', async () => {
+    const items = Array.from({ length: 25 }, (_, i) => won(i + 1))
+    const board = (key: string) => (
+      <NegotiationBoard
+        items={items}
+        pageResetKey={key}
+        onMove={vi.fn().mockResolvedValue(true)}
+        onRefuse={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+    const { rerender } = render(board('a'))
+    await userEvent.click(wonColumn().getByRole('button', { name: 'Página 9' }))
+
+    rerender(board('a'))
+    expect(wonColumn().getByText('Cliente 25')).toBeInTheDocument()
+
+    rerender(board('b'))
+    expect(wonColumn().getByRole('button', { name: 'Página 1' })).toHaveAttribute('aria-current', 'page')
+    expect(wonColumn().queryByText('Cliente 25')).not.toBeInTheDocument()
+  })
+
   it('não mostra paginação quando a coluna cabe numa página', () => {
     renderBoard([won(1), won(2)])
 

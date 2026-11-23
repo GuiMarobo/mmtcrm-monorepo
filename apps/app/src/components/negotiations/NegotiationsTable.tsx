@@ -25,6 +25,7 @@ interface NegotiationsTableProps {
   onEdit: (negotiation: Negotiation) => void
   onRequestTransition: (negotiation: Negotiation, target: NegotiationStatus) => void
   onDelete: (negotiation: Negotiation) => void
+  pageResetKey?: string
 }
 
 export function NegotiationsTable({
@@ -34,6 +35,7 @@ export function NegotiationsTable({
   onEdit,
   onRequestTransition,
   onDelete,
+  pageResetKey,
 }: NegotiationsTableProps) {
   const theme = useTheme()
   const compact = useMediaQuery(theme.breakpoints.down('md'))
@@ -148,6 +150,7 @@ export function NegotiationsTable({
       loading={loading}
       size={narrow ? 'small' : 'medium'}
       initialSort={{ key: 'updatedAt', direction: 'desc' }}
+      pageResetKey={pageResetKey}
       emptyMessage="Nenhuma negociação encontrada"
       expandLabel={(negotiation) => `Ver itens da negociação de ${negotiation.client?.name ?? 'cliente'}`}
       renderExpanded={(negotiation) => (

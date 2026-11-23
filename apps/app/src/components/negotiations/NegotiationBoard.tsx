@@ -38,10 +38,12 @@ interface NegotiationBoardProps {
   onRefuse: () => void
   onEdit: (negotiation: Negotiation) => void
   onDelete: (negotiation: Negotiation) => void
+  pageResetKey?: string
 }
 
 export function NegotiationBoard({
   items,
+  pageResetKey,
   onMove,
   onRefuse,
   onEdit,
@@ -50,6 +52,12 @@ export function NegotiationBoard({
   const [override, setOverride] = useState<Record<number, NegotiationStatus>>({})
   const [activeId, setActiveId] = useState<number | null>(null)
   const [pages, setPages] = useState<Record<NegotiationStatus, number>>(FIRST_PAGES)
+  const [seenResetKey, setSeenResetKey] = useState(pageResetKey)
+
+  if (pageResetKey !== seenResetKey) {
+    setSeenResetKey(pageResetKey)
+    setPages(FIRST_PAGES)
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

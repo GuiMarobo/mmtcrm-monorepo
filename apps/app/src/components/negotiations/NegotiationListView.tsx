@@ -9,6 +9,7 @@ interface NegotiationListViewProps {
   onEdit: (negotiation: Negotiation) => void
   onRequestTransition: (negotiation: Negotiation, target: NegotiationStatus) => void
   onDelete: (negotiation: Negotiation) => void
+  pageResetKey?: string
 }
 
 export function NegotiationListView({
@@ -18,6 +19,7 @@ export function NegotiationListView({
   onEdit,
   onRequestTransition,
   onDelete,
+  pageResetKey,
 }: NegotiationListViewProps) {
   return (
     <SectionCard>
@@ -28,6 +30,7 @@ export function NegotiationListView({
         onEdit={onEdit}
         onRequestTransition={onRequestTransition}
         onDelete={onDelete}
+        pageResetKey={pageResetKey}
       />
     </SectionCard>
   )
