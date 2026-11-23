@@ -31,7 +31,7 @@ export const PRODUCTS_TABS: ProductsTabDefinition[] = [
   {
     value: 'sem-estoque',
     label: 'Sem estoque',
-    includes: (product) => product.stock === 0,
+    includes: (product) => stockLevel(product.stock) === 'zerado',
     emptyMessage: 'Nenhum produto sem estoque',
   },
 ]

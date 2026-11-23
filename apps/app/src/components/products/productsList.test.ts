@@ -41,8 +41,9 @@ describe('productsInTab', () => {
     expect(ids(productsInTab(catalog, 'inativos'))).toEqual(['capa', 'watch'])
   })
 
-  it('Sem estoque traz os de saldo zero, em qualquer situação', () => {
-    expect(ids(productsInTab(catalog, 'sem-estoque'))).toEqual(['airpods', 'watch'])
+  it('Sem estoque traz os de saldo zero ou negativo, em qualquer situação', () => {
+    const list = [...catalog, product({ id: 'negativo', stock: -1 })]
+    expect(ids(productsInTab(list, 'sem-estoque'))).toEqual(['airpods', 'watch', 'negativo'])
   })
 })
 

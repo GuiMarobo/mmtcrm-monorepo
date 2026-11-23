@@ -415,60 +415,48 @@ export function ProductsGrid({
         selected={categories}
         onRemove={(category) => changeCategories(categories.filter((c) => c !== category))}
       />
-      {narrowedEmpty ? (
-        <EmptyMessage text="Nenhum produto encontrado para a busca e os filtros">
-          <Button size="small" onClick={clearFilters} sx={{ mt: 1.5 }}>
-            Limpar filtros
-          </Button>
-        </EmptyMessage>
-      ) : (
-        <Box sx={{ position: 'relative' }}>
-          <DataGridPremium
-            rows={tabRows}
-            columns={columns}
-            loading={loading}
-            getRowId={(row: Product) => row.id}
-            onRowClick={({ row }: { row: Product }) => onOpen(row)}
-            checkboxSelection={onBatch !== undefined}
-            disableRowSelectionOnClick
-            rowSelectionModel={selection}
-            onRowSelectionModelChange={setSelection}
-            columnVisibilityModel={{ sku: !narrow, status: !narrow }}
-            pagination
-            pageSizeOptions={PAGE_SIZE_OPTIONS}
-            initialState={{
-              sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
-              pagination: { paginationModel: { pageSize: 25, page: 0 } },
-            }}
-            disableVirtualization={disableVirtualization}
-            autoHeight
-            slots={{
-              noRowsOverlay: () => (
-                <Typography
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '100%',
-                    color: 'text.disabled',
-                    fontSize: 13,
-                  }}
-                >
-                  {emptyMessage}
-                </Typography>
+      <Box sx={{ position: 'relative' }}>
+        <DataGridPremium
+          rows={tabRows}
+          columns={columns}
+          loading={loading}
+          getRowId={(row: Product) => row.id}
+          onRowClick={({ row }: { row: Product }) => onOpen(row)}
+          checkboxSelection={onBatch !== undefined}
+          disableRowSelectionOnClick
+          rowSelectionModel={selection}
+          onRowSelectionModelChange={setSelection}
+          columnVisibilityModel={{ sku: !narrow, status: !narrow }}
+          pagination
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          initialState={{
+            sorting: { sortModel: [{ field: 'name', sort: 'asc' }] },
+            pagination: { paginationModel: { pageSize: 25, page: 0 } },
+          }}
+          disableVirtualization={disableVirtualization}
+          autoHeight
+          slots={{
+            noRowsOverlay: () =>
+              narrowedEmpty ? (
+                <EmptyMessage text="Nenhum produto encontrado para a busca e os filtros">
+                  <Button size="small" onClick={clearFilters} sx={{ mt: 1.5 }}>
+                    Limpar filtros
+                  </Button>
+                </EmptyMessage>
+              ) : (
+                <EmptyMessage text={emptyMessage} />
               ),
-            }}
-            sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+          }}
+          sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+        />
+        {onBatch && !running && selected.length > 0 && (
+          <BulkActionsBar
+            count={selected.length}
+            actions={bulkActionsFor(selected, startBatch)}
+            onClear={clearSelection}
           />
-          {onBatch && !running && selected.length > 0 && (
-            <BulkActionsBar
-              count={selected.length}
-              actions={bulkActionsFor(selected, startBatch)}
-              onClear={clearSelection}
-            />
-          )}
-        </Box>
-      )}
+        )}
+      </Box>
       {confirming && (
         <ConfirmDialog
           title={`${BATCH_CONFIRM[confirming].verb} ${productsCount(selected.length)}?`}
@@ -486,7 +474,7 @@ export function ProductsGrid({
 
 function EmptyMessage({ text, children }: { text: string; children?: ReactNode }) {
   return (
-    <Box sx={{ p: 6, textAlign: 'center' }}>
+    <Box sx={{ p: 6, textAlign: 'center', height: '100%' }}>
       <Typography sx={{ color: 'text.disabled', fontSize: 13 }}>{text}</Typography>
       {children}
     </Box>

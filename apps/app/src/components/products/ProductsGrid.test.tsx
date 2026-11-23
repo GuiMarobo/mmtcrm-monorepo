@@ -127,6 +127,24 @@ describe('ProductsGrid', () => {
     expect(visibleNames()).toHaveLength(5)
   })
 
+  it('a ordenação escolhida sobrevive a uma busca sem resultado', async () => {
+    renderGrid({
+      rows: [
+        product({ id: 'a', name: 'Apple TV', sku: 'ATV', price: 300 }),
+        product({ id: 'b', name: 'Beats', sku: 'BTS', price: 100 }),
+        product({ id: 'c', name: 'Capa', sku: 'CAP', price: 200 }),
+      ],
+    })
+    await userEvent.click(screen.getByRole('columnheader', { name: /Preço/ }))
+    expect(visibleNames()).toEqual(['Beats', 'Capa', 'Apple TV'])
+
+    search('zzz')
+    expect(screen.getByText('Nenhum produto encontrado para a busca e os filtros')).toBeInTheDocument()
+    search('')
+
+    expect(visibleNames()).toEqual(['Beats', 'Capa', 'Apple TV'])
+  })
+
   it('busca por nome ou código sem diferenciar acento nem maiúsculas, e os contadores seguem a busca', () => {
     renderGrid()
 
