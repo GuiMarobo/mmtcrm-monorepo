@@ -285,6 +285,7 @@ export function Produtos({ toast }: ProdutosProps) {
 
       {creating && (
         <ProductFormModal
+          existingSkus={list.map((product) => product.sku)}
           onClose={() => setCreating(false)}
           onSave={saveProduct}
         />

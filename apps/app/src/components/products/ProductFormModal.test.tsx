@@ -93,23 +93,92 @@ describe('ProductFormModal — edição (RP3)', () => {
 })
 
 describe('ProductFormModal — cadastro', () => {
-  it('continua enviando preço e quantidade inicial', async () => {
+  it('sugere o código enquanto o nome é digitado e envia com preço e quantidade inicial', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn().mockResolvedValue(undefined)
     render(<ProductFormModal onClose={vi.fn()} onSave={onSave} />)
 
-    await user.type(screen.getByLabelText(/^Nome/), 'AirPods Pro')
-    await user.type(screen.getByLabelText(/Código de Referência/), 'app2')
+    const name = screen.getByLabelText(/^Nome/)
+    const sku = screen.getByLabelText(/Código de Referência/)
+    await user.type(name, 'AirPods')
+    expect(sku).toHaveValue('AIRPODS')
+    await user.type(name, ' Pró')
+    expect(sku).toHaveValue('AIRPODS-PRO')
+
     await user.type(screen.getByLabelText(/Preço de Venda/), '1999')
     await user.click(screen.getByRole('button', { name: 'Cadastrar produto' }))
 
     expect(onSave).toHaveBeenCalledWith({
-      name: 'AirPods Pro',
-      sku: 'app2',
+      name: 'AirPods Pró',
+      sku: 'AIRPODS-PRO',
       description: null,
       category: 'IPHONE',
       price: 1999,
       initialStock: 0,
     })
+  })
+})
+
+describe('ProductFormModal — código sugerido', () => {
+  const setupCreate = (existingSkus: string[] = []) => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(<ProductFormModal existingSkus={existingSkus} onClose={vi.fn()} onSave={onSave} />)
+    return {
+      user: userEvent.setup(),
+      name: screen.getByLabelText(/^Nome/),
+      sku: screen.getByLabelText(/Código de Referência/),
+    }
+  }
+
+  it('ganha sufixo quando o código sugerido já existe no catálogo carregado', async () => {
+    const { user, name, sku } = setupCreate(['ipad-air', 'IPAD-AIR-2'])
+
+    await user.type(name, 'iPad Air')
+
+    expect(sku).toHaveValue('IPAD-AIR-3')
+  })
+
+  it('para de acompanhar o nome depois que o código é editado à mão', async () => {
+    const { user, name, sku } = setupCreate()
+
+    await user.type(name, 'iPad Air')
+    await user.type(sku, '-M2')
+    await user.type(name, ' 11')
+
+    expect(sku).toHaveValue('IPAD-AIR-M2')
+  })
+
+  it('apagar o código todo não religa a sugestão', async () => {
+    const { user, name, sku } = setupCreate()
+
+    await user.type(name, 'iPad Air')
+    await user.clear(sku)
+    await user.type(name, ' 11')
+
+    expect(sku).toHaveValue('')
+  })
+})
+
+describe('ProductFormModal — layout', () => {
+  it('cadastro em duas seções, com a prévia do avatar acompanhando a categoria', async () => {
+    const user = userEvent.setup()
+    render(<ProductFormModal onClose={vi.fn()} onSave={vi.fn()} />)
+
+    expect(screen.getByText('Identificação')).toBeInTheDocument()
+    expect(screen.getByText('Preço & Estoque')).toBeInTheDocument()
+    expect(screen.getByLabelText('iPhone')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('combobox', { name: /Categoria/ }))
+    await user.click(screen.getByRole('option', { name: 'Mac' }))
+
+    expect(screen.getByLabelText('Mac')).toBeInTheDocument()
+    expect(screen.queryByLabelText('iPhone')).not.toBeInTheDocument()
+  })
+
+  it('edição mostra só a seção de identificação', () => {
+    render(<ProductFormModal product={product()} onClose={vi.fn()} onSave={vi.fn()} />)
+
+    expect(screen.getByText('Identificação')).toBeInTheDocument()
+    expect(screen.queryByText('Preço & Estoque')).not.toBeInTheDocument()
   })
 })
