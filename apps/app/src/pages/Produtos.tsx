@@ -4,6 +4,7 @@ import Button from '@mui/material/Button'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
+import { useExclusive } from '../hooks/useExclusive'
 import {
   ProductConfirmDialog,
   type ProductConfirmAction,
@@ -48,7 +49,6 @@ export function Produtos({ toast }: ProdutosProps) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [action, setAction] = useState<ProductAction | null>(null)
-  const [reactivating, setReactivating] = useState(false)
   const openedId = useRef<string | null>(null)
 
   const isAdmin = user?.role === 'ADMIN'
@@ -145,18 +145,15 @@ export function Produtos({ toast }: ProdutosProps) {
     toast(`Produto "${updated.name}" descontinuado`)
   }
 
-  const reactivate = async (product: Product) => {
-    setReactivating(true)
+  const { busy: reactivating, run: reactivate } = useExclusive(async (product: Product) => {
     try {
       const updated = await productsApi.reactivate(product.id)
       applyDetail(updated)
       toast(`Produto "${updated.name}" reativado`)
     } catch (err) {
       toast(err instanceof ApiError ? err.message : 'Erro ao reativar o produto.', 'error')
-    } finally {
-      setReactivating(false)
     }
-  }
+  })
 
   const removeProduct = async (product: Product) => {
     const drop = () => {
