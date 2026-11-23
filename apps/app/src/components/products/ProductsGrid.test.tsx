@@ -405,8 +405,8 @@ describe('ProductsGrid', () => {
   })
 
   describe('seleção e ações em massa', () => {
-    const bar = () => screen.queryByRole('toolbar', { name: 'Ações em massa' })
-    const shownBar = () => screen.getByRole('toolbar', { name: 'Ações em massa' })
+    const bar = () => screen.queryByRole('region', { name: 'Ações em massa' })
+    const shownBar = () => screen.getByRole('region', { name: 'Ações em massa' })
 
     const toggleRow = (name: string) => userEvent.click(within(rowOf(name)).getByRole('checkbox'))
 
@@ -458,6 +458,23 @@ describe('ProductsGrid', () => {
 
       expect(bar()).not.toBeInTheDocument()
       expect(within(rowOf('iPhone 15 Pro')).getByRole('checkbox')).not.toBeChecked()
+    })
+
+    it('um produto que sai da aba por ação individual perde a seleção e não volta marcado', async () => {
+      const onBatch = vi.fn()
+      const { rerender } = renderGrid({ onBatch })
+      await userEvent.click(tab(/^Ativos/))
+      for (const name of ['iPhone 15 Pro', 'AirPods Pro', 'MacBook Air']) await toggleRow(name)
+
+      const withMac = (status: Product['status']) =>
+        catalog.map((p) => (p.id === 'mac' ? { ...p, status } : p))
+      const show = (rows: Product[]) =>
+        rerender(<ProductsGrid rows={rows} loading={false} onOpen={noop} onBatch={onBatch} disableVirtualization />)
+      show(withMac('INATIVO'))
+      show(withMac('ATIVO'))
+
+      expect(within(shownBar()).getByText('2 selecionados')).toBeInTheDocument()
+      expect(within(rowOf('MacBook Air')).getByRole('checkbox')).not.toBeChecked()
     })
 
     const barButtons = () =>

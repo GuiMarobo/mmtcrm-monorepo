@@ -23,7 +23,7 @@ interface BulkActionsBarProps {
 export function BulkActionsBar({ count, actions, onClear }: BulkActionsBarProps) {
   return (
     <Paper
-      role="toolbar"
+      role="region"
       aria-label="Ações em massa"
       elevation={8}
       sx={{
@@ -42,7 +42,12 @@ export function BulkActionsBar({ count, actions, onClear }: BulkActionsBarProps)
         borderRadius: 3,
       }}
     >
-      <Typography sx={{ fontWeight: 600, fontSize: 13.5, whiteSpace: 'nowrap', pr: 1 }}>
+      <Typography
+        variant="subtitle1"
+        role="status"
+        aria-live="polite"
+        sx={{ whiteSpace: 'nowrap', pr: 1 }}
+      >
         {count === 1 ? '1 selecionado' : `${count} selecionados`}
       </Typography>
       <Divider orientation="vertical" flexItem />
