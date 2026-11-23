@@ -159,6 +159,65 @@ describe('ProductFormModal — código sugerido', () => {
   })
 })
 
+describe('ProductFormModal — duplicar', () => {
+  const setupDuplicate = (existingSkus: string[] = []) => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ProductFormModal
+        duplicateOf={product({ category: 'MAC', price: 7999.9, stock: 5 })}
+        existingSkus={existingSkus}
+        onClose={vi.fn()}
+        onSave={onSave}
+      />,
+    )
+    return {
+      onSave,
+      user: userEvent.setup(),
+      name: screen.getByLabelText(/^Nome/) as HTMLInputElement,
+      sku: screen.getByLabelText(/Código de Referência/),
+    }
+  }
+
+  it('abre o cadastro com nome, categoria, descrição e preço do original, estoque 0 e código com sufixo', async () => {
+    const { onSave, user, name, sku } = setupDuplicate(['IPHONE-15-PRO'])
+
+    expect(screen.getByText('Novo Produto')).toBeInTheDocument()
+    expect(name).toHaveValue('iPhone 15 Pro')
+    expect(sku).toHaveValue('IPHONE-15-PRO-2')
+    expect(screen.getByLabelText('Descrição')).toHaveValue('Titânio natural')
+    expect(screen.getByRole('combobox', { name: /Categoria/ })).toHaveTextContent('Mac')
+    expect(screen.getByLabelText(/Preço de Venda/)).toHaveValue(7999.9)
+    expect(screen.getByLabelText(/Quantidade Inicial/)).toHaveValue(0)
+
+    await user.click(screen.getByRole('button', { name: 'Cadastrar produto' }))
+
+    expect(onSave).toHaveBeenCalledWith({
+      name: 'iPhone 15 Pro',
+      sku: 'IPHONE-15-PRO-2',
+      description: 'Titânio natural',
+      category: 'MAC',
+      price: 7999.9,
+      initialStock: 0,
+    })
+  })
+
+  it('o código continua acompanhando o nome', async () => {
+    const { user, name, sku } = setupDuplicate(['IPHONE-15-PRO'])
+
+    await user.type(name, ' 512GB')
+
+    expect(sku).toHaveValue('IPHONE-15-PRO-512GB')
+  })
+
+  it('abre com o cursor no fim do nome', async () => {
+    const { name } = setupDuplicate()
+
+    await waitFor(() => expect(name).toHaveFocus())
+    expect(name.selectionStart).toBe('iPhone 15 Pro'.length)
+    expect(name.selectionEnd).toBe('iPhone 15 Pro'.length)
+  })
+})
+
 describe('ProductFormModal — layout', () => {
   it('cadastro em duas seções, com a prévia do avatar acompanhando a categoria', async () => {
     const user = userEvent.setup()

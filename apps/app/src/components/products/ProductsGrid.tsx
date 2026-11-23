@@ -1,4 +1,5 @@
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined'
+import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import PriceChangeOutlinedIcon from '@mui/icons-material/PriceChangeOutlined'
@@ -50,6 +51,7 @@ export interface ProductRowActions {
   onEdit: (product: Product) => void
   onUpdatePrice: (product: Product) => void
   onMoveStock: (product: Product) => void
+  onDuplicate: (product: Product) => void
   onDiscontinue: (product: Product) => void
   onReactivate: (product: Product) => void
   onDelete: (product: Product) => void
@@ -159,6 +161,12 @@ function rowActionsFor(product: Product, handlers: ProductRowActions): RowAction
       label: 'Movimentar estoque',
       icon: <SwapVertOutlinedIcon />,
       onClick: () => handlers.onMoveStock(product),
+    },
+    {
+      key: 'duplicate',
+      label: 'Duplicar',
+      icon: <ContentCopyOutlinedIcon />,
+      onClick: () => handlers.onDuplicate(product),
     },
     situation,
     {

@@ -321,6 +321,7 @@ describe('ProductsGrid', () => {
       onEdit: vi.fn(),
       onUpdatePrice: vi.fn(),
       onMoveStock: vi.fn(),
+      onDuplicate: vi.fn(),
       onDiscontinue: vi.fn(),
       onReactivate: vi.fn(),
       onDelete: vi.fn(),
@@ -340,12 +341,12 @@ describe('ProductsGrid', () => {
       [
         'Ativo',
         'iPhone 15 Pro',
-        ['Editar', 'Alterar preço', 'Movimentar estoque', 'Descontinuar', 'Excluir'],
+        ['Editar', 'Alterar preço', 'Movimentar estoque', 'Duplicar', 'Descontinuar', 'Excluir'],
       ],
       [
         'Inativo',
         'Capa MagSafe',
-        ['Editar', 'Alterar preço', 'Movimentar estoque', 'Reativar', 'Excluir'],
+        ['Editar', 'Alterar preço', 'Movimentar estoque', 'Duplicar', 'Reativar', 'Excluir'],
       ],
     ])('Produto %s oferece os itens da sua Situação', async (_, name, items) => {
       renderGrid({ actions: rowActions() })
@@ -359,6 +360,7 @@ describe('ProductsGrid', () => {
       ['Editar', 'onEdit', 'iPhone 15 Pro', 'iphone'],
       ['Alterar preço', 'onUpdatePrice', 'MacBook Air', 'mac'],
       ['Movimentar estoque', 'onMoveStock', 'AirPods Pro', 'airpods'],
+      ['Duplicar', 'onDuplicate', 'MacBook Air', 'mac'],
       ['Descontinuar', 'onDiscontinue', 'iPhone 15 Pro', 'iphone'],
       ['Reativar', 'onReactivate', 'Capa MagSafe', 'capa'],
       ['Excluir', 'onDelete', 'Apple Watch Série 9', 'watch'],

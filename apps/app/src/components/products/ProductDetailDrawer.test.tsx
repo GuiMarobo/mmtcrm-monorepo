@@ -247,6 +247,16 @@ describe('ProductDetailDrawer', () => {
     expect(onDelete).toHaveBeenCalledTimes(1)
   })
 
+  it('com handler, Duplicar do menu ⋮ chama a ação (ticket 08)', async () => {
+    const onDuplicate = vi.fn()
+    setup({ onDuplicate })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Duplicar' }))
+
+    expect(onDuplicate).toHaveBeenCalledTimes(1)
+  })
+
   it('com handler, Reativar do menu ⋮ chama a ação num Produto Inativo (RP7)', async () => {
     const onReactivate = vi.fn()
     setup({ product: product({ status: 'INATIVO' }), onReactivate })

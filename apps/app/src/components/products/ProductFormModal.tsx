@@ -5,7 +5,7 @@ import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
@@ -46,6 +46,14 @@ function toForm(product: Product): ProductForm {
     sku: product.sku,
     description: product.description ?? '',
     category: product.category,
+  }
+}
+
+function toDuplicateForm(source: Product, takenSkus: string[]): ProductForm {
+  return {
+    ...toForm(source),
+    sku: suggestSku(source.name, takenSkus),
+    price: String(source.price),
   }
 }
 
@@ -114,6 +122,7 @@ type ProductFormModalProps = { onClose: () => void } & (
   | {
       product?: undefined
       existingSkus?: string[]
+      duplicateOf?: Product
       onSave: (payload: CreateProductPayload) => Promise<void>
     }
   | { product: Product; onSave: (payload: UpdateProductPayload) => Promise<void> }
@@ -123,9 +132,21 @@ export function ProductFormModal(props: ProductFormModalProps) {
   const { onClose } = props
   const editing = !!props.product
   const fields = editing ? EDIT_FIELDS : CREATE_FIELDS
-  const [form, setForm] = useState<ProductForm>(() =>
-    props.product ? toForm(props.product) : EMPTY_FORM,
-  )
+  const takenSkus = props.product ? [] : (props.existingSkus ?? [])
+  const [form, setForm] = useState<ProductForm>(() => {
+    if (props.product) return toForm(props.product)
+    if (props.duplicateOf) return toDuplicateForm(props.duplicateOf, takenSkus)
+    return EMPTY_FORM
+  })
+  const nameRef = useRef<HTMLInputElement>(null)
+  const duplicating = !props.product && !!props.duplicateOf
+
+  useEffect(() => {
+    const input = nameRef.current
+    if (!duplicating || !input) return
+    input.setSelectionRange(input.value.length, input.value.length)
+  }, [duplicating])
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
@@ -134,7 +155,6 @@ export function ProductFormModal(props: ProductFormModalProps) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const takenSkus = props.product ? [] : (props.existingSkus ?? [])
   const [suggesting, setSuggesting] = useState(!editing)
 
   const changeName = (name: string) => {
@@ -203,6 +223,8 @@ export function ProductFormModal(props: ProductFormModalProps) {
               label="Nome"
               required
               value={form.name}
+              inputRef={nameRef}
+              autoFocus={duplicating}
               onChange={(e) => changeName(e.target.value)}
               onBlur={() => handleBlur('name')}
               placeholder="Ex.: iPhone 15 Pro 256GB"

@@ -1,4 +1,5 @@
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
+import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined'
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined'
@@ -38,6 +39,7 @@ interface ProductDetailDrawerProps {
   onUpdatePrice?: () => void
   onMoveStock?: () => void
   onEdit?: () => void
+  onDuplicate?: () => void
   onDiscontinue?: () => void
   onReactivate?: () => void
   onDelete?: () => void
@@ -97,6 +99,7 @@ export function ProductDetailDrawer({
   onUpdatePrice,
   onMoveStock,
   onEdit,
+  onDuplicate,
   onDiscontinue,
   onReactivate,
   onDelete,
@@ -170,6 +173,12 @@ export function ProductDetailDrawer({
                   <EditOutlinedIcon />
                 </ListItemIcon>
                 Editar
+              </MenuItem>
+              <MenuItem disabled={!onDuplicate} onClick={run(onDuplicate)}>
+                <ListItemIcon>
+                  <ContentCopyOutlinedIcon />
+                </ListItemIcon>
+                Duplicar
               </MenuItem>
               {active ? (
                 <MenuItem disabled={!onDiscontinue} onClick={run(onDiscontinue)}>

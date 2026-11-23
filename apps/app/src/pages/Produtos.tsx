@@ -29,7 +29,7 @@ import type {
 } from '../types'
 
 interface ProductAction {
-  kind: 'edit' | 'price' | 'stock' | ProductConfirmAction
+  kind: 'edit' | 'duplicate' | 'price' | 'stock' | ProductConfirmAction
   product: Product
 }
 
@@ -104,6 +104,7 @@ export function Produtos({ toast }: ProdutosProps) {
     const created = await productsApi.create(payload)
     setList((prev) => [created, ...prev])
     setCreating(false)
+    setAction(null)
     toast(`Produto "${created.name}" cadastrado`)
   }
 
@@ -241,6 +242,7 @@ export function Produtos({ toast }: ProdutosProps) {
                       onEdit: startOn('edit'),
                       onUpdatePrice: startOn('price'),
                       onMoveStock: startOn('stock'),
+                      onDuplicate: startOn('duplicate'),
                       onDiscontinue: startOn('discontinue'),
                       onReactivate: (product) => void reactivate(product),
                       onDelete: startOn('delete'),
@@ -263,6 +265,7 @@ export function Produtos({ toast }: ProdutosProps) {
           onUpdatePrice={startOnDetail('price')}
           onMoveStock={startOnDetail('stock')}
           onEdit={startOnDetail('edit')}
+          onDuplicate={startOnDetail('duplicate')}
           onDiscontinue={startOnDetail('discontinue')}
           onReactivate={
             detail && !reactivating ? () => void reactivate(detail) : undefined
@@ -295,6 +298,15 @@ export function Produtos({ toast }: ProdutosProps) {
           product={action.product}
           onClose={() => setAction(null)}
           onSave={(payload) => updateProduct(action.product, payload)}
+        />
+      )}
+
+      {action?.kind === 'duplicate' && (
+        <ProductFormModal
+          duplicateOf={action.product}
+          existingSkus={list.map((product) => product.sku)}
+          onClose={() => setAction(null)}
+          onSave={saveProduct}
         />
       )}
 
