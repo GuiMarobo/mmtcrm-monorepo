@@ -1,3 +1,4 @@
+import { matchesQuery } from '../common/dataTableUtils'
 import type { Product, ProductCategory } from '../../types'
 
 export type ProductsTab = 'todos' | 'ativos' | 'inativos' | 'sem-estoque'
@@ -49,16 +50,8 @@ export const countProductsByTab = (products: Product[]): Record<ProductsTab, num
     PRODUCTS_TABS.map(({ value }) => [value, productsInTab(products, value).length]),
   ) as Record<ProductsTab, number>
 
-const normalize = (text: string) =>
-  text.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase()
-
-export const searchProducts = (products: Product[], query: string): Product[] => {
-  const needle = normalize(query)
-  if (!needle) return products
-  return products.filter(
-    (product) => normalize(product.name).includes(needle) || normalize(product.sku).includes(needle),
-  )
-}
+export const searchProducts = (products: Product[], query: string): Product[] =>
+  products.filter((product) => matchesQuery([product.name, product.sku], query))
 
 export const filterByCategories = (
   products: Product[],

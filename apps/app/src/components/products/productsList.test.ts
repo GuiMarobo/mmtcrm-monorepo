@@ -60,6 +60,15 @@ describe('searchProducts', () => {
     expect(ids(searchProducts(catalog, 'capa-ms'))).toEqual(['capa'])
   })
 
+  it('busca por vários termos acha o produto que tem todos, em qualquer ordem', () => {
+    const list = [
+      product({ id: 'pro', name: 'iPhone 15 Pro 256GB', sku: 'IP15P-256' }),
+      product({ id: 'base', name: 'iPhone 15 128GB', sku: 'IP15-128' }),
+    ]
+    expect(ids(searchProducts(list, 'iphone 256'))).toEqual(['pro'])
+    expect(ids(searchProducts(list, '128 iphone'))).toEqual(['base'])
+  })
+
   it('busca ignora acentos, no texto digitado e no produto', () => {
     const list = [product({ id: 'x', name: 'Cabo Elétrico', sku: 'CB-1' })]
     expect(ids(searchProducts(list, 'eletrico'))).toEqual(['x'])
