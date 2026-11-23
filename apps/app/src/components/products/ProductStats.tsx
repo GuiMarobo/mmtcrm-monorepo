@@ -6,7 +6,7 @@ import { useMemo } from 'react'
 import { KpiStat, StatGrid } from '../common/StatGrid'
 import { summarizeCatalog } from './productsSummary'
 import { LOW_STOCK_LIMIT } from './productsList'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, plural } from '../../utils/format'
 import type { Product } from '../../types'
 
 interface ProductStatsProps {
@@ -16,7 +16,7 @@ interface ProductStatsProps {
 
 const PENDING = '—'
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+const counted = (count: number, word: string) => `${count} ${plural(count, word, `${word}s`)}`
 
 export function ProductStats({ list, loading }: ProductStatsProps) {
   const summary = useMemo(() => summarizeCatalog(list), [list])
@@ -28,7 +28,7 @@ export function ProductStats({ list, loading }: ProductStatsProps) {
         tone="blue"
         label="Total de produtos"
         value={loading ? PENDING : summary.total}
-        hint={loading ? undefined : plural(summary.activeCount, 'ativo')}
+        hint={loading ? undefined : counted(summary.activeCount, 'ativo')}
       />
       <KpiStat
         icon={<LayersOutlinedIcon fontSize="small" />}
@@ -52,7 +52,7 @@ export function ProductStats({ list, loading }: ProductStatsProps) {
         hint={
           loading
             ? undefined
-            : `${plural(summary.outOfStockCount, 'zerado')} · ${plural(summary.lowStockCount, 'baixo')} (até ${LOW_STOCK_LIMIT} un.)`
+            : `${counted(summary.outOfStockCount, 'zerado')} · ${counted(summary.lowStockCount, 'baixo')} (até ${LOW_STOCK_LIMIT} un.)`
         }
       />
     </StatGrid>

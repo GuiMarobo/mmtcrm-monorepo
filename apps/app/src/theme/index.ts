@@ -39,6 +39,8 @@ export const theme = createTheme({
     subtitle1: { fontSize: 14, fontWeight: 600 },
     subtitle2: { fontSize: 12.5, fontWeight: 600 },
     caption: { fontSize: 12 },
+    overline: { fontSize: 11.5, fontWeight: 700, letterSpacing: '0.06em', lineHeight: 1.5 },
+    h4: { fontSize: 30, fontWeight: 700, letterSpacing: '-0.02em' },
     button: { fontSize: 13, fontWeight: 600, textTransform: 'none' },
   },
   components: {

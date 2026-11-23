@@ -1,5 +1,6 @@
 import { ApiError, productsApi } from '../../api'
 import type { Product, ProductDetail } from '../../types'
+import { plural } from '../../utils/format'
 
 export type BatchAction = 'discontinue' | 'reactivate' | 'delete'
 
@@ -50,7 +51,8 @@ const SUMMARY_WORDS: Record<BatchAction, { done: [string, string]; already: [str
   delete: { done: ['excluído', 'excluídos'], already: ['excluído', 'excluídos'] },
 }
 
-const plural = (count: number, [one, many]: [string, string]) => (count === 1 ? one : many)
+const counted = (count: number, [one, many]: [string, string]) =>
+  `${count} ${plural(count, one, many)}`
 
 export function summarizeBatch(
   action: BatchAction,
@@ -64,11 +66,11 @@ export function summarizeBatch(
   const notRun = count('notRun')
   const words = SUMMARY_WORDS[action]
   const parts = [
-    succeeded > 0 && `${succeeded} ${plural(succeeded, words.done)}`,
+    succeeded > 0 && counted(succeeded, words.done),
     skipped > 0 &&
-      `${skipped} ${plural(skipped, ['ignorado', 'ignorados'])} (já ${plural(skipped, words.already)})`,
-    failed > 0 && `${failed} ${plural(failed, ['falhou', 'falharam'])}`,
-    notRun > 0 && `${notRun} ${plural(notRun, ['não executado', 'não executados'])}`,
+      `${counted(skipped, ['ignorado', 'ignorados'])} (já ${plural(skipped, ...words.already)})`,
+    failed > 0 && counted(failed, ['falhou', 'falharam']),
+    notRun > 0 && counted(notRun, ['não executado', 'não executados']),
   ].filter((part): part is string => typeof part === 'string')
   return { message: parts.join(' · '), type: failed > 0 ? 'error' : 'success' }
 }

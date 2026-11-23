@@ -39,7 +39,7 @@ import type { BulkAction } from '../common/BulkActionsBar'
 import { SearchField } from '../common/SearchField'
 import { SectionToolbar } from '../common/SectionCard'
 import { ToneChip } from '../common/ToneChip'
-import { formatCurrency, formatDate } from '../../utils/format'
+import { formatCurrency, formatDate, plural } from '../../utils/format'
 import type { Product, ProductCategory } from '../../types'
 import {
   PRODUCT_CATEGORY_LABELS,
@@ -84,7 +84,7 @@ function ProductCell({ product }: { product: Product }) {
         <Box component="span" data-testid="product-name" sx={{ fontWeight: 600 }}>
           {product.name}
         </Box>
-        <Box component="span" sx={{ color: 'text.disabled', fontSize: 12 }}>
+        <Box component="span" sx={{ color: 'text.disabled', typography: 'caption' }}>
           {PRODUCT_CATEGORY_LABELS[product.category]}
         </Box>
       </Box>
@@ -98,7 +98,7 @@ function CodeCell({ product }: { product: Product }) {
       <Box component="span" sx={{ fontWeight: 500 }}>
         {product.sku}
       </Box>
-      <Box component="span" sx={{ color: 'text.disabled', fontSize: 12 }}>
+      <Box component="span" sx={{ color: 'text.disabled', typography: 'caption' }}>
         {formatDate(product.createdAt)}
       </Box>
     </Box>
@@ -197,7 +197,7 @@ const BATCH_CONFIRM: Record<
   },
 }
 
-const productsCount = (count: number) => (count === 1 ? '1 produto' : `${count} produtos`)
+const productsCount = (count: number) => `${count} ${plural(count, 'produto', 'produtos')}`
 
 function bulkActionsFor(selected: Product[], start: (action: BatchAction) => void): BulkAction[] {
   const bulk: BulkAction[] = []
@@ -475,7 +475,9 @@ export function ProductsGrid({
 function EmptyMessage({ text, children }: { text: string; children?: ReactNode }) {
   return (
     <Box sx={{ p: 6, textAlign: 'center', height: '100%' }}>
-      <Typography sx={{ color: 'text.disabled', fontSize: 13 }}>{text}</Typography>
+      <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+        {text}
+      </Typography>
       {children}
     </Box>
   )

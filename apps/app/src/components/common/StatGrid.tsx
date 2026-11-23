@@ -116,27 +116,26 @@ export function KpiStat({ icon, tone, label, value, hint }: KpiStatProps) {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
         <Avatar
           variant="rounded"
-          sx={{ width: 32, height: 32, bgcolor: TONES[tone].bg, color: TONES[tone].color }}
+          sx={{
+            width: (theme) => theme.spacing(4),
+            height: (theme) => theme.spacing(4),
+            bgcolor: TONES[tone].bg,
+            color: TONES[tone].color,
+          }}
         >
           {icon}
         </Avatar>
-        <Typography
-          sx={{
-            color: 'text.secondary',
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-          }}
-        >
+        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
           {label}
         </Typography>
       </Box>
-      <Typography sx={{ fontSize: { xs: 26, sm: 30 }, fontWeight: 700, letterSpacing: '-0.02em' }}>
+      <Typography variant="h4" component="p">
         {value}
       </Typography>
       {hint != null && (
-        <Typography sx={{ color: 'text.disabled', fontSize: 12.5 }}>{hint}</Typography>
+        <Typography variant="subtitle2" sx={{ color: 'text.disabled', fontWeight: 'normal' }}>
+          {hint}
+        </Typography>
       )}
     </Paper>
   )

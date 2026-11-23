@@ -50,6 +50,10 @@ export function formatIsoDate(isoDate: string): string {
   return `${day}/${month}/${year}`
 }
 
+export function plural(count: number, one: string, many: string): string {
+  return count === 1 ? one : many
+}
+
 export function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }

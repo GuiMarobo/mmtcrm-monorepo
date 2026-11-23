@@ -102,15 +102,7 @@ function toCreatePayload(form: ProductForm): CreateProductPayload {
 function FormSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Box component="section" sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-      <Typography
-        sx={{
-          fontSize: 11.5,
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          color: 'text.disabled',
-        }}
-      >
+      <Typography variant="overline" sx={{ color: 'text.disabled' }}>
         {title}
       </Typography>
       {children}

@@ -1,7 +1,7 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, productsApi } from '../api'
 import { useAuth } from '../contexts/AuthContext'
 import { useExclusive } from '../hooks/useExclusive'
@@ -17,6 +17,7 @@ import type { BatchAction } from '../components/products/productsBatch'
 import { ProductPriceModal } from '../components/products/ProductPriceModal'
 import { ProductStats } from '../components/products/ProductStats'
 import { StockMovementModal } from '../components/products/StockMovementModal'
+import { useProductDetail } from '../components/products/useProductDetail'
 import { PageHeader } from '../components/common/PageHeader'
 import { ErrorBanner, SectionCard } from '../components/common/SectionCard'
 import { formatCurrency } from '../utils/format'
@@ -44,12 +45,17 @@ export function Produtos({ toast }: ProdutosProps) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
-  const [selected, setSelected] = useState<Product | null>(null)
-  const [detail, setDetail] = useState<ProductDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [detailError, setDetailError] = useState<string | null>(null)
   const [action, setAction] = useState<ProductAction | null>(null)
-  const openedId = useRef<string | null>(null)
+  const {
+    selected,
+    detail,
+    loading: detailLoading,
+    error: detailError,
+    open: openDetail,
+    close: closeDetail,
+    isOpen,
+    show,
+  } = useProductDetail()
 
   const isAdmin = user?.role === 'ADMIN'
 
@@ -71,35 +77,6 @@ export function Produtos({ toast }: ProdutosProps) {
     void reload()
   }, [])
 
-  const openDetail = async (product: Product) => {
-    openedId.current = product.id
-    setSelected(product)
-    setDetail(null)
-    setDetailError(null)
-    setDetailLoading(true)
-    try {
-      const loaded = await productsApi.findOne(product.id)
-      if (openedId.current !== product.id) return
-      setDetail(loaded)
-    } catch (err) {
-      if (openedId.current !== product.id) return
-      setDetailError(
-        err instanceof ApiError
-          ? err.message
-          : 'Falha ao carregar o histórico de estoque.',
-      )
-    } finally {
-      if (openedId.current === product.id) setDetailLoading(false)
-    }
-  }
-
-  const closeDetail = () => {
-    openedId.current = null
-    setSelected(null)
-    setDetail(null)
-    setDetailError(null)
-  }
-
   const saveProduct = async (payload: CreateProductPayload) => {
     const created = await productsApi.create(payload)
     setList((prev) => [created, ...prev])
@@ -111,10 +88,7 @@ export function Produtos({ toast }: ProdutosProps) {
   const applyDetail = (updated: ProductDetail) => {
     const { stockMovements: _, ...row } = updated
     setList((prev) => prev.map((p) => (p.id === row.id ? row : p)))
-    if (openedId.current === updated.id) {
-      setSelected(row)
-      setDetail(updated)
-    }
+    show(updated)
   }
 
   const moveStock = async (product: Product, payload: CreateStockMovementPayload) => {
@@ -159,7 +133,7 @@ export function Produtos({ toast }: ProdutosProps) {
     const drop = () => {
       setList((prev) => prev.filter((p) => p.id !== product.id))
       setAction(null)
-      if (openedId.current === product.id) closeDetail()
+      if (isOpen(product.id)) closeDetail()
     }
     try {
       await productsApi.remove(product.id)
@@ -176,7 +150,7 @@ export function Produtos({ toast }: ProdutosProps) {
       applyDetail,
       drop: (ids) => {
         setList((prev) => prev.filter((product) => !ids.has(product.id)))
-        if (openedId.current && ids.has(openedId.current)) closeDetail()
+        if ([...ids].some(isOpen)) closeDetail()
       },
       reload,
       toast,
