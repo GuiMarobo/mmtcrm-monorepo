@@ -5,6 +5,7 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
+import { IsBrazilianPhone, IsCnpj } from '../../common/br-validators';
 
 export class ReplaceCompanySettingsDto {
   @IsString()
@@ -17,6 +18,7 @@ export class ReplaceCompanySettingsDto {
   @IsOptional()
   @IsString()
   @MaxLength(40)
+  @IsCnpj()
   cnpj?: string | null;
 
   @IsOptional()
@@ -27,6 +29,7 @@ export class ReplaceCompanySettingsDto {
   @IsOptional()
   @IsString()
   @MaxLength(40)
+  @IsBrazilianPhone()
   phone?: string | null;
 
   // A faixa de 1 a 90 dias (RS3) é conferida no service, que devolve a

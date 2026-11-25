@@ -9,7 +9,7 @@ import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
 import { FormRow } from '../common/FormRow'
 import { maskPhone, onlyDigits } from '../../utils/format'
-import { isValidEmail, isValidPhone } from '../../utils/validators'
+import { isValidEmail, isValidPhone, personNameError } from '../../utils/validators'
 import type { CreateUserPayload, Role, UpdateUserPayload, User, UserStatus } from '../../types'
 import { ROLE_OPTIONS, USER_STATUS_OPTIONS } from '../../types'
 
@@ -69,7 +69,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
   const computeError = (key: FieldKey): string | undefined => {
     switch (key) {
       case 'name':
-        return form.name.trim() ? undefined : 'Informe o nome.'
+        return personNameError(form.name, 'Informe o nome.')
       case 'email':
         if (!form.email.trim()) return 'Informe o e-mail.'
         return isValidEmail(form.email) ? undefined : 'E-mail inválido.'
@@ -79,6 +79,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
           : 'Telefone inválido - informe DDD + número.'
       case 'password':
         if (isEdit && !form.password) return undefined
+        if (form.password.length > 72) return 'A senha deve ter no máximo 72 caracteres.'
         return form.password.length >= 8
           ? undefined
           : isEdit
@@ -170,6 +171,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
           placeholder="Ex.: João da Silva"
           error={!!displayError('name')}
           helperText={displayError('name') ?? ' '}
+          slotProps={{ htmlInput: { maxLength: 200 } }}
           fullWidth
         />
 
@@ -184,6 +186,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             placeholder="nome@mmturbana.com"
             error={!!displayError('email')}
             helperText={displayError('email') ?? ' '}
+            slotProps={{ htmlInput: { maxLength: 254 } }}
             fullWidth
           />
           <TextField
@@ -211,6 +214,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             autoComplete="new-password"
             error={!!displayError('password')}
             helperText={displayError('password') ?? ' '}
+            slotProps={{ htmlInput: { maxLength: 72 } }}
             fullWidth
           />
           <TextField
@@ -223,6 +227,7 @@ export function UserFormModal({ user, onClose, onSubmit }: UserFormModalProps) {
             autoComplete="new-password"
             error={!!displayError('confirm')}
             helperText={displayError('confirm') ?? ' '}
+            slotProps={{ htmlInput: { maxLength: 72 } }}
             fullWidth
           />
         </FormRow>

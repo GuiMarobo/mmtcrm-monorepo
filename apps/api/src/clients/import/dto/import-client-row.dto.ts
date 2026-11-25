@@ -5,7 +5,10 @@ import {
   IsOptional,
   IsString,
   Min,
+  MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsCpf, IsPersonName, toDigits } from '../../../common/br-validators';
 import {
   ClientStatusEnum,
   LeadOriginEnum,
@@ -15,6 +18,8 @@ import {
 export class ImportClientRowDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200)
+  @IsPersonName()
   name!: string;
 
   @IsString()
@@ -25,8 +30,10 @@ export class ImportClientRowDto {
   @IsOptional()
   email?: string;
 
+  @Transform(toDigits)
   @IsString()
   @IsOptional()
+  @IsCpf()
   cpf?: string;
 
   @IsString()

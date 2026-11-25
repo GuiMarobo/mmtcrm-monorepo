@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { ProductFormModal } from './ProductFormModal'
 import { ApiError } from '../../api'
 import type { Product } from '../../types'
+import { formatCurrency } from '../../utils/format'
 
 const product = (overrides: Partial<Product> = {}): Product => ({
   id: 'p1',
@@ -106,7 +107,8 @@ describe('ProductFormModal — cadastro', () => {
     await user.type(name, ' Pró')
     expect(sku).toHaveValue('AIRPODS-PRO')
 
-    await user.type(screen.getByLabelText(/Preço de Venda/), '1999')
+    await user.type(screen.getByLabelText(/Preço de Venda/), '199900')
+    expect(screen.getByLabelText(/Preço de Venda/)).toHaveValue(formatCurrency(1999))
     await user.click(screen.getByRole('button', { name: 'Cadastrar produto' }))
 
     expect(onSave).toHaveBeenCalledWith({
@@ -191,8 +193,8 @@ describe('ProductFormModal — duplicar', () => {
     expect(sku).toHaveValue('IPHONE-15-PRO-2')
     expect(screen.getByLabelText('Descrição')).toHaveValue('Titânio natural')
     expect(screen.getByRole('combobox', { name: /Categoria/ })).toHaveTextContent('Mac')
-    expect(screen.getByLabelText(/Preço de Venda/)).toHaveValue(7999.9)
-    expect(screen.getByLabelText(/Quantidade Inicial/)).toHaveValue(0)
+    expect(screen.getByLabelText(/Preço de Venda/)).toHaveValue(formatCurrency(7999.9))
+    expect(screen.getByLabelText(/Quantidade Inicial/)).toHaveValue('0')
 
     await user.click(screen.getByRole('button', { name: 'Cadastrar produto' }))
 
@@ -225,19 +227,11 @@ describe('ProductFormModal — duplicar', () => {
 })
 
 describe('ProductFormModal — layout', () => {
-  it('cadastro em duas seções, com a prévia do avatar acompanhando a categoria', async () => {
-    const user = userEvent.setup()
+  it('cadastro em duas seções', () => {
     render(<ProductFormModal onClose={vi.fn()} onSave={vi.fn()} />)
 
     expect(screen.getByText('Identificação')).toBeInTheDocument()
     expect(screen.getByText('Preço & Estoque')).toBeInTheDocument()
-    expect(screen.getByLabelText('iPhone')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('combobox', { name: /Categoria/ }))
-    await user.click(screen.getByRole('option', { name: 'Mac' }))
-
-    expect(screen.getByLabelText('Mac')).toBeInTheDocument()
-    expect(screen.queryByLabelText('iPhone')).not.toBeInTheDocument()
   })
 
   it('edição mostra só a seção de identificação', () => {
@@ -245,5 +239,26 @@ describe('ProductFormModal — layout', () => {
 
     expect(screen.getByText('Identificação')).toBeInTheDocument()
     expect(screen.queryByText('Preço & Estoque')).not.toBeInTheDocument()
+  })
+})
+
+describe('ProductFormModal — campos numéricos', () => {
+  it('o preço só aceita dígitos e monta a máscara de R$ a partir dos centavos', async () => {
+    const user = userEvent.setup()
+    render(<ProductFormModal onClose={vi.fn()} onSave={vi.fn()} />)
+
+    const price = screen.getByLabelText(/Preço de Venda/)
+    await user.type(price, '-1e2,5')
+    expect(price).toHaveValue(formatCurrency(1.25))
+  })
+
+  it('a quantidade inicial descarta sinal, letra e casa decimal', async () => {
+    const user = userEvent.setup()
+    render(<ProductFormModal onClose={vi.fn()} onSave={vi.fn()} />)
+
+    const stock = screen.getByLabelText(/Quantidade Inicial/)
+    await user.clear(stock)
+    await user.type(stock, '-1.5e')
+    expect(stock).toHaveValue('15')
   })
 })

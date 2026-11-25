@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
 import { formatCurrency, formatDate, formatIsoDate, formatPercent } from '../../utils/format'
+import { parseDecimal, sanitizeDecimal } from '../../utils/format'
 import { ratePercentError } from '../../utils/validators'
 import { ToneChip } from '../common/ToneChip'
 import { describeCondition } from '../quotations/quotationCondition'
@@ -170,7 +171,7 @@ function InstallmentSimulationTable({
 }) {
   const [values, setValues] = useState(() =>
     INSTALLMENT_OPTIONS.map((installments) =>
-      String(rates.find((rate) => rate.installments === installments)?.ratePercent ?? 0),
+      String(rates.find((rate) => rate.installments === installments)?.ratePercent ?? 0).replace('.', ','),
     ),
   )
   const [selected, setSelected] = useState<number | null>(null)
@@ -193,7 +194,7 @@ function InstallmentSimulationTable({
     try {
       await onIssue({
         installments: selected,
-        ratePercent: Number(values[selected - 1]),
+        ratePercent: parseDecimal(values[selected - 1]),
         validUntil,
       })
     } catch (err) {
@@ -249,7 +250,7 @@ function InstallmentSimulationTable({
             const error = ratePercentError(values[index])
             const simulation = error
               ? null
-              : simulateInstallment(summary.amountDue, installments, Number(values[index]))
+              : simulateInstallment(summary.amountDue, installments, parseDecimal(values[index]))
             return (
               <TableRow key={installments} selected={selected === installments}>
                 {onIssue && (
@@ -266,22 +267,17 @@ function InstallmentSimulationTable({
                 <TableCell sx={{ width: 120 }}>
                   <TextField
                     size="small"
-                    type="number"
                     value={values[index]}
-                    onChange={(e) =>
-                      setValues((prev) =>
-                        prev.map((value, i) => (i === index ? e.target.value : value)),
-                      )
-                    }
+                    onChange={(e) => {
+                      const next = sanitizeDecimal(e.target.value)
+                      setValues((prev) => prev.map((value, i) => (i === index ? next : value)))
+                    }}
                     error={!!error}
                     helperText={error}
                     slotProps={{
                       htmlInput: {
                         'aria-label': `Taxa ${installments}x`,
                         inputMode: 'decimal',
-                        min: 0,
-                        max: 100,
-                        step: '0.01',
                       },
                       input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
                     }}

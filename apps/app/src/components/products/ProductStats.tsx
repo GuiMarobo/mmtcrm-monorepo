@@ -1,9 +1,5 @@
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined'
-import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined'
-import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined'
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
 import { useMemo } from 'react'
-import { KpiStat, StatGrid } from '../common/StatGrid'
+import { Stat, StatGrid } from '../common/StatGrid'
 import { summarizeCatalog } from './productsSummary'
 import { LOW_STOCK_LIMIT } from './productsList'
 import { formatCurrency, plural } from '../../utils/format'
@@ -22,31 +18,23 @@ export function ProductStats({ list, loading }: ProductStatsProps) {
   const summary = useMemo(() => summarizeCatalog(list), [list])
 
   return (
-    <StatGrid variant="cards" columns={4}>
-      <KpiStat
-        icon={<Inventory2OutlinedIcon fontSize="small" />}
-        tone="blue"
+    <StatGrid columns={4}>
+      <Stat
         label="Total de produtos"
         value={loading ? PENDING : summary.total}
         hint={loading ? undefined : counted(summary.activeCount, 'ativo')}
       />
-      <KpiStat
-        icon={<LayersOutlinedIcon fontSize="small" />}
-        tone="purple"
+      <Stat
         label="Unidades em estoque"
         value={loading ? PENDING : summary.units}
         hint={loading ? undefined : 'saldo somado de todos os produtos'}
       />
-      <KpiStat
-        icon={<PaidOutlinedIcon fontSize="small" />}
-        tone="green"
+      <Stat
         label="Valor do estoque"
         value={loading ? PENDING : formatCurrency(summary.stockValue)}
         hint={loading ? undefined : 'saldo × preço de venda'}
       />
-      <KpiStat
-        icon={<WarningAmberOutlinedIcon fontSize="small" />}
-        tone="amber"
+      <Stat
         label="Sem estoque / baixo"
         value={loading ? PENDING : `${summary.outOfStockCount} / ${summary.lowStockCount}`}
         hint={

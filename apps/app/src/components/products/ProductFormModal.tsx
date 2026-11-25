@@ -9,7 +9,9 @@ import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
+import { CurrencyField } from '../common/CurrencyField'
 import { FormRow } from '../common/FormRow'
+import { MAX_INTEGER, sanitizeInteger } from '../../utils/format'
 import { priceError } from '../../utils/validators'
 import type {
   CreateProductPayload,
@@ -18,7 +20,6 @@ import type {
   UpdateProductPayload,
 } from '../../types'
 import { PRODUCT_CATEGORY_OPTIONS } from '../../types'
-import { CategoryAvatar } from './CategoryAvatar'
 import { suggestSku } from './skuSuggestion'
 
 interface ProductForm {
@@ -26,7 +27,7 @@ interface ProductForm {
   sku: string
   description: string
   category: ProductCategory
-  price: string
+  price: number | null
   initialStock: string
 }
 
@@ -35,7 +36,7 @@ const EMPTY_FORM: ProductForm = {
   sku: '',
   description: '',
   category: 'IPHONE',
-  price: '',
+  price: null,
   initialStock: '0',
 }
 
@@ -53,7 +54,7 @@ function toDuplicateForm(source: Product, takenSkus: string[]): ProductForm {
   return {
     ...toForm(source),
     sku: suggestSku(source.name, takenSkus),
-    price: String(source.price),
+    price: source.price,
   }
 }
 
@@ -66,18 +67,17 @@ const EDIT_FIELDS: FieldKey[] = ['name', 'sku']
 function computeError(key: FieldKey, form: ProductForm): string | undefined {
   switch (key) {
     case 'name':
-      return form.name.trim() ? undefined : 'Informe o nome do produto.'
+      if (!form.name.trim()) return 'Informe o nome do produto.'
+      return form.name.trim().length > 200 ? 'Até 200 caracteres.' : undefined
     case 'sku':
-      return form.sku.trim()
-        ? undefined
-        : 'Informe o código de referência do produto.'
+      if (!form.sku.trim()) return 'Informe o código de referência do produto.'
+      return form.sku.trim().length > 60 ? 'Até 60 caracteres.' : undefined
     case 'price':
       return priceError(form.price)
     case 'initialStock': {
       if (!form.initialStock.trim()) return 'Informe a quantidade inicial.'
-      const stock = Number(form.initialStock)
-      if (!Number.isInteger(stock)) return 'A quantidade deve ser um número inteiro.'
-      return stock < 0 ? 'A quantidade não pode ser negativa.' : undefined
+      if (!/^\d+$/.test(form.initialStock)) return 'A quantidade deve ser um número inteiro.'
+      return Number(form.initialStock) > MAX_INTEGER ? 'Quantidade acima do limite.' : undefined
     }
   }
 }
@@ -94,7 +94,7 @@ function toUpdatePayload(form: ProductForm): UpdateProductPayload {
 function toCreatePayload(form: ProductForm): CreateProductPayload {
   return {
     ...toUpdatePayload(form),
-    price: Number(form.price),
+    price: form.price ?? 0,
     initialStock: Number(form.initialStock),
   }
 }
@@ -210,22 +210,20 @@ export function ProductFormModal(props: ProductFormModalProps) {
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
         <FormSection title="Identificação">
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-            <CategoryAvatar category={form.category} size={56} />
-            <TextField
-              label="Nome"
-              required
-              value={form.name}
-              inputRef={placeCaretAtEnd}
-              autoFocus={duplicating}
-              onChange={(e) => changeName(e.target.value)}
-              onBlur={() => handleBlur('name')}
-              placeholder="Ex.: iPhone 15 Pro 256GB"
-              error={!!displayError('name')}
-              helperText={displayError('name') ?? ' '}
-              fullWidth
-            />
-          </Box>
+          <TextField
+            label="Nome"
+            required
+            value={form.name}
+            inputRef={placeCaretAtEnd}
+            autoFocus={duplicating}
+            onChange={(e) => changeName(e.target.value)}
+            onBlur={() => handleBlur('name')}
+            placeholder="Ex.: iPhone 15 Pro 256GB"
+            error={!!displayError('name')}
+            helperText={displayError('name') ?? ' '}
+            slotProps={{ htmlInput: { maxLength: 200 } }}
+            fullWidth
+          />
 
           <FormRow>
             <TextField
@@ -242,6 +240,7 @@ export function ProductFormModal(props: ProductFormModalProps) {
                   ? 'Gravado em maiúsculas, sem espaços nas pontas.'
                   : 'Sugerido a partir do nome; edite à vontade.')
               }
+              slotProps={{ htmlInput: { maxLength: 60 } }}
               fullWidth
             />
             <TextField
@@ -269,6 +268,7 @@ export function ProductFormModal(props: ProductFormModalProps) {
             multiline
             minRows={2}
             helperText=" "
+            slotProps={{ htmlInput: { maxLength: 1000 } }}
             fullWidth
           />
         </FormSection>
@@ -276,29 +276,25 @@ export function ProductFormModal(props: ProductFormModalProps) {
         {!editing && (
           <FormSection title="Preço & Estoque">
             <FormRow>
-              <TextField
+              <CurrencyField
                 label="Preço de Venda"
                 required
-                type="number"
                 value={form.price}
-                onChange={(e) => set('price', e.target.value)}
+                onChange={(price) => set('price', price)}
                 onBlur={() => handleBlur('price')}
-                placeholder="0,00"
                 error={!!displayError('price')}
                 helperText={displayError('price') ?? ' '}
-                slotProps={{ htmlInput: { inputMode: 'decimal', min: 0, step: '0.01' } }}
                 fullWidth
               />
               <TextField
                 label="Quantidade Inicial em Estoque"
                 required
-                type="number"
                 value={form.initialStock}
-                onChange={(e) => set('initialStock', e.target.value)}
+                onChange={(e) => set('initialStock', sanitizeInteger(e.target.value))}
                 onBlur={() => handleBlur('initialStock')}
                 error={!!displayError('initialStock')}
                 helperText={displayError('initialStock') ?? ' '}
-                slotProps={{ htmlInput: { inputMode: 'numeric', min: 0, step: 1 } }}
+                slotProps={{ htmlInput: { inputMode: 'numeric' } }}
                 fullWidth
               />
             </FormRow>

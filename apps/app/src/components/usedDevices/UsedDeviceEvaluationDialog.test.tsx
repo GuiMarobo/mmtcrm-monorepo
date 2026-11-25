@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { formatCurrency } from '../../utils/format'
 import { UsedDeviceEvaluationDialog } from './UsedDeviceEvaluationDialog'
 import type { QueueUsedDevice, UsedDeviceDetail } from '../../types'
 
@@ -68,7 +69,7 @@ describe('UsedDeviceEvaluationDialog', () => {
 
     await userEvent.click(screen.getByRole('combobox', { name: /Condição/ }))
     await userEvent.click(screen.getByRole('option', { name: 'Bom' }))
-    await userEvent.type(screen.getByLabelText(/Valor estimado/), '2000')
+    await userEvent.type(screen.getByLabelText(/Valor estimado/), '200000')
     await userEvent.type(screen.getByLabelText(/Laudo/), '  Bateria 87%  ')
     await userEvent.click(screen.getByRole('checkbox', { name: /iCloud liberado/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Avaliar' }))
@@ -170,7 +171,7 @@ describe('UsedDeviceEvaluationDialog', () => {
       }),
     })
 
-    expect(screen.getByLabelText(/Valor estimado/)).toHaveValue(2000)
+    expect(screen.getByLabelText(/Valor estimado/)).toHaveValue(formatCurrency(2000))
     expect(screen.getByLabelText(/Laudo/)).toHaveValue('Bateria 87%')
     expect(screen.getByRole('button', { name: 'Avaliar' })).toBeEnabled()
     expect(screen.getByText(/Técnico A/)).toBeInTheDocument()

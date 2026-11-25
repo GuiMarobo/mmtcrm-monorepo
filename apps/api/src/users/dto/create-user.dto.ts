@@ -5,8 +5,9 @@ import {
   MinLength,
   IsEnum,
   IsOptional,
-  Matches,
+  MaxLength,
 } from 'class-validator';
+import { IsBrazilianPhone, IsPersonName } from '../../common/br-validators';
 
 export enum RoleEnum {
   ADMIN = 'ADMIN',
@@ -23,18 +24,22 @@ export enum UserStatusEnum {
 export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
-  @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
+  @IsPersonName()
+  @MaxLength(200)
   name!: string;
 
   @IsEmail()
+  @MaxLength(254)
   email!: string;
 
   @IsString()
   @MinLength(8)
+  @MaxLength(72)
   password!: string;
 
   @IsString()
   @IsOptional()
+  @IsBrazilianPhone()
   phone?: string;
 
   @IsEnum(RoleEnum)

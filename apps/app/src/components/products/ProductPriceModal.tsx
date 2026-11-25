@@ -1,10 +1,10 @@
 import CheckOutlinedIcon from '@mui/icons-material/CheckOutlined'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
-import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
+import { CurrencyField } from '../common/CurrencyField'
 import { FormDialog } from '../common/FormDialog'
 import { formatCurrency } from '../../utils/format'
 import { priceError } from '../../utils/validators'
@@ -23,7 +23,7 @@ export function ProductPriceModal({
   onSave,
   onError,
 }: ProductPriceModalProps) {
-  const [price, setPrice] = useState(String(product.price))
+  const [price, setPrice] = useState<number | null>(product.price)
   const [touched, setTouched] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -34,7 +34,7 @@ export function ProductPriceModal({
     if (priceError(price)) return
     setSaving(true)
     try {
-      await onSave({ price: Number(price) })
+      await onSave({ price: price ?? 0 })
     } catch (err) {
       onError(err instanceof ApiError ? err.message : 'Erro ao atualizar o preço.')
       setSaving(false)
@@ -69,18 +69,16 @@ export function ProductPriceModal({
           Preço atual: {formatCurrency(product.price)}
         </Typography>
 
-        <TextField
+        <CurrencyField
           label="Novo preço de venda"
           required
-          type="number"
           value={price}
-          onChange={(e) => setPrice(e.target.value)}
+          onChange={setPrice}
           onBlur={() => setTouched(true)}
           error={!!error}
           helperText={
             error ?? 'Negociações e pedidos já registrados mantêm o preço praticado.'
           }
-          slotProps={{ htmlInput: { inputMode: 'decimal', min: 0, step: '0.01' } }}
           fullWidth
         />
       </Box>

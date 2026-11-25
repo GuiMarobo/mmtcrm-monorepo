@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { formatCurrency } from '../../utils/format'
 import { NegotiationItemsEditor, type NegotiationItemFormValue } from './NegotiationItemsEditor'
 import type { Product } from '../../types'
 
@@ -95,7 +96,7 @@ describe('NegotiationItemsEditor', () => {
     )
 
     expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
-    expect(screen.getByLabelText('Qtd.')).toHaveValue(2)
+    expect(screen.getByLabelText('Qtd.')).toHaveValue('2')
   })
 
   it('esconde do seletor de adicionar um Produto descontinuado', async () => {
@@ -208,7 +209,7 @@ describe('NegotiationItemsEditor', () => {
       await user.keyboard('5')
 
       expect(onChange).toHaveBeenLastCalledWith([{ productId: 'p1', quantity: 5 }])
-      expect(screen.getByLabelText('Qtd.')).toHaveValue(5)
+      expect(screen.getByLabelText('Qtd.')).toHaveValue('5')
       expect(screen.getByText(/Saldo em estoque: 2/)).toBeInTheDocument()
     })
 
@@ -226,7 +227,7 @@ describe('NegotiationItemsEditor', () => {
       await user.tripleClick(screen.getByLabelText('Qtd.'))
       await user.keyboard('0')
 
-      expect(screen.getByLabelText('Qtd.')).toHaveValue(0)
+      expect(screen.getByLabelText('Qtd.')).toHaveValue('0')
       expect(screen.getByLabelText('Qtd.')).toBeInvalid()
       expect(screen.getByText('Inteiro a partir de 1')).toBeInTheDocument()
       expect(onChange).toHaveBeenLastCalledWith([{ productId: 'p1', quantity: 0 }])
@@ -243,7 +244,7 @@ describe('NegotiationItemsEditor', () => {
 
       await user.clear(screen.getByLabelText('Qtd.'))
 
-      expect(screen.getByLabelText('Qtd.')).toHaveValue(null)
+      expect(screen.getByLabelText('Qtd.')).toHaveValue('')
       expect(screen.getByText('Inteiro a partir de 1')).toBeInTheDocument()
       expect(screen.getAllByText(/R\$\s*0,00/)).toHaveLength(2)
     })
@@ -314,7 +315,7 @@ describe('NegotiationItemsEditor', () => {
       expect(screen.getAllByText(/R\$\s*170,00/)).toHaveLength(2)
     })
 
-    it('não aceita mais de duas casas decimais no desconto', async () => {
+    it('desconto em R$ tem máscara automática a partir dos centavos e ignora sinal e letra', async () => {
       const user = userEvent.setup()
       const onChange = vi.fn()
       render(
@@ -326,11 +327,31 @@ describe('NegotiationItemsEditor', () => {
         />,
       )
 
-      await user.tripleClick(screen.getByLabelText('Desconto'))
-      await user.keyboard('1.255')
+      await user.type(screen.getByLabelText('Desconto'), '-1a255')
 
+      expect(screen.getByLabelText('Desconto')).toHaveValue(formatCurrency(12.55))
       expect(onChange).toHaveBeenLastCalledWith([
-        { productId: 'p1', quantity: 1, discountType: 'VALOR', discountValue: 1.25 },
+        { productId: 'p1', quantity: 1, discountType: 'VALOR', discountValue: 12.55 },
+      ])
+    })
+
+    it('desconto em % aceita vírgula e corta na segunda casa decimal', async () => {
+      const user = userEvent.setup()
+      const onChange = vi.fn()
+      render(
+        <StatefulEditor
+          initialItems={[
+            { productId: 'p1', quantity: 1, discountType: 'PERCENTUAL', discountValue: 0 },
+          ]}
+          onChange={onChange}
+        />,
+      )
+
+      await user.type(screen.getByLabelText('Desconto'), '-1,255')
+
+      expect(screen.getByLabelText('Desconto')).toHaveValue('1,25')
+      expect(onChange).toHaveBeenLastCalledWith([
+        { productId: 'p1', quantity: 1, discountType: 'PERCENTUAL', discountValue: 1.25 },
       ])
     })
 

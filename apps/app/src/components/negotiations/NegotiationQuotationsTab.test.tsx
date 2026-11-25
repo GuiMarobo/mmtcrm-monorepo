@@ -148,10 +148,10 @@ describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () =>
     expect(screen.getByText(/Total à vista/)).toHaveTextContent(/R\$\s1\.000,00/)
     expect(within(simulationBody()).getAllByRole('row')).toHaveLength(12)
 
-    expect(within(row(1)).getByLabelText('Taxa 1x')).toHaveValue(0)
+    expect(within(row(1)).getByLabelText('Taxa 1x')).toHaveValue('0')
     expect(within(row(1)).getByText(/1x de R\$\s1\.000,00/)).toBeInTheDocument()
 
-    expect(within(row(10)).getByLabelText('Taxa 10x')).toHaveValue(5)
+    expect(within(row(10)).getByLabelText('Taxa 10x')).toHaveValue('5')
     expect(within(row(10)).getByText(/10x de R\$\s105,00/)).toBeInTheDocument()
     expect(within(row(10)).getByText(/^R\$\s1\.050,00$/)).toBeInTheDocument()
     expect(within(row(10)).getByText(/\+R\$\s50,00/)).toBeInTheDocument()
@@ -191,7 +191,7 @@ describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () =>
     expect(within(row(10)).getByText(/10x de R\$\s108,00/)).toBeInTheDocument()
     expect(within(row(10)).getByText(/^R\$\s1\.080,00$/)).toBeInTheDocument()
     expect(within(row(10)).getByText(/\+R\$\s80,00/)).toBeInTheDocument()
-    expect(within(row(12)).getByLabelText('Taxa 12x')).toHaveValue(0)
+    expect(within(row(12)).getByLabelText('Taxa 12x')).toHaveValue('0')
     expect(onUpdate).not.toHaveBeenCalled()
   })
 
@@ -205,7 +205,7 @@ describe('NegotiationFormModal — aba Orçamentos (spec 011, ticket 02)', () =>
     await user.click(screen.getByRole('tab', { name: 'Itens' }))
     await openQuotations(user)
 
-    expect(within(row(10)).getByLabelText('Taxa 10x')).toHaveValue(8)
+    expect(within(row(10)).getByLabelText('Taxa 10x')).toHaveValue('8')
   })
 
   it('na aba Orçamentos não há botão de salvar: simular não grava nada (RQ1)', async () => {

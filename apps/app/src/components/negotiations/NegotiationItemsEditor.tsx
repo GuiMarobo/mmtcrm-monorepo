@@ -4,6 +4,7 @@ import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
+import InputAdornment from '@mui/material/InputAdornment'
 import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
@@ -14,8 +15,10 @@ import {
   sellerDiscountLimitError,
   sumItemsAtPracticedPrice,
 } from './negotiationItemsSummary'
+import { CurrencyField } from '../common/CurrencyField'
+import { DecimalField } from '../common/DecimalField'
 import { ToneChip } from '../common/ToneChip'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, sanitizeInteger } from '../../utils/format'
 import { isValidQuantity, quantityError } from '../../utils/validators'
 import { DISCOUNT_TYPE_OPTIONS } from '../../types'
 import type {
@@ -206,19 +209,18 @@ export function NegotiationItemsEditor({
 
                   <TextField
                     label="Qtd."
-                    type="number"
                     size="small"
                     value={item.quantity ?? ''}
                     disabled={deleted}
                     error={!!quantityMessage}
                     helperText={quantityMessage}
                     onChange={(e) => {
-                      const raw = e.target.value
+                      const raw = sanitizeInteger(e.target.value)
                       updateItem(item.productId, {
                         quantity: raw === '' ? null : Number(raw),
                       })
                     }}
-                    slotProps={{ htmlInput: { min: 1, step: 1 } }}
+                    slotProps={{ htmlInput: { inputMode: 'numeric' } }}
                     sx={{ width: 84 }}
                   />
 
@@ -243,32 +245,39 @@ export function NegotiationItemsEditor({
                     ))}
                   </ToggleButtonGroup>
 
-                  <TextField
-                    label="Desconto"
-                    type="number"
-                    size="small"
-                    value={item.discountValue ?? 0}
-                    disabled={deleted}
-                    error={!!discountError}
-                    helperText={discountError ?? undefined}
-                    onChange={(e) => {
-                      const discountValue = Number(e.target.value)
-                      if (
-                        Number.isFinite(discountValue) &&
-                        Math.round(discountValue * 100) === discountValue * 100
-                      ) {
-                        updateItem(item.productId, { discountValue })
+                  {item.discountType === 'PERCENTUAL' ? (
+                    <DecimalField
+                      key="PERCENTUAL"
+                      label="Desconto"
+                      size="small"
+                      placeholder="0"
+                      value={item.discountValue || null}
+                      disabled={deleted}
+                      error={!!discountError}
+                      helperText={discountError ?? undefined}
+                      onChange={(discountValue) =>
+                        updateItem(item.productId, { discountValue: discountValue ?? 0 })
                       }
-                    }}
-                    slotProps={{
-                      htmlInput: {
-                        min: 0,
-                        max: item.discountType === 'PERCENTUAL' ? 100 : undefined,
-                        step: 0.01,
-                      },
-                    }}
-                    sx={{ width: 104 }}
-                  />
+                      slotProps={{
+                        input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
+                      }}
+                      sx={{ width: 104 }}
+                    />
+                  ) : (
+                    <CurrencyField
+                      key="VALOR"
+                      label="Desconto"
+                      size="small"
+                      value={item.discountValue || null}
+                      disabled={deleted}
+                      error={!!discountError}
+                      helperText={discountError ?? undefined}
+                      onChange={(discountValue) =>
+                        updateItem(item.productId, { discountValue: discountValue ?? 0 })
+                      }
+                      sx={{ width: 128 }}
+                    />
+                  )}
 
                   <Typography
                     sx={{ fontSize: 13.5, fontWeight: 600, width: 96, textAlign: 'right' }}

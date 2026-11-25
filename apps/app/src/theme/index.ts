@@ -206,6 +206,7 @@ export const theme = createTheme({
         columnHeader: {
           padding: '0 16px',
           '&:focus, &:focus-within': { outline: 'none' },
+          '&.MuiDataGrid-columnHeaderCheckbox': { padding: 0 },
         },
         columnHeaderTitle: { fontSize: 11.5, fontWeight: 600, color: '#8a8f98' },
         columnSeparator: { display: 'none' },
@@ -217,6 +218,7 @@ export const theme = createTheme({
           padding: '14px 16px',
           borderColor: BORDER,
           '&:focus, &:focus-within': { outline: 'none' },
+          '&.MuiDataGrid-cellCheckbox': { padding: 0, justifyContent: 'center' },
         },
         footerContainer: { borderTopColor: BORDER },
       },

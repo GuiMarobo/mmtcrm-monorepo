@@ -1,6 +1,5 @@
 import ErrorOutlined from '@mui/icons-material/ErrorOutlined'
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined'
-import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
 import Tab from '@mui/material/Tab'
@@ -19,7 +18,6 @@ import {
   formatCurrency,
   formatDateTime,
   formatRelativeTime,
-  initials,
 } from '../../utils/format'
 import type { Order } from '../../types'
 import { PAYMENT_METHOD_LABELS } from '../../types'
@@ -63,25 +61,11 @@ const ALERT_ICONS = {
 function ClientCell({ order }: { order: Order }) {
   if (!order.client) return <Box component="span">-</Box>
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-      <Avatar
-        sx={{
-          width: 32,
-          height: 32,
-          fontSize: 12.5,
-          fontWeight: 700,
-          bgcolor: 'primary.light',
-          color: 'primary.main',
-        }}
-      >
-        {initials(order.client.name)}
-      </Avatar>
-      <PersonCell
-        name={order.client.name}
-        secondary={`Vendedor: ${order.vendedor?.name ?? '-'}`}
-        anonymized={order.client.anonymizedAt !== null}
-      />
-    </Box>
+    <PersonCell
+      name={order.client.name}
+      secondary={`Vendedor: ${order.vendedor?.name ?? '-'}`}
+      anonymized={order.client.anonymizedAt !== null}
+    />
   )
 }
 

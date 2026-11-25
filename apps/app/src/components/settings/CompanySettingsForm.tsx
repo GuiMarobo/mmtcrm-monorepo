@@ -6,7 +6,8 @@ import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { SectionCard, SectionToolbar } from '../common/SectionCard'
 import { FormRow } from '../common/FormRow'
-import { validityDaysError } from '../../utils/validators'
+import { maskCnpj, maskPhone, sanitizeInteger } from '../../utils/format'
+import { isValidCnpj, isValidPhone, validityDaysError } from '../../utils/validators'
 import type { CompanySettings, ReplaceCompanySettingsPayload } from '../../types'
 
 interface CompanySettingsFormProps {
@@ -25,10 +26,14 @@ export function CompanySettingsForm({ company, onSave }: CompanySettingsFormProp
 
   const nameError = touched && !name.trim() ? 'Informe o nome da loja.' : undefined
   const validityError = touched ? validityDaysError(validity) : undefined
+  const cnpjProblem = cnpj && !isValidCnpj(cnpj) ? 'CNPJ inválido.' : undefined
+  const phoneProblem = phone && !isValidPhone(phone) ? 'Telefone inválido - informe DDD + número.' : undefined
+  const cnpjError = touched ? cnpjProblem : undefined
+  const phoneError = touched ? phoneProblem : undefined
 
   const submit = async () => {
     setTouched(true)
-    if (!name.trim() || validityDaysError(validity)) return
+    if (!name.trim() || validityDaysError(validity) || cnpjProblem || phoneProblem) return
     setSaving(true)
     try {
       await onSave({
@@ -69,16 +74,22 @@ export function CompanySettingsForm({ company, onSave }: CompanySettingsFormProp
         <FormRow>
           <TextField
             label="CNPJ"
-            value={cnpj}
-            onChange={(e) => setCnpj(e.target.value)}
-            slotProps={{ htmlInput: { maxLength: 40 } }}
+            value={maskCnpj(cnpj)}
+            onChange={(e) => setCnpj(maskCnpj(e.target.value))}
+            placeholder="00.000.000/0000-00"
+            error={!!cnpjError}
+            helperText={cnpjError}
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             fullWidth
           />
           <TextField
             label="Telefone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            slotProps={{ htmlInput: { maxLength: 40 } }}
+            value={maskPhone(phone)}
+            onChange={(e) => setPhone(maskPhone(e.target.value))}
+            placeholder="(00) 00000-0000"
+            error={!!phoneError}
+            helperText={phoneError}
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             fullWidth
           />
         </FormRow>
@@ -93,12 +104,11 @@ export function CompanySettingsForm({ company, onSave }: CompanySettingsFormProp
           <TextField
             label="Validade padrão do Orçamento (dias)"
             required
-            type="number"
             value={validity}
-            onChange={(e) => setValidity(e.target.value)}
+            onChange={(e) => setValidity(sanitizeInteger(e.target.value))}
             error={!!validityError}
             helperText={validityError ?? 'De 1 a 90 dias.'}
-            slotProps={{ htmlInput: { inputMode: 'numeric', min: 1, max: 90, step: 1 } }}
+            slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             fullWidth
           />
         </FormRow>

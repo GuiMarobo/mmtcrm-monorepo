@@ -8,7 +8,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, maskPhone } from '../../utils/format'
 import { FormDialog } from '../common/FormDialog'
 import { NegotiationItemsEditor } from './NegotiationItemsEditor'
 import { NegotiationQuotationsTab } from './NegotiationQuotationsTab'
@@ -89,6 +89,9 @@ export function NegotiationFormModal({
   const knownWithoutIssued = !quotationsError && !!quotations && quotations.length === 0
   const quotationsTabDisabled = !!issueBlockedReason && knownWithoutIssued
   const [clientId, setClientId] = useState(negotiation?.clientId ?? '')
+  const clientOptions = clients.filter(
+    (c) => c.anonymizedAt === null || c.id === negotiation?.clientId,
+  )
   const savedItems: NegotiationItemFormValue[] = negotiation
     ? negotiation.items.map((item) => ({
         productId: item.product.id,
@@ -245,11 +248,23 @@ export function NegotiationFormModal({
           {error && <Alert severity="error">{error}</Alert>}
 
           <Autocomplete
-            options={clients}
+            options={clientOptions}
             getOptionLabel={(c) => c.name}
             value={clients.find((c) => c.id === clientId) ?? null}
             onChange={(_, option) => setClientId(option?.id ?? '')}
             isOptionEqualToValue={(o, v) => o.id === v.id}
+            renderOption={({ key: _key, ...props }, option) => (
+              <Box component="li" {...props} key={option.id}>
+                <Box sx={{ display: 'grid' }}>
+                  <span>{option.name}</span>
+                  {option.phone && (
+                    <Box component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>
+                      {maskPhone(option.phone)}
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            )}
             noOptionsText="Nenhum cliente encontrado"
             fullWidth
             renderInput={(params) => (

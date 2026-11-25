@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
+import { sanitizeInteger } from '../../utils/format'
 import { isPositiveInteger } from '../../utils/validators'
 import type {
   CreateStockMovementPayload,
@@ -18,8 +19,15 @@ import { STOCK_MOVEMENT_TYPE_OPTIONS } from '../../types'
 
 const INVALID_QUANTITY = 'A quantidade deve ser um número inteiro maior que zero.'
 
-function quantityError(value: string): string | undefined {
-  return isPositiveInteger(value) ? undefined : INVALID_QUANTITY
+function quantityError(
+  value: string,
+  type: StockMovementType,
+  stock: number,
+): string | undefined {
+  if (!isPositiveInteger(value)) return INVALID_QUANTITY
+  return type === 'SAIDA' && Number(value) > stock
+    ? `Saída maior que o saldo atual (${stock}).`
+    : undefined
 }
 
 interface StockMovementModalProps {
@@ -41,11 +49,11 @@ export function StockMovementModal({
   const [touched, setTouched] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const error = touched ? quantityError(quantity) : undefined
+  const error = touched ? quantityError(quantity, type, product.stock) : undefined
 
   const submit = async () => {
     setTouched(true)
-    if (quantityError(quantity)) return
+    if (quantityError(quantity, type, product.stock)) return
     const payload: CreateStockMovementPayload = {
       type,
       quantity: Number(quantity),
@@ -108,13 +116,12 @@ export function StockMovementModal({
         <TextField
           label="Quantidade"
           required
-          type="number"
           value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
+          onChange={(e) => setQuantity(sanitizeInteger(e.target.value))}
           onBlur={() => setTouched(true)}
           error={!!error}
           helperText={error ?? ' '}
-          slotProps={{ htmlInput: { inputMode: 'numeric', min: 1, step: 1 } }}
+          slotProps={{ htmlInput: { inputMode: 'numeric' } }}
           fullWidth
         />
 

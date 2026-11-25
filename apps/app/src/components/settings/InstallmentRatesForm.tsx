@@ -6,6 +6,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { SectionCard, SectionToolbar } from '../common/SectionCard'
+import { parseDecimal, sanitizeDecimal } from '../../utils/format'
 import { ratePercentError } from '../../utils/validators'
 import type { InstallmentRate, ReplaceInstallmentRatesPayload } from '../../types'
 
@@ -15,7 +16,7 @@ interface InstallmentRatesFormProps {
 }
 
 export function InstallmentRatesForm({ rates, onSave }: InstallmentRatesFormProps) {
-  const [values, setValues] = useState(() => rates.map((rate) => String(rate.ratePercent)))
+  const [values, setValues] = useState(() => rates.map((rate) => String(rate.ratePercent).replace('.', ',')))
   const [touched, setTouched] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -29,7 +30,7 @@ export function InstallmentRatesForm({ rates, onSave }: InstallmentRatesFormProp
       await onSave({
         rates: rates.map((rate, index) => ({
           installments: rate.installments,
-          ratePercent: Number(values[index]),
+          ratePercent: parseDecimal(values[index]),
         })),
       })
     } finally {
@@ -61,15 +62,15 @@ export function InstallmentRatesForm({ rates, onSave }: InstallmentRatesFormProp
             <TextField
               key={rate.installments}
               label={`${rate.installments}x`}
-              type="number"
               value={values[index]}
-              onChange={(e) =>
-                setValues((prev) => prev.map((v, i) => (i === index ? e.target.value : v)))
-              }
+              onChange={(e) => {
+                const next = sanitizeDecimal(e.target.value)
+                setValues((prev) => prev.map((v, i) => (i === index ? next : v)))
+              }}
               error={!!errors[index]}
               helperText={errors[index]}
               slotProps={{
-                htmlInput: { inputMode: 'decimal', min: 0, max: 100, step: '0.01' },
+                htmlInput: { inputMode: 'decimal' },
                 input: { endAdornment: <InputAdornment position="end">%</InputAdornment> },
               }}
               fullWidth

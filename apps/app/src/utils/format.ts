@@ -37,14 +37,6 @@ export function formatRelativeTime(iso: string | null | undefined, now: Date = n
   return relativeTimeFormat.format(-Math.trunc(elapsed / size), unit)
 }
 
-export function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return ''
-  const first = words[0][0]
-  const last = words.length > 1 ? words[words.length - 1][0] : ''
-  return (first + last).toUpperCase()
-}
-
 export function formatIsoDate(isoDate: string): string {
   const [year, month, day] = isoDate.split('-')
   return `${day}/${month}/${year}`
@@ -66,6 +58,32 @@ export function onlyDigits(value: string | null | undefined): string {
   return (value ?? '').replace(/\D/g, '')
 }
 
+export const MAX_MONEY = 9_999_999_999.99
+
+export const MAX_INTEGER = 2_147_483_647
+
+export function parseCurrencyInput(raw: string): number | null {
+  const digits = onlyDigits(raw).replace(/^0+/, '')
+  return digits ? Number(digits) / 100 : null
+}
+
+export function sanitizeInteger(raw: string): string {
+  return onlyDigits(raw).replace(/^0+(?=\d)/, '').slice(0, 10)
+}
+
+export function sanitizeDecimal(raw: string, decimals = 2): string {
+  const cleaned = raw.replace(/[^\d.,]/g, '').replace(/^0+(?=\d)/, '')
+  const separator = cleaned.search(/[.,]/)
+  if (separator === -1) return cleaned
+  const integer = cleaned.slice(0, separator)
+  const fraction = onlyDigits(cleaned.slice(separator + 1)).slice(0, decimals)
+  return `${integer}${cleaned[separator]}${fraction}`
+}
+
+export function parseDecimal(raw: string): number {
+  return raw.trim() ? Number(raw.replace(',', '.')) : Number.NaN
+}
+
 export function maskPhone(value: string | null | undefined): string {
   const d = onlyDigits(value).slice(0, 11)
   if (d.length === 0) return ''
@@ -73,6 +91,17 @@ export function maskPhone(value: string | null | undefined): string {
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`
   if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`
+}
+
+export function maskCnpj(value: string | null | undefined): string {
+  const d = onlyDigits(value).slice(0, 14)
+  if (d.length === 0) return ''
+  let out = d.slice(0, 2)
+  if (d.length > 2) out += '.' + d.slice(2, 5)
+  if (d.length > 5) out += '.' + d.slice(5, 8)
+  if (d.length > 8) out += '/' + d.slice(8, 12)
+  if (d.length > 12) out += '-' + d.slice(12, 14)
+  return out
 }
 
 export function maskCpf(value: string | null | undefined): string {

@@ -118,7 +118,7 @@ describe('OrdersGrid', () => {
 
     await userEvent.click(tab(/Todos/))
     expect(screen.getByRole('columnheader', { name: 'Situação' })).toBeInTheDocument()
-    expect(screen.getByText('Desistência', { selector: '.MuiChip-label' })).toBeInTheDocument()
+    expect(within(screen.getByRole('grid')).getByText('Desistência')).toBeInTheDocument()
   })
 
   it('cada aba vazia tem a sua mensagem', async () => {
@@ -174,11 +174,11 @@ describe('OrdersGrid', () => {
       vi.useRealTimers()
     })
 
-    it('Cliente mostra avatar com iniciais, o nome e o vendedor embaixo; Vendedor e Forma de pagamento não são mais colunas', () => {
+    it('Cliente mostra o nome e o vendedor embaixo, sem avatar; Vendedor e Forma de pagamento não são mais colunas', () => {
       renderGrid({ rows: [order({ code: 'PED-0001' })] })
 
       const row = rowOf('PED-0001')
-      expect(within(row).getByText('MS')).toBeInTheDocument()
+      expect(within(row).queryByText('MS')).not.toBeInTheDocument()
       expect(within(row).getByText('Maria Souza')).toBeInTheDocument()
       expect(within(row).getByText('Vendedor: João Vendedor')).toBeInTheDocument()
       expect(within(row).queryByText('Anonimizado')).not.toBeInTheDocument()
@@ -204,7 +204,6 @@ describe('OrdersGrid', () => {
       })
 
       const row = rowOf('PED-0001')
-      expect(within(row).getByText('TR')).toBeInTheDocument()
       expect(within(row).getByText('Anonimizado')).toBeInTheDocument()
     })
 

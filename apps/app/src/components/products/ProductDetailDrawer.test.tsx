@@ -45,12 +45,6 @@ const setup = (props: Partial<Parameters<typeof ProductDetailDrawer>[0]> = {}) =
   )
 
 describe('ProductDetailDrawer', () => {
-  it('abre com o avatar da categoria em destaque no topo', () => {
-    setup({ product: product({ category: 'AUDIO' }) })
-
-    expect(screen.getByLabelText('Áudio')).toHaveStyle({ width: '64px', height: '64px' })
-  })
-
   it('mostra todos os dados do Produto, inclusive a descrição completa (UC6 §2.3)', () => {
     setup()
 

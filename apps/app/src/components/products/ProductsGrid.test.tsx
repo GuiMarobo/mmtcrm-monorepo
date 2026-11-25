@@ -303,13 +303,12 @@ describe('ProductsGrid', () => {
   })
 
   describe('leitura da linha', () => {
-    it('Produto mostra o avatar da categoria, o nome e a categoria embaixo', () => {
+    it('Produto mostra o nome e a categoria embaixo, sem avatar', () => {
       renderGrid()
 
       const row = rowOf('iPhone 15 Pro')
-      expect(within(row).getByTestId('PhoneIphoneIcon')).toBeInTheDocument()
       expect(within(row).getByText('iPhone')).toBeInTheDocument()
-      expect(within(rowOf('AirPods Pro')).getByTestId('HeadphonesIcon')).toBeInTheDocument()
+      expect(within(row).queryByTestId('PhoneIphoneIcon')).not.toBeInTheDocument()
       expect(within(rowOf('AirPods Pro')).getByText('Áudio')).toBeInTheDocument()
     })
 

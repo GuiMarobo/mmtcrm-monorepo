@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProductPriceModal } from './ProductPriceModal'
 import { ApiError } from '../../api'
+import { formatCurrency } from '../../utils/format'
 import type { Product } from '../../types'
 
 const product = (overrides: Partial<Product> = {}): Product => ({
@@ -35,9 +36,10 @@ describe('ProductPriceModal (RP4)', () => {
     const { onSave } = setup()
 
     const price = screen.getByLabelText(/Novo preço/)
-    expect(price).toHaveValue(7999.9)
+    expect(price).toHaveValue(formatCurrency(7999.9))
     await user.clear(price)
-    await user.type(price, '8499.5')
+    await user.type(price, '849950')
+    expect(price).toHaveValue(formatCurrency(8499.5))
     await user.click(screen.getByRole('button', { name: 'Atualizar preço' }))
 
     expect(onSave).toHaveBeenCalledWith({ price: 8499.5 })
@@ -50,7 +52,7 @@ describe('ProductPriceModal (RP4)', () => {
   })
 
   it.each([
-    ['-1', 'O preço não pode ser negativo.'],
+    ['-abc', 'Informe o preço de venda.'],
     ['', 'Informe o preço de venda.'],
   ])('não envia o preço %p', async (value, message) => {
     const user = userEvent.setup()

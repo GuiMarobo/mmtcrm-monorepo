@@ -320,7 +320,7 @@ describe('NegotiationFormModal — desconto do item (ticket 08)', () => {
     )
 
     expect(screen.getByRole('button', { name: '%' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText('Desconto')).toHaveValue(10)
+    expect(screen.getByLabelText('Desconto')).toHaveValue('10')
     expect(screen.getAllByText(/R\$\s*180,00/)).toHaveLength(2)
 
     await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
@@ -380,7 +380,7 @@ describe('NegotiationFormModal — item de Produto descontinuado ou excluído (R
     expect(screen.getByText('iPhone 15 Pro')).toBeInTheDocument()
     expect(screen.getByText('Excluído do catálogo')).toBeInTheDocument()
     expect(screen.getByLabelText('Qtd.')).toBeDisabled()
-    expect(screen.getByLabelText('Qtd.')).toHaveValue(2)
+    expect(screen.getByLabelText('Qtd.')).toHaveValue('2')
     expect(screen.getByLabelText('Remover iPhone 15 Pro')).toBeEnabled()
     expect(screen.getAllByText(/R\$\s*200,00/)).toHaveLength(2)
   })
@@ -616,5 +616,41 @@ describe('NegotiationFormModal — aba Troca (spec 007, ticket 01)', () => {
     )
 
     expect(screen.queryByRole('tab', { name: 'Troca' })).not.toBeInTheDocument()
+  })
+})
+
+describe('NegotiationFormModal — busca de cliente', () => {
+  const anonymized = (id: string) =>
+    client({ id, name: 'Titular removido', anonymizedAt: '2026-10-01T00:00:00Z' })
+
+  const renderNew = () =>
+    render(
+      <NegotiationFormModal
+        isAdmin={false}
+        negotiation={null}
+        clients={[anonymized('a1'), anonymized('a2'), client({ id: 'c2', name: 'Maria Souza' })]}
+        products={[product()]}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+  it('a busca devolve só quem casa com o texto digitado', async () => {
+    const user = userEvent.setup()
+    renderNew()
+
+    await user.type(screen.getByRole('combobox', { name: /Cliente/ }), 'Maria')
+
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Maria Souza'])
+  })
+
+  it('cliente anonimizado (LGPD) não aparece como opção, nem com a busca vazia', async () => {
+    const user = userEvent.setup()
+    renderNew()
+
+    await user.click(screen.getByRole('combobox', { name: /Cliente/ }))
+
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Maria Souza'])
   })
 })

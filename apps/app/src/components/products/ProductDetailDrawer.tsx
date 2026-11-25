@@ -17,7 +17,6 @@ import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
-import { CategoryAvatar } from './CategoryAvatar'
 import { ProductStatusBadge } from './ProductStatusBadge'
 import { DetailField, DetailSection } from '../common/DetailSection'
 import { MOVEMENT_TONE } from './movementTone'
@@ -143,7 +142,6 @@ export function ProductDetailDrawer({
           borderColor: 'divider',
         }}
       >
-        <CategoryAvatar category={product.category} size={64} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontSize: 16, fontWeight: 700, overflowWrap: 'anywhere' }}>
             {product.name}

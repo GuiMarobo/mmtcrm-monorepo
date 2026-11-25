@@ -56,7 +56,7 @@ describe('StockMovementModal', () => {
     expect(onSave).toHaveBeenCalledWith({ type: 'ENTRADA', quantity: 5 })
   })
 
-  it.each(['0', '-3', '1.5'])(
+  it.each(['0', '-', 'abc'])(
     'não envia quantidade %s: precisa ser inteiro maior que zero',
     async (quantity) => {
       const user = userEvent.setup()
@@ -72,6 +72,30 @@ describe('StockMovementModal', () => {
     },
   )
 
+  it.each([
+    ['-3', '3'],
+    ['1.5', '15'],
+    ['2e1', '21'],
+  ])('o campo descarta sinal, ponto e letra: %s vira %s', async (typed, kept) => {
+    const user = userEvent.setup()
+    setup()
+
+    await user.type(screen.getByLabelText(/Quantidade/), typed)
+    expect(screen.getByLabelText(/Quantidade/)).toHaveValue(kept)
+  })
+
+  it('não envia saída maior que o saldo atual', async () => {
+    const user = userEvent.setup()
+    const { onSave } = setup()
+
+    await user.click(screen.getByRole('button', { name: 'Saída' }))
+    await user.type(screen.getByLabelText(/Quantidade/), '3')
+    await user.click(screen.getByRole('button', { name: 'Registrar movimento' }))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByText('Saída maior que o saldo atual (2).')).toBeInTheDocument()
+  })
+
   it('mostra o erro do backend e mantém o diálogo aberto quando a saída é recusada', async () => {
     const user = userEvent.setup()
     const { onSave, onError, onClose } = setup({
@@ -83,7 +107,7 @@ describe('StockMovementModal', () => {
     })
 
     await user.click(screen.getByRole('button', { name: 'Saída' }))
-    await user.type(screen.getByLabelText(/Quantidade/), '3')
+    await user.type(screen.getByLabelText(/Quantidade/), '2')
     await user.click(screen.getByRole('button', { name: 'Registrar movimento' }))
 
     expect(onSave).toHaveBeenCalled()

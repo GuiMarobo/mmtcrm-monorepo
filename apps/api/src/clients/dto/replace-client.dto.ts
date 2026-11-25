@@ -4,8 +4,15 @@ import {
   IsEmail,
   IsOptional,
   IsEnum,
-  Matches,
+  MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsBrazilianPhone,
+  IsCpf,
+  IsPersonName,
+  toDigits,
+} from '../../common/br-validators';
 import {
   ClientStatusEnum,
   LeadQualificationEnum,
@@ -15,11 +22,13 @@ import {
 export class ReplaceClientDto {
   @IsString()
   @IsNotEmpty()
-  @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
+  @IsPersonName()
+  @MaxLength(200)
   name!: string;
 
   @IsString()
   @IsNotEmpty()
+  @IsBrazilianPhone()
   phone!: string;
 
   @IsEnum(LeadOriginEnum)
@@ -32,18 +41,23 @@ export class ReplaceClientDto {
   qualification!: LeadQualificationEnum;
 
   @IsEmail()
+  @MaxLength(254)
   @IsOptional()
   email?: string;
 
+  @Transform(toDigits)
   @IsString()
   @IsOptional()
+  @IsCpf()
   cpf?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(300)
   address?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(2000)
   notes?: string;
 }

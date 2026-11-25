@@ -16,7 +16,6 @@ import { useTheme } from '@mui/material/styles'
 import { DataGridPremium } from '@mui/x-data-grid-premium'
 import type { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid-premium'
 import { useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
-import { CategoryAvatar } from './CategoryAvatar'
 import { ProductStatusBadge } from './ProductStatusBadge'
 import {
   INITIAL_PRODUCTS_TAB,
@@ -78,15 +77,12 @@ function selectedIn(rows: Product[], model: GridRowSelectionModel): Product[] {
 
 function ProductCell({ product }: { product: Product }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-      <CategoryAvatar category={product.category} />
-      <Box sx={{ display: 'grid', gap: 0.25, minWidth: 0 }}>
-        <Box component="span" data-testid="product-name" sx={{ fontWeight: 600 }}>
-          {product.name}
-        </Box>
-        <Box component="span" sx={{ color: 'text.disabled', typography: 'caption' }}>
-          {PRODUCT_CATEGORY_LABELS[product.category]}
-        </Box>
+    <Box sx={{ display: 'grid', gap: 0.25, minWidth: 0 }}>
+      <Box component="span" data-testid="product-name" sx={{ fontWeight: 600 }}>
+        {product.name}
+      </Box>
+      <Box component="span" sx={{ color: 'text.disabled', typography: 'caption' }}>
+        {PRODUCT_CATEGORY_LABELS[product.category]}
       </Box>
     </Box>
   )

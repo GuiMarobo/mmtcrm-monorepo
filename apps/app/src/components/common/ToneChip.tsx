@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box'
-import Chip from '@mui/material/Chip'
 import type { ReactNode } from 'react'
 import { TONES } from '../../theme/tones'
 import type { BadgeTone } from '../../theme/tones'
@@ -11,21 +10,30 @@ interface ToneChipProps {
 }
 
 export function ToneChip({ tone, dot = false, children }: ToneChipProps) {
-  const { color, bg } = TONES[tone]
+  const { color } = TONES[tone]
 
   return (
-    <Chip
-      size="small"
-      label={children}
-      icon={
-        dot ? (
-          <Box
-            component="span"
-            sx={{ width: 6, height: 6, borderRadius: '999px', backgroundColor: color, flexShrink: 0 }}
-          />
-        ) : undefined
-      }
-      sx={{ color, backgroundColor: bg, '& .MuiChip-icon': { ml: '10px', mr: '-4px' } }}
-    />
+    <Box
+      component="span"
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        color,
+        fontSize: 12.5,
+        fontWeight: 700,
+        lineHeight: 1.4,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {dot && (
+        <Box
+          component="span"
+          aria-hidden
+          sx={{ width: 6, height: 6, borderRadius: '999px', backgroundColor: color, flexShrink: 0 }}
+        />
+      )}
+      {children}
+    </Box>
   )
 }

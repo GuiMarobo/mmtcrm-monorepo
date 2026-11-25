@@ -5,25 +5,30 @@ import {
   MinLength,
   IsEnum,
   IsOptional,
-  Matches,
+  MaxLength,
 } from 'class-validator';
+import { IsBrazilianPhone, IsPersonName } from '../../common/br-validators';
 import { RoleEnum, UserStatusEnum } from './create-user.dto';
 
 export class ReplaceUserDto {
   @IsString()
   @IsNotEmpty()
-  @Matches(/\p{L}/u, { message: 'O nome não pode conter apenas números' })
+  @IsPersonName()
+  @MaxLength(200)
   name!: string;
 
   @IsEmail()
+  @MaxLength(254)
   email!: string;
 
   @IsString()
   @MinLength(8)
+  @MaxLength(72)
   password!: string;
 
   @IsString()
   @IsOptional()
+  @IsBrazilianPhone()
   phone?: string;
 
   @IsEnum(RoleEnum)

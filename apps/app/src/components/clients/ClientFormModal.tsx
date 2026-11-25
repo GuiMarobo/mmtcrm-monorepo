@@ -9,7 +9,7 @@ import { ApiError } from '../../api'
 import { FormDialog } from '../common/FormDialog'
 import { FormRow } from '../common/FormRow'
 import { maskCpf, maskPhone, onlyDigits } from '../../utils/format'
-import { isValidCpf, isValidEmail, isValidPhone } from '../../utils/validators'
+import { isValidCpf, isValidEmail, isValidPhone, personNameError } from '../../utils/validators'
 import type {
   Client,
   ClientStatus,
@@ -74,7 +74,7 @@ const ALL_FIELDS: FieldKey[] = ['name', 'email', 'phone', 'cpf']
 function computeError(key: FieldKey, form: CreateClientPayload): string | undefined {
   switch (key) {
     case 'name':
-      return form.name.trim() ? undefined : 'Informe o nome do cliente.'
+      return personNameError(form.name, 'Informe o nome do cliente.')
     case 'phone':
       if (!form.phone) return 'Informe o telefone.'
       return isValidPhone(form.phone) ? undefined : 'Telefone inválido - informe DDD + número.'
@@ -157,6 +157,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
           placeholder="Ex.: João da Silva"
           error={!!displayError('name')}
           helperText={displayError('name') ?? ' '}
+          slotProps={{ htmlInput: { maxLength: 200 } }}
           fullWidth
         />
 
@@ -170,6 +171,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
             placeholder="cliente@email.com"
             error={!!displayError('email')}
             helperText={displayError('email') ?? ' '}
+            slotProps={{ htmlInput: { maxLength: 254 } }}
             fullWidth
           />
           <TextField
@@ -221,6 +223,7 @@ export function ClientFormModal({ client, onClose, onSave }: ClientFormModalProp
           onChange={(e) => set('address', e.target.value)}
           placeholder="Rua, nº - Bairro, Cidade/UF"
           helperText=" "
+          slotProps={{ htmlInput: { maxLength: 300 } }}
           fullWidth
         />
 

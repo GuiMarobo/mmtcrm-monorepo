@@ -3,7 +3,6 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
 import FormControlLabel from '@mui/material/FormControlLabel'
-import InputAdornment from '@mui/material/InputAdornment'
 import MenuItem from '@mui/material/MenuItem'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -14,6 +13,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useState } from 'react'
 import { ApiError } from '../../api'
+import { CurrencyField } from '../common/CurrencyField'
 import { FormDialog } from '../common/FormDialog'
 import { DetailField } from '../common/DetailSection'
 import { EvaluationStatusChip } from './EvaluationStatusChip'
@@ -53,9 +53,7 @@ export function UsedDeviceEvaluationDialog({
 }: UsedDeviceEvaluationDialogProps) {
   const readOnly = device.negotiation.status !== 'ABERTA'
   const [condition, setCondition] = useState<DeviceCondition | ''>(device.condition ?? '')
-  const [value, setValue] = useState(
-    device.estimatedValue === null ? '' : String(device.estimatedValue),
-  )
+  const [value, setValue] = useState<number | null>(device.estimatedValue)
   const [report, setReport] = useState(device.report ?? '')
   const [icloudUnlocked, setIcloudUnlocked] = useState(device.icloudUnlocked === true)
   const [submitted, setSubmitted] = useState(false)
@@ -63,7 +61,7 @@ export function UsedDeviceEvaluationDialog({
   const [error, setError] = useState<string | null>(null)
 
   const conditionProblem = condition ? undefined : 'Informe a condição.'
-  const valueProblem = Number(value) > 0 ? undefined : 'O valor deve ser maior que zero.'
+  const valueProblem = value !== null && value > 0 ? undefined : 'O valor deve ser maior que zero.'
   const reportText = report.trim()
 
   const run = async (action: () => Promise<unknown>) => {
@@ -81,11 +79,11 @@ export function UsedDeviceEvaluationDialog({
 
   const evaluate = () => {
     setSubmitted(true)
-    if (!condition || conditionProblem || valueProblem) return
+    if (!condition || conditionProblem || valueProblem || value === null) return
     void run(() =>
       onEvaluate({
         condition,
-        estimatedValue: Number(value),
+        estimatedValue: value,
         report: reportText || null,
         icloudUnlocked,
       }),
@@ -170,17 +168,12 @@ export function UsedDeviceEvaluationDialog({
                   </MenuItem>
                 ))}
               </TextField>
-              <TextField
+              <CurrencyField
                 label="Valor estimado"
-                type="number"
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
+                onChange={setValue}
                 error={submitted && !!valueProblem}
                 helperText={(submitted && valueProblem) || 'É o valor de troca.'}
-                slotProps={{
-                  input: { startAdornment: <InputAdornment position="start">R$</InputAdornment> },
-                  htmlInput: { min: 0, step: 0.01 },
-                }}
                 sx={{ flex: 1 }}
               />
             </Box>
